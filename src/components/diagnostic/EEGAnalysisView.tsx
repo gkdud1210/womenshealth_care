@@ -73,7 +73,7 @@ export function EEGAnalysisView() {
     <div className="space-y-6 animate-fade-in">
 
       {/* ── KPI Row ── */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
           {
             icon: Brain,
@@ -129,10 +129,10 @@ export function EEGAnalysisView() {
       </div>
 
       {/* ── Main row: Topo Map + Freq Spectrum ── */}
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
 
         {/* Brain Topo Map */}
-        <div className="col-span-4 glass-card p-5">
+        <div className="lg:col-span-4 glass-card p-4 sm:p-5">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h4 className="card-title">뇌파 토포그래피</h4>
@@ -169,13 +169,13 @@ export function EEGAnalysisView() {
         </div>
 
         {/* Frequency Spectrum */}
-        <div className="col-span-8 glass-card p-5">
-          <div className="flex items-center justify-between mb-4">
+        <div className="lg:col-span-8 glass-card p-4 sm:p-5">
+          <div className="flex items-start justify-between mb-4 gap-2">
             <div>
               <h4 className="card-title">EEG 주파수 스펙트럼</h4>
               <p className="text-2xs text-slate-400 mt-0.5">Power Spectral Density (PSD)</p>
             </div>
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1 justify-end">
               {[
                 { label: 'δ Delta', color: '#6366f1' },
                 { label: 'θ Theta', color: '#3b82f6' },
@@ -183,9 +183,9 @@ export function EEGAnalysisView() {
                 { label: 'β Beta',  color: '#f59e0b' },
                 { label: 'γ Gamma', color: '#ef4444' },
               ].map(({ label, color }) => (
-                <div key={label} className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 border border-slate-100">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="text-2xs text-slate-500">{label}</span>
+                <div key={label} className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-slate-50 border border-slate-100">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                  <span className="text-2xs text-slate-500 hidden sm:inline">{label}</span>
                 </div>
               ))}
             </div>
@@ -253,10 +253,10 @@ export function EEGAnalysisView() {
       </div>
 
       {/* ── Stress + ANS Charts ── */}
-      <div className="grid grid-cols-12 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 lg:gap-5">
 
         {/* Stress timeline */}
-        <div className="col-span-5 glass-card p-5">
+        <div className="sm:col-span-1 lg:col-span-5 glass-card p-4 sm:p-5">
           <h4 className="card-title mb-1">스트레스·이완 타임라인</h4>
           <p className="text-2xs text-slate-400 mb-4">베타/알파 비율 기반 실시간 추적</p>
           <ResponsiveContainer width="100%" height={160}>
@@ -298,7 +298,7 @@ export function EEGAnalysisView() {
         </div>
 
         {/* ANS Balance */}
-        <div className="col-span-4 glass-card p-5">
+        <div className="sm:col-span-1 lg:col-span-4 glass-card p-4 sm:p-5">
           <h4 className="card-title mb-1">자율신경계 균형</h4>
           <p className="text-2xs text-slate-400 mb-4">교감 vs 부교감 신경 활성도</p>
           <ResponsiveContainer width="100%" height={160}>
@@ -345,7 +345,7 @@ export function EEGAnalysisView() {
         </div>
 
         {/* Brain Coherence Radar */}
-        <div className="col-span-3 glass-card p-5">
+        <div className="sm:col-span-2 lg:col-span-3 glass-card p-4 sm:p-5">
           <h4 className="card-title mb-1">뇌 영역 코히런스</h4>
           <p className="text-2xs text-slate-400 mb-2">뇌파 동기화 분포</p>
           <ResponsiveContainer width="100%" height={180}>
@@ -396,7 +396,7 @@ export function EEGAnalysisView() {
       {/* ── AI Interpretation ── */}
       <div className="glass-card p-5 border-l-4 border-purple-400">
         <h4 className="card-title mb-3">🧠 뇌파 AI 해석</h4>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
             {
               type: 'warn' as const,

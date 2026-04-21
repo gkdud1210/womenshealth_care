@@ -65,7 +65,7 @@ export function BioSignalPanel() {
   return (
     <div className="space-y-5">
       {/* Top KPI row */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 xs:grid-cols-3 sm:grid-cols-3 gap-3">
         {[
           {
             icon: Heart,
@@ -116,7 +116,7 @@ export function BioSignalPanel() {
       </div>
 
       {/* HRV + Sleep Charts */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* HRV Trend */}
         <div className="glass-card p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -175,7 +175,7 @@ export function BioSignalPanel() {
       </div>
 
       {/* Radar + Weight */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Wellness Radar */}
         <div className="glass-card p-4">
           <p className="text-sm font-semibold text-slate-700 mb-3">웰니스 레이더</p>

@@ -74,8 +74,10 @@ export function DailyLogModal({ date, existingLog, cyclePhase, onSave, onClose }
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-slide-up">
+      {/* Modal — fullscreen on mobile, centered card on sm+ */}
+      <div className="relative w-full sm:max-w-lg bg-white sm:rounded-3xl shadow-2xl overflow-hidden animate-slide-up
+                      max-h-[100dvh] sm:max-h-[90vh] flex flex-col
+                      rounded-t-3xl fixed bottom-0 left-0 sm:static sm:bottom-auto">
         {/* Header */}
         <div className="relative px-6 pt-6 pb-4 bg-gradient-to-br from-rose-50 to-pink-50 border-b border-rose-100/60">
           <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center hover:bg-rose-50 transition-colors">
@@ -133,7 +135,7 @@ export function DailyLogModal({ date, existingLog, cyclePhase, onSave, onClose }
         </div>
 
         {/* Content */}
-        <div className="px-6 py-5 max-h-[420px] overflow-y-auto">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 flex-1 overflow-y-auto">
 
           {/* === MENSTRUAL TAB === */}
           {activeTab === 'menstrual' && (
