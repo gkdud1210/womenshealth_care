@@ -1,20 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { Microscope, Eye, Thermometer, Activity, FileText, Download, RefreshCw } from 'lucide-react'
+import { Microscope, Eye, Thermometer, Activity, FileText, Download, RefreshCw, Brain } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
 import { ThermalMapView } from '@/components/diagnostic/ThermalMapView'
 import { BioSignalPanel } from '@/components/diagnostic/BioSignalPanel'
 import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
+import { EEGAnalysisView } from '@/components/diagnostic/EEGAnalysisView'
 
-type Tab = 'iris' | 'thermal' | 'biosignal' | 'report'
+type Tab = 'iris' | 'thermal' | 'eeg' | 'biosignal' | 'report'
 
 const TABS: { id: Tab; label: string; icon: typeof Eye; badge?: string }[] = [
-  { id: 'iris', label: '홍채 분석', icon: Eye },
-  { id: 'thermal', label: '열화상 맵', icon: Thermometer, badge: '냉기감지' },
+  { id: 'iris',      label: '홍채 분석',   icon: Eye },
+  { id: 'thermal',   label: '열화상 맵',   icon: Thermometer, badge: '냉기감지' },
+  { id: 'eeg',       label: '뇌파 분석',   icon: Brain,       badge: 'NEW' },
   { id: 'biosignal', label: '바이오 신호', icon: Activity },
-  { id: 'report', label: '종합 리포트', icon: FileText },
+  { id: 'report',    label: '종합 리포트', icon: FileText },
 ]
 
 const SCAN_META = {
@@ -218,6 +220,12 @@ export default function DiagnosticPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'eeg' && (
+        <div className="animate-fade-in">
+          <EEGAnalysisView />
         </div>
       )}
 
