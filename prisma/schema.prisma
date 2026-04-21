@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  birthDate     DateTime?
+  averageCycleLength Int @default(28)
+  averagePeriodLength Int @default(5)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dailyLogs     DailyLog[]
+  cycleLogs     CycleLog[]
+  irisScans     IrisScan[]
+  thermalScans  ThermalScan[]
+  programs      ProgramEnrollment[]
+}
+
+model DailyLog {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime @db.Date
+
+  // Menstrual
+  isPeriod        Boolean  @default(false)
+  periodFlow      FlowLevel?
+
+  // Symptoms
+  painIntensity   Int?     // 1-10
+  painLocations   String[] // ["lower_abdomen", "back", "head"]
+
+  // Mood
+  mood            MoodType?
+  moodNotes       String?
+
+  // Skin
+  skinCondition   SkinCondition?
+  acneCount       Int?
+
+  // Discharge
+  dischargeType   DischargeType?
+  dischargeColor  String?
+
+  // Vitals (from IoT)
+  bodyTemperature Float?
+  heartRate       Int?
+  hrv             Float?  // Heart Rate Variability
+  sleepHours      Float?
+  sleepQuality    Int?    // 1-10
+
+  // BMI
+  weight          Float?  // kg
+
+  // Computed
+  bodyScore       Float?  // 0-100
+  cyclePhase      CyclePhase?
+
+  // Notes
+  notes           String?
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+model CycleLog {
+  id            String   @id @default(cuid())
+  userId        String
+  startDate     DateTime @db.Date
+  endDate       DateTime? @db.Date
+  cycleLength   Int?
+  periodLength  Int?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, startDate])
+}
+
+model IrisScan {
+  id            String   @id @default(cuid())
+  userId        String
+  scanDate      DateTime
+  cyclePhase    CyclePhase
+
+  // Iris analysis data
+  leftIrisData  Json?    // density map, tissue analysis
+  rightIrisData Json?
+  overallScore  Float?
+  findings      String[]
+
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, scanDate])
+}
+
+model ThermalScan {
+  id              String   @id @default(cuid())
+  userId          String
+  scanDate        DateTime
+  cyclePhase      CyclePhase
+
+  // Thermal data (320x240 map)
+  thermalMatrix   Json?    // 320x240 temperature array
+  minTemp         Float?
+  maxTemp         Float?
+  avgTemp         Float?
+  uterusAreaTemp  Float?
+  coldSpots       Json?    // detected cold regions
+  hotSpots        Json?    // detected hot regions
+
+  findings        String[]
+  recommendation  String?
+
+  createdAt       DateTime @default(now())
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, scanDate])
+}
+
+model ProgramEnrollment {
+  id            String   @id @default(cuid())
+  userId        String
+  programType   ProgramType
+  startDate     DateTime
+  endDate       DateTime
+  isActive      Boolean  @default(true)
+  checkpoints   Json[]   // scheduled scan dates and phases
+  progress      Int      @default(0) // 0-100
+  reports       Json[]   // generated quarterly reports
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum FlowLevel {
+  SPOTTING
+  LIGHT
+  MEDIUM
+  HEAVY
+  VERY_HEAVY
+}
+
+enum MoodType {
+  HAPPY
+  CALM
+  TIRED
+  ANXIOUS
+  IRRITABLE
+  SAD
+  ENERGETIC
+  SENSITIVE
+}
+
+enum SkinCondition {
+  CLEAR
+  SLIGHTLY_OILY
+  OILY
+  DRY
+  BREAKOUT_MILD
+  BREAKOUT_SEVERE
+  SENSITIVE
+}
+
+enum DischargeType {
+  NONE
+  WHITE_CREAMY
+  CLEAR_WATERY
+  EGG_WHITE
+  YELLOW
+  BROWN
+  UNUSUAL
+}
+
+enum CyclePhase {
+  MENSTRUAL
+  FOLLICULAR
+  OVULATION
+  LUTEAL
+}
+
+enum ProgramType {
+  THREE_MONTH_DEEP_DIVE
+  FERTILITY_TRACKING
+  MENOPAUSE_MANAGEMENT
+  PCOS_MONITORING
+}
