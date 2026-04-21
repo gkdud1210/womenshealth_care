@@ -4,10 +4,10 @@ import { useState, useCallback, useMemo } from 'react'
 import { CalendarHeart, Sparkles, TrendingUp, Droplets } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
 import { LudiaInsightCard } from '@/components/calendar/LudiaInsightCard'
-import { MultimodalDataPanel, DEFAULT_MULTIMODAL } from '@/components/calendar/MultimodalDataPanel'
-import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
+import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
 import type { DailyLogFormData } from '@/types/health'
 import { getCyclePhase } from '@/lib/cycle-utils'
+import { useMultimodalData } from '@/hooks/useMultimodalData'
 
 const MOCK_LAST_PERIOD = new Date(2026, 3, 8)   // April 8 2026
 const CYCLE_LENGTH     = 28
@@ -32,7 +32,7 @@ function computeCycleDay(lastPeriodStart: Date, today: Date, cycleLength: number
 
 export default function CalendarPage() {
   const [logs, setLogs] = useState<Record<string, DailyLogFormData>>(MOCK_LOGS)
-  const [multimodalData, setMultimodalData] = useState<MultimodalData>(DEFAULT_MULTIMODAL)
+  const { data: multimodalData, setData: setMultimodalData } = useMultimodalData()
 
   const today      = useMemo(() => new Date(), [])
   const cycleDay   = useMemo(() => computeCycleDay(MOCK_LAST_PERIOD, today, CYCLE_LENGTH), [today])
