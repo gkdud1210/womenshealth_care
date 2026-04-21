@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Microscope, Eye, Thermometer, Activity, FileText, Download, RefreshCw, Brain } from 'lucide-react'
+import Link from 'next/link'
+import { Microscope, Eye, Thermometer, Activity, FileText, Download, RefreshCw, Brain, Scan } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
 import { ThermalMapView } from '@/components/diagnostic/ThermalMapView'
@@ -49,9 +50,14 @@ export default function DiagnosticPage() {
           </div>
         </div>
         <div className="flex gap-2">
+          <Link href="/diagnostic/scan"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium btn-primary">
+            <Scan className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">새 진단 시작</span>
+          </Link>
           <button onClick={handleSimulateScan} disabled={isScanning}
             className={cn('flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all',
-              isScanning ? 'bg-rose-100 text-rose-400 cursor-wait' : 'btn-primary')}>
+              isScanning ? 'bg-rose-100 text-rose-400 cursor-wait' : 'btn-ghost')}>
             <RefreshCw className={cn('w-3.5 h-3.5', isScanning && 'animate-spin')} />
             <span className="hidden sm:inline">{isScanning ? '스캔 중...' : '새 스캔'}</span>
           </button>
