@@ -1,19 +1,32 @@
 'use client'
 
+import { useMemo } from 'react'
 import {
-  Activity, Droplets, TrendingUp, Sparkles, Heart,
+  Activity, Droplets, Sparkles, Heart,
   CalendarHeart, Microscope, ChevronRight, Zap, Moon, Scale
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
-import type { CyclePhase } from '@/types/health'
+import { getPhaseLabel, getPhaseColor, getCyclePhase } from '@/lib/cycle-utils'
+import { LudiaInsightCard } from '@/components/calendar/LudiaInsightCard'
+import { useMultimodalData } from '@/hooks/useMultimodalData'
 
-const TODAY_PHASE: CyclePhase = 'luteal'
-const CYCLE_DAY = 14
-const BODY_SCORE = 75
+const MOCK_LAST_PERIOD = new Date(2026, 3, 8)
+const CYCLE_LENGTH = 28
+const PERIOD_LENGTH = 5
+
+function computeCycleDay(from: Date, to: Date, len: number) {
+  return (Math.floor((to.getTime() - from.getTime()) / 86400000) % len) + 1
+}
 
 export default function DashboardPage() {
+  const { data, ready } = useMultimodalData()
+  const today    = useMemo(() => new Date(), [])
+  const cycleDay = useMemo(() => computeCycleDay(MOCK_LAST_PERIOD, today, CYCLE_LENGTH), [today])
+  const phase    = useMemo(() => getCyclePhase(cycleDay, CYCLE_LENGTH, PERIOD_LENGTH), [cycleDay])
+
+  if (!ready) return null
+
   return (
     <div className="min-h-screen p-4 sm:p-6 lg:p-8">
 
@@ -25,52 +38,30 @@ export default function DashboardPage() {
 
       <div className="space-y-4">
 
-        {/* Body Score + Vitals — stack on mobile, side by side on lg */}
+        {/* LUDIA AI Insight */}
+        <LudiaInsightCard phase={phase} cycleDay={cycleDay} data={data} />
+
+        {/* Vitals + Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-          {/* Body Score Hero */}
-          <div className="lg:col-span-5 glass-card p-5 sm:p-7 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-gradient-to-br from-rose-100/60 to-pink-100/40 -translate-y-10 translate-x-10" />
-            <div className="absolute bottom-0 left-0 w-28 h-28 rounded-full bg-gradient-to-tr from-gold-100/40 to-transparent -translate-x-6 translate-y-6" />
-            <div className="relative z-10">
-              <p className="label-caps mb-3">오늘의 바디 스코어</p>
-              <div className="flex items-end gap-4 mb-4">
-                <span className="font-display text-6xl sm:text-7xl font-bold text-rose-500 leading-none">{BODY_SCORE}</span>
-                <div className="mb-1">
-                  <div className="flex items-center gap-1.5 text-green-500 text-sm font-medium">
-                    <TrendingUp className="w-4 h-4" />
-                    <span>+5 from yesterday</span>
-                  </div>
-                  <span className="text-slate-400 text-xs">양호</span>
-                </div>
-              </div>
-              <div className="progress-bar mb-4">
-                <div className="progress-fill" style={{ width: `${BODY_SCORE}%` }} />
-              </div>
-              <div className="flex items-center gap-3 p-3 bg-white/60 rounded-2xl">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: getPhaseColor(TODAY_PHASE) + '20' }}>
-                  <Droplets className="w-5 h-5" style={{ color: getPhaseColor(TODAY_PHASE) }} />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">현재 주기</p>
-                  <p className="font-semibold text-slate-700 text-sm">
-                    D+{CYCLE_DAY} · <span style={{ color: getPhaseColor(TODAY_PHASE) }}>{getPhaseLabel(TODAY_PHASE)}</span>
-                  </p>
-                </div>
+          {/* Vitals */}
+          <div className="lg:col-span-5 glass-card p-4 sm:p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="card-title">오늘의 바이탈</h3>
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-full"
+                style={{ background: getPhaseColor(phase) + '18', border: `1px solid ${getPhaseColor(phase)}35` }}>
+                <Droplets className="w-3 h-3" style={{ color: getPhaseColor(phase) }} />
+                <span className="text-xs font-semibold" style={{ color: getPhaseColor(phase) }}>
+                  D+{cycleDay} · {getPhaseLabel(phase)}
+                </span>
               </div>
             </div>
-          </div>
-
-          {/* Quick Vitals */}
-          <div className="lg:col-span-4 glass-card p-4 sm:p-5">
-            <h3 className="card-title mb-4">오늘의 바이탈</h3>
             <div className="space-y-2.5">
               {[
-                { icon: Heart,    label: '심박수', value: '72', unit: 'bpm',  color: 'text-rose-500',   bg: 'bg-rose-50' },
-                { icon: Moon,     label: '수면',   value: '7.5', unit: '시간', color: 'text-indigo-500', bg: 'bg-indigo-50' },
-                { icon: Activity, label: 'HRV',   value: '42', unit: 'ms',   color: 'text-green-500',  bg: 'bg-green-50' },
-                { icon: Scale,    label: '체중',   value: '58.2', unit: 'kg', color: 'text-amber-500',  bg: 'bg-amber-50' },
+                { icon: Heart,    label: '심박수', value: '72',   unit: 'bpm',  color: 'text-rose-500',   bg: 'bg-rose-50' },
+                { icon: Moon,     label: '수면',   value: '7.5',  unit: '시간', color: 'text-indigo-500', bg: 'bg-indigo-50' },
+                { icon: Activity, label: 'HRV',   value: '42',   unit: 'ms',   color: 'text-green-500',  bg: 'bg-green-50' },
+                { icon: Scale,    label: '체중',   value: '58.2', unit: 'kg',   color: 'text-amber-500',  bg: 'bg-amber-50' },
               ].map(({ icon: Icon, label, value, unit, color, bg }) => (
                 <div key={label} className="stat-row">
                   <div className={cn('icon-badge-sm', bg)}>
@@ -84,6 +75,24 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* AI 인사이트 */}
+          <div className="lg:col-span-4 glass-card p-4 sm:p-5">
+            <h3 className="card-title mb-3">AI 인사이트</h3>
+            <div className="space-y-2.5">
+              {[
+                { icon: Zap,   text: '황체기로 접어들며 에너지가 감소할 수 있어요. 마그네슘 보충을 추천해요.', color: 'text-amber-500', bg: 'bg-amber-50' },
+                { icon: Heart, text: 'HRV가 정상 범위입니다. 스트레스 수준이 양호해요.',                      color: 'text-green-500', bg: 'bg-green-50' },
+              ].map(({ icon: Icon, text, color, bg }, i) => (
+                <div key={i} className="flex gap-2.5 p-3 rounded-xl bg-slate-50/50">
+                  <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5', bg)}>
+                    <Icon className={cn('w-3 h-3', color)} />
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">{text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Quick Actions */}
           <div className="lg:col-span-3 glass-card p-4">
             <p className="label-caps mb-3">빠른 실행</p>
@@ -91,7 +100,7 @@ export default function DashboardPage() {
               {[
                 { href: '/calendar',   icon: CalendarHeart, label: '오늘 건강 기록', color: 'icon-badge-brand' },
                 { href: '/diagnostic', icon: Microscope,    label: '진단 분석',     color: 'bg-purple-500' },
-                { href: '/consultant', icon: Sparkles,      label: 'AI 상담',       color: 'bg-amber-400' },
+                { href: '/consultant', icon: Sparkles,      label: 'LUDIA 상담',    color: 'bg-amber-400' },
               ].map(({ href, icon: Icon, label, color }) => (
                 <Link key={href} href={href}
                   className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-rose-50/50 transition-all duration-200 group">
@@ -101,54 +110,6 @@ export default function DashboardPage() {
                   <span className="text-sm text-slate-600 group-hover:text-rose-600 transition-colors">{label}</span>
                   <ChevronRight className="w-4 h-4 text-slate-300 ml-auto group-hover:text-rose-400 transition-colors" />
                 </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Cycle Progress + Insights */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-          <div className="lg:col-span-8 glass-card p-4 sm:p-5">
-            <h3 className="card-title mb-4">사이클 진행률</h3>
-            <div className="flex items-end gap-1 sm:gap-2 overflow-hidden">
-              {(['menstrual', 'follicular', 'ovulation', 'luteal'] as CyclePhase[]).map((phase) => {
-                const isActive = phase === TODAY_PHASE
-                const durations = { menstrual: 5, follicular: 9, ovulation: 3, luteal: 11 }
-                return (
-                  <div key={phase} className="relative flex-1">
-                    {isActive && (
-                      <div className="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-medium whitespace-nowrap"
-                        style={{ color: getPhaseColor(phase) }}>
-                        {getPhaseLabel(phase)} ▼
-                      </div>
-                    )}
-                    <div className={cn('h-2.5 rounded-full transition-all duration-300', isActive ? 'opacity-100' : 'opacity-35')}
-                      style={{ backgroundColor: getPhaseColor(phase) }} />
-                    <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1 text-center truncate">{getPhaseLabel(phase)}</p>
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex justify-between mt-2 text-xs text-slate-400">
-              <span>1일</span>
-              <span className="font-medium text-rose-500">D+{CYCLE_DAY}</span>
-              <span>28일</span>
-            </div>
-          </div>
-
-          <div className="lg:col-span-4 glass-card p-4 sm:p-5">
-            <h3 className="card-title mb-3">AI 인사이트</h3>
-            <div className="space-y-2.5">
-              {[
-                { icon: Zap,  text: '황체기로 접어들며 에너지가 감소할 수 있어요. 마그네슘 보충을 추천해요.', color: 'text-amber-500', bg: 'bg-amber-50' },
-                { icon: Heart, text: 'HRV가 정상 범위입니다. 스트레스 수준이 양호해요.', color: 'text-green-500', bg: 'bg-green-50' },
-              ].map(({ icon: Icon, text, color, bg }, i) => (
-                <div key={i} className="flex gap-2.5 p-3 rounded-xl bg-slate-50/50">
-                  <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5', bg)}>
-                    <Icon className={cn('w-3 h-3', color)} />
-                  </div>
-                  <p className="text-xs text-slate-600 leading-relaxed">{text}</p>
-                </div>
               ))}
             </div>
           </div>
