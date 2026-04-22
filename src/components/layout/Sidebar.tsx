@@ -13,7 +13,7 @@ const navItems = [
   { href: '/calendar',   icon: CalendarHeart,      label: '건강 캘린더' },
   { href: '/diagnostic', icon: Microscope,         label: '진단 분석' },
   { href: '/program',    icon: TrendingUp,         label: '3개월 프로그램' },
-  { href: '/consultant', icon: MessageCircleHeart, label: 'AI 상담사' },
+  { href: '/consultant', icon: MessageCircleHeart, label: 'LUDIA 건강상담' },
   { href: '/shop',       icon: ShoppingBag,        label: '맞춤 케어샵' },
 ]
 

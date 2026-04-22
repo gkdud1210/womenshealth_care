@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: '/calendar',   icon: CalendarHeart,      label: '캘린더' },
   { href: '/diagnostic', icon: Microscope,         label: '진단' },
   { href: '/program',    icon: TrendingUp,         label: '프로그램' },
-  { href: '/consultant', icon: MessageCircleHeart, label: 'AI상담' },
+  { href: '/consultant', icon: MessageCircleHeart, label: 'LUDIA상담' },
   { href: '/shop',       icon: ShoppingBag,        label: '케어샵' },
 ]
 
