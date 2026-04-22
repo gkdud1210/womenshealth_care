@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Droplets, Zap, Sparkles, Activity, Leaf, Shield, Check, Brain, Scale, Wind } from 'lucide-react'
+import { Droplets, Zap, Sparkles, Activity, Leaf, Shield, Check, Brain, Scale, Wind, Bone, Scissors } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
@@ -86,6 +86,26 @@ const CARE_CASES = [
     glow: 'rgba(6,182,212,0.3)',
     border: 'rgba(6,182,212,0.25)',
     bg: 'rgba(6,182,212,0.06)',
+  },
+  {
+    id: 'osteoporosis',
+    label: '골다공증',
+    desc: '호르몬 골밀도 변화 · 칼슘 흡수 · 운동 가이드',
+    icon: Bone,
+    gradient: 'linear-gradient(135deg, #64748b, #475569)',
+    glow: 'rgba(100,116,139,0.3)',
+    border: 'rgba(100,116,139,0.25)',
+    bg: 'rgba(100,116,139,0.06)',
+  },
+  {
+    id: 'hair_care',
+    label: '모발 관리',
+    desc: '탈모 패턴 · 두피 건강 · 주기별 영양 가이드',
+    icon: Scissors,
+    gradient: 'linear-gradient(135deg, #ec4899, #db2777)',
+    glow: 'rgba(236,72,153,0.3)',
+    border: 'rgba(236,72,153,0.25)',
+    bg: 'rgba(236,72,153,0.06)',
   },
 ]
 
