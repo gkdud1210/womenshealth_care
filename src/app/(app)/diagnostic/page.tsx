@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Microscope, Eye, Thermometer, Activity, FileText, Download, RefreshCw, Brain, Scan } from 'lucide-react'
+import { Microscope, Eye, Thermometer, Activity, FileText, Download, Brain, Scan, History, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
 import { ThermalMapView } from '@/components/diagnostic/ThermalMapView'
@@ -11,6 +11,7 @@ import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
 import { EEGAnalysisView } from '@/components/diagnostic/EEGAnalysisView'
 
 type Tab = 'iris' | 'thermal' | 'eeg' | 'biosignal' | 'report'
+type View = 'home' | 'history'
 
 const TABS: { id: Tab; label: string; icon: typeof Eye; badge?: string }[] = [
   { id: 'iris',      label: '홍채 분석',   icon: Eye },
@@ -28,47 +29,102 @@ const SCAN_META = {
 }
 
 export default function DiagnosticPage() {
+  const [view, setView]           = useState<View>('home')
   const [activeTab, setActiveTab] = useState<Tab>('iris')
-  const [isScanning, setIsScanning] = useState(false)
 
-  function handleSimulateScan() {
-    setIsScanning(true)
-    setTimeout(() => setIsScanning(false), 2200)
-  }
+  /* ── Landing: two action buttons ── */
+  if (view === 'home') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 sm:p-10">
 
-  return (
-    <div className="min-h-screen p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-5 sm:mb-8">
-        <div className="flex items-center gap-3">
-          <div className="icon-badge-lg bg-gradient-to-br from-purple-400 to-purple-600 shadow-soft">
-            <Microscope className="w-5 h-5 text-white" />
+        {/* Header */}
+        <div className="flex flex-col items-center mb-10 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+            style={{
+              background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+              boxShadow: '0 8px 32px rgba(168,85,247,0.35)',
+            }}>
+            <Microscope className="w-7 h-7 text-white" />
           </div>
-          <div>
-            <h1 className="font-display text-xl sm:text-3xl font-semibold text-slate-800">멀티모달 진단 분석</h1>
-            <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">홍채 3D + 열화상 + 뇌파 + 바이오신호 융합</p>
-          </div>
+          <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-800 mb-2">멀티모달 진단 분석</h1>
+          <p className="text-sm text-slate-400">홍채 3D · 열화상 · 뇌파 · 바이오신호 융합 분석</p>
         </div>
-        <div className="flex gap-2">
+
+        {/* Two CTA cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+
+          {/* 새 진단 시작 */}
           <Link href="/diagnostic/scan"
-            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium btn-primary">
-            <Scan className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">새 진단 시작</span>
+            className="group glass-card p-6 sm:p-8 flex flex-col items-center text-center hover-lift transition-all duration-300 cursor-pointer"
+            style={{ border: '1.5px solid rgba(244,63,117,0.2)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
+              style={{
+                background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
+                boxShadow: '0 6px 24px rgba(244,63,117,0.35)',
+              }}>
+              <Scan className="w-6 h-6 text-white" />
+            </div>
+            <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">새 진단 시작</h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              홍채 · 열화상 · 뇌파 · 바이오신호<br />4단계 전신 진단을 시작합니다
+            </p>
+            <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)' }}>
+              시작하기 →
+            </div>
           </Link>
-          <button onClick={handleSimulateScan} disabled={isScanning}
-            className={cn('flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all',
-              isScanning ? 'bg-rose-100 text-rose-400 cursor-wait' : 'btn-ghost')}>
-            <RefreshCw className={cn('w-3.5 h-3.5', isScanning && 'animate-spin')} />
-            <span className="hidden sm:inline">{isScanning ? '스캔 중...' : '새 스캔'}</span>
-          </button>
-          <button className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium btn-ghost">
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">저장</span>
+
+          {/* 과거 진단 기록 */}
+          <button onClick={() => setView('history')}
+            className="group glass-card p-6 sm:p-8 flex flex-col items-center text-center hover-lift transition-all duration-300 cursor-pointer"
+            style={{ border: '1.5px solid rgba(168,85,247,0.2)' }}>
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
+              style={{
+                background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+                boxShadow: '0 6px 24px rgba(168,85,247,0.3)',
+              }}>
+              <History className="w-6 h-6 text-white" />
+            </div>
+            <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">과거 진단 기록</h2>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              이전 진단 결과를 확인하고<br />홍채 · 열화상 · 뇌파 기록을 분석합니다
+            </p>
+            <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
+              style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }}>
+              기록 보기 →
+            </div>
           </button>
         </div>
       </div>
+    )
+  }
 
-      {/* Scan Meta Bar — scrollable on mobile */}
+  /* ── History: existing diagnostic tabs ── */
+  return (
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8">
+
+      {/* Header */}
+      <div className="flex items-start justify-between mb-5 sm:mb-8">
+        <div className="flex items-center gap-3">
+          <button onClick={() => setView('home')}
+            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-rose-50 transition-colors text-slate-400 hover:text-rose-500">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <div className="icon-badge-lg bg-gradient-to-br from-purple-400 to-purple-600 shadow-soft">
+            <History className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h1 className="font-display text-xl sm:text-3xl font-semibold text-slate-800">과거 진단 기록</h1>
+            <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">홍채 3D · 열화상 · 뇌파 · 바이오신호 기록</p>
+          </div>
+        </div>
+        <button className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium btn-ghost">
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">저장</span>
+        </button>
+      </div>
+
+      {/* Scan Meta Bar */}
       <div className="glass-card px-4 py-3 mb-5 overflow-x-auto">
         <div className="flex items-center gap-4 sm:gap-6 min-w-max sm:min-w-0 justify-between">
           <div className="flex items-center gap-4 sm:gap-6">
@@ -92,7 +148,7 @@ export default function DiagnosticPage() {
         </div>
       </div>
 
-      {/* Tab Navigation — horizontal scroll on mobile */}
+      {/* Tab Navigation */}
       <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide pb-1">
         {TABS.map(({ id, label, icon: Icon, badge }) => (
           <button key={id} onClick={() => setActiveTab(id)}
@@ -182,7 +238,7 @@ export default function DiagnosticPage() {
                     { range: '36.0 – 36.4°C', label: '약간 저온', color: 'bg-cyan-400', desc: '경미한 순환 저하' },
                     { range: '36.5 – 37.0°C', label: '정상 범위', color: 'bg-green-400', desc: '건강한 혈액 순환' },
                     { range: '37.1 – 37.9°C', label: '약간 고온', color: 'bg-yellow-400', desc: '염증 반응 가능성' },
-                    { range: '38.0°C 이상', label: '고온 경보', color: 'bg-red-400', desc: '염증/감염 의심' },
+                    { range: '38.0°C 이상',   label: '고온 경보', color: 'bg-red-400',    desc: '염증/감염 의심' },
                   ].map(({ range, label, color, desc }) => (
                     <div key={range} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
                       <div className={cn('w-3 h-3 rounded-full flex-shrink-0', color)} />
