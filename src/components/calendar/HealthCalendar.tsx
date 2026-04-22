@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
-  ChevronLeft, ChevronRight, Plus, Droplets,
-  Smile, Zap, AlertCircle, Sun
+  ChevronLeft, ChevronRight, Droplets, Plus,
+  Zap, Sun, ChevronDown
 } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -12,7 +12,6 @@ import {
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { getCyclePhase, getPhaseColor, getPhaseLabel } from '@/lib/cycle-utils'
-import { getBodyScoreColor } from '@/lib/body-score'
 import type { DailyLogFormData, CyclePhase } from '@/types/health'
 import { DailyLogModal } from './DailyLogModal'
 
@@ -25,292 +24,366 @@ interface Props {
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
-const PHASE_LEGEND = [
-  { phase: 'menstrual'  as CyclePhase, label: '생리기', color: '#f43f75' },
-  { phase: 'follicular' as CyclePhase, label: '난포기', color: '#fb923c' },
-  { phase: 'ovulation'  as CyclePhase, label: '배란기', color: '#22c55e' },
-  { phase: 'luteal'     as CyclePhase, label: '황체기', color: '#a855f7' },
+
+const MOODS = [
+  { key: 'happy',    emoji: '😊', label: '행복' },
+  { key: 'calm',     emoji: '😌', label: '평온' },
+  { key: 'tired',    emoji: '😴', label: '피곤' },
+  { key: 'sad',      emoji: '😢', label: '슬픔' },
+  { key: 'energetic',emoji: '⚡', label: '활기' },
 ]
 
+const PAIN_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
 export function HealthCalendar({ logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave }: Props) {
-  const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [currentMonth, setCurrentMonth]   = useState(new Date())
+  const [selectedDate, setSelectedDate]   = useState<Date | null>(null)
+  const [showModal, setShowModal]         = useState(false)
+
+  // quick-log state
+  const [quickPeriod, setQuickPeriod]     = useState(false)
+  const [quickMood,   setQuickMood]       = useState('')
+  const [quickPain,   setQuickPain]       = useState(0)
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth)
     const monthEnd   = endOfMonth(currentMonth)
-    const calStart   = startOfWeek(monthStart, { weekStartsOn: 0 })
-    const calEnd     = endOfWeek(monthEnd,     { weekStartsOn: 0 })
-    return eachDayOfInterval({ start: calStart, end: calEnd })
+    return eachDayOfInterval({
+      start: startOfWeek(monthStart, { weekStartsOn: 0 }),
+      end:   endOfWeek(monthEnd,     { weekStartsOn: 0 }),
+    })
   }, [currentMonth])
 
   function getDayPhase(date: Date): CyclePhase | undefined {
     if (!lastPeriodStart) return undefined
-    const diffDays = Math.floor((date.getTime() - lastPeriodStart.getTime()) / 86400000)
-    if (diffDays < 0) return undefined
-    return getCyclePhase((diffDays % cycleLength) + 1, cycleLength, periodLength)
+    const diff = Math.floor((date.getTime() - lastPeriodStart.getTime()) / 86400000)
+    if (diff < 0) return undefined
+    return getCyclePhase((diff % cycleLength) + 1, cycleLength, periodLength)
   }
 
-  function getLogKey(date: Date) { return format(date, 'yyyy-MM-dd') }
+  function getKey(date: Date) { return format(date, 'yyyy-MM-dd') }
 
-  const selectedLog   = selectedDate ? logs[getLogKey(selectedDate)] : undefined
+  const selectedLog   = selectedDate ? logs[getKey(selectedDate)] : undefined
   const selectedPhase = selectedDate ? getDayPhase(selectedDate) : undefined
 
+  // sync quick-log state when selectedDate changes
+  useEffect(() => {
+    if (!selectedDate) return
+    const log = logs[getKey(selectedDate)]
+    setQuickPeriod(log?.isPeriod ?? false)
+    setQuickMood(log?.mood ?? '')
+    setQuickPain(log?.painIntensity ?? 0)
+  }, [selectedDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleQuickSave() {
+    if (!selectedDate) return
+    const key = getKey(selectedDate)
+    const existing = logs[key] ?? {}
+    onLogSave({
+      ...existing,
+      date: key,
+      isPeriod: quickPeriod,
+      mood: quickMood || undefined,
+      painIntensity: quickPain,
+      cyclePhase: selectedPhase,
+    } as DailyLogFormData)
+    setSelectedDate(null)
+  }
+
   const monthStats = useMemo(() => {
-    const monthDays = calendarDays.filter(d => isSameMonth(d, currentMonth))
-    let periodDays = 0, loggedDays = 0, avgScore = 0, scoreCount = 0
-    monthDays.forEach(d => {
-      const log = logs[getLogKey(d)]
+    const days = calendarDays.filter(d => isSameMonth(d, currentMonth))
+    let period = 0, logged = 0, scoreSum = 0, scoreN = 0
+    days.forEach(d => {
+      const log = logs[getKey(d)]
       if (log) {
-        loggedDays++
-        if (log.isPeriod) periodDays++
-        if (log.bodyScore) { avgScore += log.bodyScore; scoreCount++ }
+        logged++
+        if (log.isPeriod) period++
+        if (log.bodyScore) { scoreSum += log.bodyScore; scoreN++ }
       }
     })
     return {
-      periodDays, loggedDays,
-      avgScore: scoreCount > 0 ? Math.round(avgScore / scoreCount) : null,
+      periodDays: period,
+      loggedDays: logged,
+      avgScore: scoreN > 0 ? Math.round(scoreSum / scoreN) : null,
       totalDays: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate(),
     }
   }, [calendarDays, currentMonth, logs])
 
   return (
     <>
-      {/* Mobile: stacked, Desktop: side-by-side */}
-      <div className="flex flex-col lg:flex-row gap-4">
+      <div className="glass-card p-4 sm:p-5">
 
-        {/* Calendar Panel */}
-        <div className="flex-1 glass-card p-4 sm:p-6">
-          {/* Month Navigation */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="font-display text-xl sm:text-2xl font-semibold text-slate-800">
-                {format(currentMonth, 'yyyy년 M월', { locale: ko })}
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">건강 사이클 추적</p>
-            </div>
-            <div className="flex gap-1.5">
-              <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
-                <ChevronLeft className="w-4 h-4 text-rose-500" />
-              </button>
-              <button onClick={() => setCurrentMonth(new Date())}
-                className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-500 transition-colors">
-                오늘
-              </button>
-              <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
-                <ChevronRight className="w-4 h-4 text-rose-500" />
-              </button>
-            </div>
-          </div>
-
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 mb-1">
-            {WEEKDAYS.map((day, i) => (
-              <div key={day} className={cn('text-center text-xs font-semibold py-1',
-                i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-slate-400')}>
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-0.5 sm:gap-1">
-            {calendarDays.map((day, idx) => {
-              const isCurrentMonth = isSameMonth(day, currentMonth)
-              const isCurrentDay   = isToday(day)
-              const isSelected     = selectedDate ? isSameDay(day, selectedDate) : false
-              const log            = logs[getLogKey(day)]
-              const phase          = getDayPhase(day)
-              const phaseColor     = phase ? getPhaseColor(phase) : null
-              const dayOfWeek      = day.getDay()
-
-              return (
-                <button key={idx} onClick={() => setSelectedDate(isSelected ? null : day)}
-                  className={cn(
-                    'relative aspect-square rounded-xl sm:rounded-2xl flex flex-col items-center justify-start pt-1 sm:pt-1.5 transition-all duration-200 overflow-hidden',
-                    !isCurrentMonth && 'opacity-25',
-                    isSelected     ? 'ring-2 ring-rose-400 ring-offset-1 bg-rose-50'
-                      : 'hover:bg-rose-50/50',
-                    isCurrentDay && !isSelected && 'bg-gradient-to-br from-rose-50 to-pink-50'
-                  )}>
-                  {phase && isCurrentMonth && (
-                    <div className="absolute inset-0 opacity-10 rounded-xl sm:rounded-2xl"
-                      style={{ backgroundColor: phaseColor ?? undefined }} />
-                  )}
-
-                  <span className={cn(
-                    'text-xs sm:text-sm font-medium leading-none relative z-10',
-                    isCurrentDay
-                      ? 'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] sm:text-xs font-bold'
-                      : dayOfWeek === 0 ? 'text-rose-500'
-                        : dayOfWeek === 6 ? 'text-blue-400'
-                          : 'text-slate-700'
-                  )}>
-                    {format(day, 'd')}
-                  </span>
-
-                  {log && isCurrentMonth && (
-                    <div className="flex flex-wrap gap-0 sm:gap-0.5 mt-0.5 justify-center relative z-10">
-                      {log.isPeriod && <Droplets className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-rose-400" />}
-                      {log.mood && (
-                        <span className="text-[8px] sm:text-[10px]">
-                          {log.mood === 'happy' ? '😊' : log.mood === 'sad' ? '😢' : log.mood === 'tired' ? '😴' : '😊'}
-                        </span>
-                      )}
-                      {(log.painIntensity ?? 0) >= 5 && (
-                        <AlertCircle className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-orange-400" />
-                      )}
-                    </div>
-                  )}
-
-                  {log?.bodyScore && isCurrentMonth && (
-                    <div className="absolute bottom-0.5 right-0.5 w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full"
-                      style={{ backgroundColor: log.bodyScore >= 80 ? '#22c55e' : log.bodyScore >= 60 ? '#f59e0b' : '#f43f75' }} />
-                  )}
-
-                  {!log && isCurrentMonth && (
-                    <Plus className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 text-slate-300 opacity-0 hover:opacity-100 transition-opacity" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Legend */}
-          <div className="mt-3 pt-3 border-t border-rose-100/60 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            {PHASE_LEGEND.map(({ label, color }) => (
-              <div key={label} className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-                <span className="text-[10px] text-slate-500">{label}</span>
-              </div>
-            ))}
-            <div className="flex items-center gap-1 ml-auto">
-              <Droplets className="w-2.5 h-2.5 text-rose-400" />
-              <span className="text-[10px] text-slate-500">생리</span>
-            </div>
+        {/* ── Month navigation ── */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-display text-xl sm:text-2xl font-semibold text-slate-800">
+            {format(currentMonth, 'yyyy년 M월', { locale: ko })}
+          </h2>
+          <div className="flex gap-1.5">
+            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
+              <ChevronLeft className="w-4 h-4 text-rose-500" />
+            </button>
+            <button onClick={() => setCurrentMonth(new Date())}
+              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-500 transition-colors">
+              오늘
+            </button>
+            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
+              <ChevronRight className="w-4 h-4 text-rose-500" />
+            </button>
           </div>
         </div>
 
-        {/* Right Panel — horizontal scroll on mobile */}
-        <div className="lg:w-64 flex flex-row lg:flex-col gap-3 overflow-x-auto lg:overflow-x-visible pb-1 lg:pb-0">
-
-          {/* Monthly Stats */}
-          <div className="glass-card p-4 flex-shrink-0 w-56 sm:w-64 lg:w-auto">
-            <h3 className="card-title mb-3">이번 달 요약</h3>
-            <div className="space-y-2.5">
-              {[
-                { icon: Droplets, label: '생리 일수', value: `${monthStats.periodDays}일`, bg: 'bg-rose-100',  color: 'text-rose-500' },
-                { icon: Sun,      label: '기록 일수', value: `${monthStats.loggedDays}일`, bg: 'bg-green-100', color: 'text-green-500' },
-                ...(monthStats.avgScore !== null ? [{ icon: Zap, label: '평균 스코어', value: `${monthStats.avgScore}`, bg: 'bg-amber-100', color: 'text-amber-500' }] : []),
-              ].map(({ icon: Icon, label, value, bg, color }) => (
-                <div key={label} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={cn('icon-badge-sm', bg)}>
-                      <Icon className={cn('w-3 h-3', color)} />
-                    </div>
-                    <span className="text-xs text-slate-600">{label}</span>
-                  </div>
-                  <span className="font-bold text-slate-800 text-sm">{value}</span>
-                </div>
-              ))}
+        {/* ── Weekday headers ── */}
+        <div className="grid grid-cols-7 mb-1">
+          {WEEKDAYS.map((day, i) => (
+            <div key={day} className={cn('text-center text-xs font-semibold py-1',
+              i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-slate-400')}>
+              {day}
             </div>
-            <div className="mt-3 pt-3 border-t border-rose-100/60">
-              <div className="flex justify-between text-xs text-slate-400 mb-1">
-                <span>기록률</span>
-                <span className="font-medium text-slate-600">
-                  {Math.round(monthStats.loggedDays / monthStats.totalDays * 100)}%
+          ))}
+        </div>
+
+        {/* ── Calendar grid ── */}
+        <div className="grid grid-cols-7 gap-1">
+          {calendarDays.map((day, idx) => {
+            const inMonth  = isSameMonth(day, currentMonth)
+            const isNow    = isToday(day)
+            const isSel    = selectedDate ? isSameDay(day, selectedDate) : false
+            const log      = inMonth ? logs[getKey(day)] : undefined
+            const phase    = getDayPhase(day)
+            const pColor   = phase ? getPhaseColor(phase) : null
+            const dow      = day.getDay()
+
+            return (
+              <button key={idx}
+                onClick={() => {
+                  if (!inMonth) return
+                  setSelectedDate(isSel ? null : day)
+                }}
+                disabled={!inMonth}
+                className={cn(
+                  'relative rounded-2xl flex flex-col items-center py-2 gap-0.5 transition-all duration-150 min-h-[3.5rem] sm:min-h-[4rem]',
+                  !inMonth && 'opacity-0 pointer-events-none',
+                  isSel
+                    ? 'ring-2 ring-rose-400 ring-offset-1 bg-rose-50 shadow-md'
+                    : 'hover:bg-rose-50/60 active:scale-95',
+                  isNow && !isSel && 'bg-gradient-to-b from-rose-50 to-pink-50',
+                )}>
+
+                {/* phase strip */}
+                {phase && inMonth && (
+                  <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl opacity-60"
+                    style={{ backgroundColor: pColor ?? undefined }} />
+                )}
+
+                {/* day number */}
+                <span className={cn(
+                  'text-sm font-semibold leading-none mt-0.5',
+                  isNow
+                    ? 'w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold'
+                    : dow === 0 ? 'text-rose-500'
+                      : dow === 6 ? 'text-blue-400'
+                        : 'text-slate-700'
+                )}>
+                  {format(day, 'd')}
                 </span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${Math.round(monthStats.loggedDays / monthStats.totalDays * 100)}%` }} />
-              </div>
-            </div>
-          </div>
 
-          {/* Selected Day */}
-          {selectedDate && (
-            <div className="glass-card p-4 flex-shrink-0 w-56 sm:w-64 lg:w-auto animate-slide-up">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-xs text-rose-400 font-medium">{format(selectedDate, 'M월 d일', { locale: ko })}</p>
-                  <p className="text-sm font-semibold text-slate-700">{format(selectedDate, 'EEEE', { locale: ko })}</p>
-                </div>
+                {/* log indicators */}
+                {log && (
+                  <div className="flex items-center gap-0.5">
+                    {log.isPeriod && (
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center"
+                        style={{ background: 'rgba(244,63,117,0.15)' }}>
+                        <Droplets className="w-2.5 h-2.5 text-rose-400" />
+                      </div>
+                    )}
+                    {log.mood && (
+                      <span className="text-[11px] leading-none">
+                        {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* pain dot */}
+                {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
+                  <div className="w-1.5 h-1.5 rounded-full absolute bottom-1 right-1.5"
+                    style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
+                )}
+
+                {/* unlogged + cue */}
+                {!log && inMonth && !isSel && (
+                  <Plus className="w-3 h-3 text-slate-200 mt-auto mb-1" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* ── Phase legend ── */}
+        <div className="mt-3 pt-3 border-t border-rose-100/50 flex flex-wrap gap-x-3 gap-y-1">
+          {(['menstrual','follicular','ovulation','luteal'] as CyclePhase[]).map(p => (
+            <div key={p} className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPhaseColor(p) }} />
+              <span className="text-[10px] text-slate-400">{getPhaseLabel(p)}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1 ml-auto">
+            <Droplets className="w-2.5 h-2.5 text-rose-300" />
+            <span className="text-[10px] text-slate-400">생리일</span>
+          </div>
+        </div>
+
+        {/* ── Quick log panel ── */}
+        {selectedDate && (
+          <div className="mt-4 pt-4 border-t border-rose-100/60 animate-fade-in">
+
+            {/* date header */}
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="font-semibold text-slate-800 text-sm">
+                  {format(selectedDate, 'M월 d일 EEEE', { locale: ko })}
+                </p>
                 {selectedPhase && (
-                  <span className="px-2 py-1 rounded-full text-[10px] font-medium"
-                    style={{ backgroundColor: getPhaseColor(selectedPhase) + '20', color: getPhaseColor(selectedPhase) }}>
+                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full inline-block mt-0.5"
+                    style={{ background: getPhaseColor(selectedPhase) + '18', color: getPhaseColor(selectedPhase) }}>
                     {getPhaseLabel(selectedPhase)}
                   </span>
                 )}
               </div>
-
-              {selectedLog ? (
-                <div className="space-y-1.5">
-                  {selectedLog.bodyScore !== undefined && (
-                    <div className="flex items-center justify-between p-2 bg-slate-50 rounded-xl">
-                      <span className="text-xs text-slate-500">바디 스코어</span>
-                      <span className={cn('font-bold text-lg font-display', getBodyScoreColor(selectedLog.bodyScore))}>
-                        {selectedLog.bodyScore}
-                      </span>
-                    </div>
-                  )}
-                  {selectedLog.isPeriod && (
-                    <div className="flex items-center gap-2 p-2 bg-rose-50 rounded-xl">
-                      <Droplets className="w-3.5 h-3.5 text-rose-400" />
-                      <span className="text-xs text-rose-600">생리 중</span>
-                    </div>
-                  )}
-                  {selectedLog.mood && (
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-xl">
-                      <Smile className="w-3.5 h-3.5 text-slate-400" />
-                      <span className="text-xs text-slate-600 ml-auto">{selectedLog.mood === 'happy' ? '😊 행복' : selectedLog.mood === 'calm' ? '😌 평온' : selectedLog.mood}</span>
-                    </div>
-                  )}
-                  <button onClick={() => setSelectedDate(selectedDate)}
-                    className="w-full btn-ghost text-xs py-1.5 mt-1">
-                    수정하기
-                  </button>
-                </div>
-              ) : (
-                <div className="text-center py-3">
-                  <p className="text-xs text-slate-400 mb-2.5">아직 기록이 없어요</p>
-                  <button onClick={() => setSelectedDate(selectedDate)}
-                    className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5 mx-auto">
-                    <Plus className="w-3 h-3" />
-                    기록 추가
-                  </button>
-                </div>
-              )}
+              <button onClick={() => { setShowModal(true) }}
+                className="text-xs text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1">
+                상세 기록 <ChevronDown className="w-3 h-3" />
+              </button>
             </div>
-          )}
 
-          {/* Phase Guide */}
-          {selectedPhase && (
-            <div className="glass-card p-4 flex-shrink-0 w-56 sm:w-64 lg:w-auto">
-              <p className="label-caps mb-2">사이클 가이드</p>
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getPhaseColor(selectedPhase) }} />
-                <span className="text-sm font-semibold text-slate-700">{getPhaseLabel(selectedPhase)}</span>
+            {/* 생리 중 토글 */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-slate-500 mb-2">생리 중인가요?</p>
+              <div className="flex gap-2">
+                {[{ v: true, label: '네, 생리 중', icon: '🩸' }, { v: false, label: '아니요', icon: '✓' }].map(({ v, label, icon }) => (
+                  <button key={String(v)} onClick={() => setQuickPeriod(v)}
+                    className={cn('flex-1 py-2.5 rounded-2xl text-sm font-medium transition-all border',
+                      quickPeriod === v
+                        ? v ? 'bg-rose-500 text-white border-rose-500 shadow-md' : 'bg-slate-100 text-slate-700 border-slate-200'
+                        : 'bg-white text-slate-500 border-slate-100 hover:border-rose-200')}>
+                    {icon} {label}
+                  </button>
+                ))}
               </div>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                {selectedPhase === 'menstrual'  && '자궁 내막이 탈락하는 시기. 충분한 휴식과 철분 보충이 필요합니다.'}
-                {selectedPhase === 'follicular' && '에스트로겐이 증가하며 에너지가 높아지는 시기.'}
-                {selectedPhase === 'ovulation'  && '가임력이 최고조. 기초 체온이 약간 상승합니다.'}
-                {selectedPhase === 'luteal'     && 'PMS 증상이 나타날 수 있어요. 마그네슘이 도움됩니다.'}
-              </p>
             </div>
-          )}
+
+            {/* 기분 */}
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-slate-500 mb-2">오늘 기분은?</p>
+              <div className="flex gap-2">
+                {MOODS.map(({ key, emoji, label }) => (
+                  <button key={key} onClick={() => setQuickMood(quickMood === key ? '' : key)}
+                    className={cn(
+                      'flex-1 flex flex-col items-center py-2 rounded-2xl transition-all border text-center',
+                      quickMood === key
+                        ? 'bg-amber-50 border-amber-300 shadow-sm'
+                        : 'bg-white border-slate-100 hover:border-amber-200'
+                    )}>
+                    <span className="text-lg leading-none">{emoji}</span>
+                    <span className="text-[9px] text-slate-400 mt-0.5">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 통증 */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-slate-500">통증 강도</p>
+                <span className={cn('text-sm font-bold',
+                  quickPain === 0 ? 'text-slate-300'
+                    : quickPain <= 3 ? 'text-green-500'
+                      : quickPain <= 6 ? 'text-amber-500'
+                        : 'text-rose-500')}>
+                  {quickPain === 0 ? '없음' : `${quickPain} / 10`}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                {PAIN_LEVELS.map(n => (
+                  <button key={n} onClick={() => setQuickPain(quickPain === n ? 0 : n)}
+                    className={cn('flex-1 h-7 rounded-lg transition-all',
+                      n <= quickPain && quickPain > 0
+                        ? n <= 3 ? 'bg-green-400' : n <= 6 ? 'bg-amber-400' : 'bg-rose-500'
+                        : 'bg-slate-100 hover:bg-slate-200'
+                    )} />
+                ))}
+              </div>
+              <div className="flex justify-between mt-0.5">
+                <span className="text-[9px] text-slate-300">없음</span>
+                <span className="text-[9px] text-slate-300">매우 심함</span>
+              </div>
+            </div>
+
+            {/* actions */}
+            <div className="flex gap-2">
+              <button onClick={() => setSelectedDate(null)}
+                className="flex-1 py-2.5 rounded-2xl text-sm text-slate-400 border border-slate-100 hover:border-slate-200 transition-colors">
+                취소
+              </button>
+              <button onClick={handleQuickSave}
+                className="flex-1 py-2.5 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
+                  boxShadow: '0 4px 16px rgba(244,63,117,0.35)',
+                }}>
+                저장하기 ✓
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Monthly summary (passed via render) ── */}
+      <div className="grid grid-cols-3 gap-3 mt-4">
+        {[
+          { icon: Droplets, label: '생리 일수', value: `${monthStats.periodDays}일`,   color: 'text-rose-500',  bg: 'bg-rose-50' },
+          { icon: Sun,      label: '기록 일수', value: `${monthStats.loggedDays}일`,   color: 'text-green-500', bg: 'bg-green-50' },
+          { icon: Zap,      label: '평균 스코어', value: monthStats.avgScore !== null ? `${monthStats.avgScore}점` : '—', color: 'text-amber-500', bg: 'bg-amber-50' },
+        ].map(({ icon: Icon, label, value, color, bg }) => (
+          <div key={label} className="glass-card p-3 flex items-center gap-2.5">
+            <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0', bg)}>
+              <Icon className={cn('w-4 h-4', color)} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] text-slate-400 leading-none">{label}</p>
+              <p className="font-bold text-slate-800 text-sm mt-0.5">{value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── 기록률 bar ── */}
+      <div className="glass-card px-4 py-3 mt-3">
+        <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+          <span>이번 달 기록률</span>
+          <span className="font-semibold text-rose-500">
+            {Math.round(monthStats.loggedDays / monthStats.totalDays * 100)}%
+          </span>
+        </div>
+        <div className="h-2 bg-rose-50 rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{
+              width: `${Math.round(monthStats.loggedDays / monthStats.totalDays * 100)}%`,
+              background: 'linear-gradient(90deg, #f43f75, #e11d5a)',
+            }} />
         </div>
       </div>
 
-      {selectedDate && (
+      {/* ── Full log modal ── */}
+      {showModal && selectedDate && (
         <DailyLogModal
           date={selectedDate}
           existingLog={selectedLog}
           cyclePhase={selectedPhase}
-          onSave={(data) => { onLogSave(data); setSelectedDate(null) }}
-          onClose={() => setSelectedDate(null)}
+          onSave={(data) => { onLogSave(data); setShowModal(false); setSelectedDate(null) }}
+          onClose={() => setShowModal(false)}
         />
       )}
     </>
