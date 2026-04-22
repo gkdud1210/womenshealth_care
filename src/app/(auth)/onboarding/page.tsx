@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Droplets, Zap, Sparkles, Activity, Leaf, Shield, Check, Brain } from 'lucide-react'
+import { Droplets, Zap, Sparkles, Activity, Leaf, Shield, Check, Brain, Scale, Wind } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
@@ -66,6 +66,26 @@ const CARE_CASES = [
     glow: 'rgba(59,130,246,0.3)',
     border: 'rgba(59,130,246,0.25)',
     bg: 'rgba(59,130,246,0.06)',
+  },
+  {
+    id: 'diet',
+    label: '다이어트',
+    desc: '주기별 대사 변화 · 체중 관리 · 식이 가이드',
+    icon: Scale,
+    gradient: 'linear-gradient(135deg, #f97316, #ea580c)',
+    glow: 'rgba(249,115,22,0.3)',
+    border: 'rgba(249,115,22,0.25)',
+    bg: 'rgba(249,115,22,0.06)',
+  },
+  {
+    id: 'stress',
+    label: '스트레스 관리',
+    desc: 'EEG 뇌파 · HRV · 자율신경 균형 · 회복 가이드',
+    icon: Wind,
+    gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)',
+    glow: 'rgba(6,182,212,0.3)',
+    border: 'rgba(6,182,212,0.25)',
+    bg: 'rgba(6,182,212,0.06)',
   },
 ]
 
