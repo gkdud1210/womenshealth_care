@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect } from 'react'
+import { AppShell } from '@/components/layout/AppShell'
+import DashboardPage from './(app)/dashboard/page'
 
 export default function RootPage() {
-  useEffect(() => {
-    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
-    window.location.replace(base + '/dashboard/')
-  }, [])
-  return null
+  return (
+    <AppShell>
+      <DashboardPage />
+    </AppShell>
+  )
 }
