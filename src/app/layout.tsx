@@ -14,7 +14,7 @@ const playfair = Playfair_Display({
 })
 
 export const metadata: Metadata = {
-  title: 'Luna — Women\'s Health Guardian',
+  title: 'LUDIA — Women\'s Health Guardian',
   description: 'Comprehensive women\'s health management with IoT diagnostics',
   icons: { icon: '/favicon.ico' },
 }

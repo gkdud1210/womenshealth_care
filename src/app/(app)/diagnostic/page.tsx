@@ -23,7 +23,7 @@ const TABS: { id: Tab; label: string; icon: typeof Eye; badge?: string }[] = [
 const SCAN_META = {
   date: '2026-04-21',
   cyclePhase: '황체기 D+14',
-  device: 'Luna Iris 3D v2.1',
+  device: 'LUDIA Iris 3D v2.1',
   quality: 94,
 }
 

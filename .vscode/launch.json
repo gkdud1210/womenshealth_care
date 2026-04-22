@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🌸 Luna — Open in Browser",
+      "name": "🌸 LUDIA — Open in Browser",
       "type": "chrome",
       "request": "launch",
       "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/src",
-      "preLaunchTask": "🚀 Luna Dev Server"
+      "preLaunchTask": "🚀 LUDIA Dev Server"
     }
   ]
 }

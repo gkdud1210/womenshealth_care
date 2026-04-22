@@ -38,7 +38,7 @@ export function Sidebar() {
             <Sparkles className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
-            <h1 className="font-display text-xl font-semibold rose-text leading-none">Luna</h1>
+            <h1 className="font-display text-xl font-semibold rose-text leading-none">LUDIA</h1>
             <p className="text-2xs text-rose-400/70 mt-0.5 tracking-caps uppercase font-medium">Health Guardian</p>
           </div>
         </div>

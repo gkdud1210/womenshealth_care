@@ -2,7 +2,7 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "🚀 Luna Dev Server",
+      "label": "🚀 LUDIA Dev Server",
       "type": "shell",
       "command": "npm run dev",
       "group": {
