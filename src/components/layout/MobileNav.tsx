@@ -9,7 +9,7 @@ import {
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { href: '/dashboard',  icon: LayoutDashboard,   label: '홈' },
+  { href: '/',           icon: LayoutDashboard,   label: '홈' },
   { href: '/calendar',   icon: CalendarHeart,      label: '캘린더' },
   { href: '/diagnostic', icon: Microscope,         label: '진단' },
   { href: '/program',    icon: TrendingUp,         label: '프로그램' },

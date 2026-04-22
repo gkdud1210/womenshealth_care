@@ -32,16 +32,16 @@ export function Sidebar() {
 
       {/* Logo */}
       <div className="px-6 py-6" style={{ borderBottom: '1px solid rgba(244,63,117,0.08)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-soft flex-shrink-0"
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-soft flex-shrink-0 transition-transform group-hover:scale-105"
             style={{ background: 'linear-gradient(135deg, #f43f75 0%, #e11d5a 100%)' }}>
             <Sparkles className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
-            <h1 className="font-display text-xl font-semibold rose-text leading-none">LUDIA</h1>
+            <h1 className="font-display text-xl font-semibold rose-text leading-none group-hover:opacity-80 transition-opacity">LUDIA</h1>
             <p className="text-2xs text-rose-400/70 mt-0.5 tracking-caps uppercase font-medium">Health Guardian</p>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Navigation */}
