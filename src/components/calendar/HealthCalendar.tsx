@@ -2,8 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import {
-  ChevronLeft, ChevronRight, Droplets, Plus,
-  Zap, Sun, ChevronDown
+  ChevronLeft, ChevronRight, Droplets, Plus, ChevronDown
 } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -90,25 +89,6 @@ export function HealthCalendar({ logs, lastPeriodStart, cycleLength = 28, period
     setSelectedDate(null)
   }
 
-  const monthStats = useMemo(() => {
-    const days = calendarDays.filter(d => isSameMonth(d, currentMonth))
-    let period = 0, logged = 0, scoreSum = 0, scoreN = 0
-    days.forEach(d => {
-      const log = logs[getKey(d)]
-      if (log) {
-        logged++
-        if (log.isPeriod) period++
-        if (log.bodyScore) { scoreSum += log.bodyScore; scoreN++ }
-      }
-    })
-    return {
-      periodDays: period,
-      loggedDays: logged,
-      avgScore: scoreN > 0 ? Math.round(scoreSum / scoreN) : null,
-      totalDays: new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0).getDate(),
-    }
-  }, [calendarDays, currentMonth, logs])
-
   return (
     <>
       <div className="glass-card p-4 sm:p-5">
@@ -163,7 +143,7 @@ export function HealthCalendar({ logs, lastPeriodStart, cycleLength = 28, period
                 }}
                 disabled={!inMonth}
                 className={cn(
-                  'relative rounded-2xl flex flex-col items-center py-2 gap-0.5 transition-all duration-150 min-h-[3.5rem] sm:min-h-[4rem]',
+                  'relative rounded-2xl flex flex-col items-center py-2 gap-0.5 transition-all duration-150 min-h-[4.5rem] sm:min-h-[5.5rem]',
                   !inMonth && 'opacity-0 pointer-events-none',
                   isSel
                     ? 'ring-2 ring-rose-400 ring-offset-1 bg-rose-50 shadow-md'
@@ -338,42 +318,6 @@ export function HealthCalendar({ logs, lastPeriodStart, cycleLength = 28, period
             </div>
           </div>
         )}
-      </div>
-
-      {/* ── Monthly summary (passed via render) ── */}
-      <div className="grid grid-cols-3 gap-3 mt-4">
-        {[
-          { icon: Droplets, label: '생리 일수', value: `${monthStats.periodDays}일`,   color: 'text-rose-500',  bg: 'bg-rose-50' },
-          { icon: Sun,      label: '기록 일수', value: `${monthStats.loggedDays}일`,   color: 'text-green-500', bg: 'bg-green-50' },
-          { icon: Zap,      label: '평균 스코어', value: monthStats.avgScore !== null ? `${monthStats.avgScore}점` : '—', color: 'text-amber-500', bg: 'bg-amber-50' },
-        ].map(({ icon: Icon, label, value, color, bg }) => (
-          <div key={label} className="glass-card p-3 flex items-center gap-2.5">
-            <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0', bg)}>
-              <Icon className={cn('w-4 h-4', color)} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[10px] text-slate-400 leading-none">{label}</p>
-              <p className="font-bold text-slate-800 text-sm mt-0.5">{value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── 기록률 bar ── */}
-      <div className="glass-card px-4 py-3 mt-3">
-        <div className="flex justify-between text-xs text-slate-500 mb-1.5">
-          <span>이번 달 기록률</span>
-          <span className="font-semibold text-rose-500">
-            {Math.round(monthStats.loggedDays / monthStats.totalDays * 100)}%
-          </span>
-        </div>
-        <div className="h-2 bg-rose-50 rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${Math.round(monthStats.loggedDays / monthStats.totalDays * 100)}%`,
-              background: 'linear-gradient(90deg, #f43f75, #e11d5a)',
-            }} />
-        </div>
       </div>
 
       {/* ── Full log modal ── */}

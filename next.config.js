@@ -3,7 +3,7 @@ const isProd = process.env.NODE_ENV === 'production'
 const basePath = isProd ? '/womenshealth_care' : ''
 
 const nextConfig = {
-  output: 'export',
+  ...(isProd && { output: 'export' }),
   basePath,
   assetPrefix: isProd ? '/womenshealth_care/' : '',
   trailingSlash: true,

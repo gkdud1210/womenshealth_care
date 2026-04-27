@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Eye, Thermometer, Brain, Activity, CheckCircle2,
   Camera, CameraOff, ChevronRight, Scan, Zap,
-  ArrowRight, MessageCircleHeart, BarChart2,
+  ArrowRight, MessageCircleHeart, BarChart2, Upload,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -28,19 +28,31 @@ const STEPS = [
    STEP 1 — IRIS SCAN
 ══════════════════════════════════════════════════════════════════ */
 
-type IrisPhase = 'idle' | 'scanning' | 'captured' | 'analyzing' | 'done'
+type IrisPhase = 'idle' | 'scanning' | 'captured' | 'analyzing' | 'uploading' | 'done'
 
 function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
   const videoRef   = useRef<HTMLVideoElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
   const simRef     = useRef<HTMLCanvasElement>(null)
+  const fileRef    = useRef<HTMLInputElement>(null)
   const streamRef  = useRef<MediaStream | null>(null)
   const rafRef     = useRef<number>()
 
-  const [cam, setCam]     = useState<'requesting' | 'live' | 'denied'>('requesting')
-  const [phase, setPhase] = useState<IrisPhase>('idle')
-  const [pct, setPct]     = useState(0)
-  const [res, setRes]     = useState<MultimodalData['iris'] | null>(null)
+  const [cam, setCam]       = useState<'requesting' | 'live' | 'denied'>('requesting')
+  const [phase, setPhase]   = useState<IrisPhase>('idle')
+  const [pct, setPct]       = useState(0)
+  const [res, setRes]       = useState<MultimodalData['iris'] | null>(null)
+  const [uploadErr, setUploadErr]     = useState<string | null>(null)
+  const [isRealData, setIsRealData]   = useState(false)
+  const [annotatedImg, setAnnotatedImg] = useState<string | null>(null)
+  const [organPatterns, setOrganPatterns] = useState<Record<string, {
+    nameKo: string
+    patterns: Record<string, number>
+    patternsKo: Record<string, number>
+  }> | null>(null)
+  const [dominantPatterns, setDominantPatterns] = useState<Record<string, {
+    pattern: string; patternKo: string; confidence: number
+  }> | null>(null)
 
   /* camera */
   useEffect(() => {
@@ -57,6 +69,32 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       cancelAnimationFrame(rafRef.current ?? 0)
     }
   }, [])
+
+  /* image upload handler */
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadErr(null)
+    setPhase('uploading')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const resp = await fetch('/api/iris-analyze', { method: 'POST', body: fd })
+      const data = await resp.json()
+      if (data.error) throw new Error(data.error)
+      setRes({ leftScore: data.leftScore, rightScore: data.rightScore, skinZone: data.skinZone, thyroidZone: data.thyroidZone })
+      if (data.organPatterns)    setOrganPatterns(data.organPatterns)
+      if (data.dominantPatterns) setDominantPatterns(data.dominantPatterns)
+      if (data.annotatedImage)   setAnnotatedImg(data.annotatedImage)
+      setIsRealData(true)
+      setPhase('done')
+    } catch (err) {
+      setUploadErr(err instanceof Error ? err.message : '분석 실패')
+      setPhase('idle')
+    } finally {
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   /* overlay canvas for camera mode */
   useEffect(() => {
@@ -198,7 +236,20 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
   return (
     <div className="space-y-4">
       <div className="relative rounded-2xl overflow-hidden bg-slate-950" style={{aspectRatio:'4/3',maxHeight:360}}>
-        {cam==='live' ? (
+        {phase==='done' && annotatedImg ? (
+          /* 인식 결과 이미지 */
+          <>
+            <img src={annotatedImg} alt="홍채 인식 결과" className="w-full h-full object-contain" />
+            <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
+              <Eye className="w-3 h-3 text-green-400"/>
+              <span className="text-[10px] text-white">홍채 인식 완료</span>
+            </div>
+            <div className="absolute bottom-3 right-3 flex items-center gap-3 px-2.5 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-[9px] text-white">
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#1edc5a'}}/> 홍채</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#00c8ff'}}/> 동공</span>
+            </div>
+          </>
+        ) : cam==='live' ? (
           <>
             <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" style={{transform:'scaleX(-1)'}} />
             <canvas ref={overlayRef} width={640} height={480} className="absolute inset-0 w-full h-full pointer-events-none" style={{transform:'scaleX(-1)'}} />
@@ -206,41 +257,93 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         ) : (
           <canvas ref={simRef} width={420} height={320} className="w-full h-full" />
         )}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
-          {cam==='live'
-            ? <><Camera className="w-3 h-3 text-green-400"/><span className="text-[10px] text-white">카메라 연결</span></>
-            : <><CameraOff className="w-3 h-3 text-amber-400"/><span className="text-[10px] text-white">시뮬레이션 모드</span></>}
-        </div>
+        {!(phase==='done' && annotatedImg) && (
+          <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
+            {cam==='live'
+              ? <><Camera className="w-3 h-3 text-green-400"/><span className="text-[10px] text-white">카메라 연결</span></>
+              : <><CameraOff className="w-3 h-3 text-amber-400"/><span className="text-[10px] text-white">시뮬레이션 모드</span></>}
+          </div>
+        )}
         {(phase==='scanning') && (
           <div className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
             <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"/><span className="text-[10px] text-rose-300 font-medium">스캔 중 {pct}%</span>
           </div>
         )}
         {phase==='captured' && <div className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm"><div className="w-1.5 h-1.5 rounded-full bg-green-400"/><span className="text-[10px] text-green-300 font-medium">캡처 완료</span></div>}
+        {phase==='uploading' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"/>
+              <span className="text-xs text-white font-medium">AI 분석 중...</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {phase==='scanning' && <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full transition-all duration-75" style={{width:`${pct}%`}}/></div>}
 
       {phase==='done' && res && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[['좌안 밀도',res.leftScore],['우안 밀도',res.rightScore],['피부 Zone',res.skinZone],['갑상선 Zone',res.thyroidZone]].map(([l,v])=>(
-            <div key={String(l)} className="rounded-xl p-2.5 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-              <div className={cn('text-xl font-bold font-display',(v as number)>=70?'text-green-600':'text-amber-600')}>{v}</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{l}</div>
+        <div className="space-y-3">
+          {/* 기본 점수 */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[['좌안 밀도',res.leftScore],['우안 밀도',res.rightScore],['피부 Zone',res.skinZone],['갑상선 Zone',res.thyroidZone]].map(([l,v])=>(
+              <div key={String(l)} className="rounded-xl p-2.5 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+                <div className={cn('text-xl font-bold font-display',(v as number)>=70?'text-green-600':'text-amber-600')}>{v}</div>
+                <div className="text-[10px] text-slate-500 mt-0.5">{l}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* 장기 패턴 (상세 분석 결과) */}
+          {dominantPatterns && (
+            <div className="rounded-xl p-3 space-y-2" style={{background:'rgba(168,85,247,.06)',border:'1px solid rgba(168,85,247,.2)'}}>
+              <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">장기 패턴 분석 (EfficientNet)</p>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(dominantPatterns).map(([organ, d]) => {
+                  const nameKo = organPatterns?.[organ]?.nameKo ?? organ
+                  const isNormal = d.pattern === 'normal'
+                  return (
+                    <div key={organ} className="rounded-lg p-2 flex items-center gap-2" style={{background:'rgba(255,255,255,.7)'}}>
+                      <div className={cn('w-2 h-2 rounded-full flex-shrink-0', isNormal ? 'bg-green-400' : 'bg-amber-400')}/>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-semibold text-slate-600">{nameKo}</p>
+                        <p className={cn('text-[11px] font-bold', isNormal ? 'text-green-600' : 'text-amber-600')}>
+                          {d.patternKo} <span className="font-normal text-slate-400">({d.confidence.toFixed(1)}%)</span>
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
       <div className="text-center text-sm text-slate-500 min-h-[28px]">
-        {phase==='idle'&&'카메라를 눈 앞에 위치시킨 후 스캔을 시작하세요'}
+        {phase==='idle'&&'카메라를 눈 앞에 위치시킨 후 스캔하거나, 홍채 사진을 업로드하세요'}
         {phase==='scanning'&&'👁  홍채를 화면 중앙에 맞추고 가만히 있어 주세요...'}
         {phase==='captured'&&'📸 이미지 캡처 완료 — 구역 분석 중...'}
         {phase==='analyzing'&&'🔬 홍채 패턴 분석 중...'}
-        {phase==='done'&&'✅ 홍채 분석 완료!'}
+        {phase==='uploading'&&'🔬 AI 홍채 분석 중... 잠시만 기다려 주세요'}
+        {phase==='done'&&(isRealData ? '✅ AI 홍채 분석 완료! (실제 데이터)' : '✅ 홍채 분석 완료!')}
       </div>
 
-      {phase==='idle' && <button onClick={()=>setPhase('scanning')} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2"><Scan className="w-4 h-4"/>홍채 스캔 시작</button>}
+      {uploadErr && <p className="text-xs text-red-500 text-center">{uploadErr}</p>}
+
+      {phase==='idle' && (
+        <div className="flex gap-2">
+          <button onClick={()=>setPhase('scanning')} className="flex-1 btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+            <Scan className="w-4 h-4"/>카메라 스캔
+          </button>
+          <button onClick={()=>fileRef.current?.click()}
+            className="flex-1 py-3 rounded-2xl text-sm flex items-center justify-center gap-2 font-medium transition-all hover:opacity-90 active:scale-95"
+            style={{background:'rgba(248,244,246,.9)',border:'1.5px solid rgba(168,85,247,.3)',color:'#a855f7'}}>
+            <Upload className="w-4 h-4"/>이미지 업로드
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload}/>
+        </div>
+      )}
       {phase==='done' && <button onClick={()=>onDone(res!)} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">다음 단계: 열화상 스캔<ChevronRight className="w-4 h-4"/></button>}
     </div>
   )

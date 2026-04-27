@@ -8,18 +8,21 @@ import { useAuth } from '@/hooks/useAuth'
 
 export default function RootPage() {
   const router = useRouter()
-  const { user, ready, isOnboarded } = useAuth()
+  const { user, ready, hasSession, isOnboarded } = useAuth()
 
   useEffect(() => {
     if (!ready) return
-    if (!user) {
+    if (!hasSession) {
+      // 새 브라우저 세션 — 항상 로그인 화면으로
+      router.replace('/signup')
+    } else if (!user) {
       router.replace('/signup')
     } else if (!isOnboarded) {
       router.replace('/onboarding')
     }
-  }, [ready, user, isOnboarded, router])
+  }, [ready, hasSession, user, isOnboarded, router])
 
-  if (!ready || !user || !isOnboarded) return null
+  if (!ready || !hasSession || !user || !isOnboarded) return null
 
   return (
     <AppShell>

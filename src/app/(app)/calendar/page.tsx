@@ -3,9 +3,7 @@
 import { useState, useCallback } from 'react'
 import { CalendarHeart, Sparkles } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
-import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
 import type { DailyLogFormData } from '@/types/health'
-import { useMultimodalData } from '@/hooks/useMultimodalData'
 
 const MOCK_LAST_PERIOD = new Date(2026, 3, 8)
 const CYCLE_LENGTH     = 28
@@ -25,7 +23,6 @@ const MOCK_LOGS: Record<string, DailyLogFormData> = {
 
 export default function CalendarPage() {
   const [logs, setLogs] = useState<Record<string, DailyLogFormData>>(MOCK_LOGS)
-  const { data: multimodalData, setData: setMultimodalData } = useMultimodalData()
 
   const handleLogSave = useCallback((data: DailyLogFormData) => {
     setLogs(prev => ({ ...prev, [data.date]: data }))
@@ -34,7 +31,7 @@ export default function CalendarPage() {
   return (
     <div className="min-h-screen p-4 sm:p-5 lg:p-6">
 
-      {/* ── Compact header ── */}
+      {/* ── Header ── */}
       <div className="flex items-center gap-2.5 mb-4">
         <div className="relative">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -55,7 +52,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ── Calendar (top) ── */}
+      {/* ── Calendar ── */}
       <HealthCalendar
         logs={logs}
         lastPeriodStart={MOCK_LAST_PERIOD}
@@ -63,14 +60,6 @@ export default function CalendarPage() {
         periodLength={PERIOD_LENGTH}
         onLogSave={handleLogSave}
       />
-
-      {/* ── Multimodal data panel (bottom) ── */}
-      <div className="mt-4">
-        <MultimodalDataPanel
-          value={multimodalData}
-          onChange={setMultimodalData}
-        />
-      </div>
     </div>
   )
 }

@@ -111,7 +111,7 @@ const CARE_CASES = [
 
 export default function OnboardingPage() {
   const router   = useRouter()
-  const { user, saveUser, ready } = useAuth()
+  const { user, saveUser, startSession, ready } = useAuth()
   const [selected, setSelected]   = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -131,6 +131,7 @@ export default function OnboardingPage() {
   function handleStart() {
     if (selected.size === 0) return
     saveUser({ ...user!, careTypes: Array.from(selected) })
+    startSession()
     router.push('/')
   }
 

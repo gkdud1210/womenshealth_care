@@ -26,3 +26,9 @@ yarn-error.log*
 .DS_Store
 *.pem
 .vercel
+
+# model weights (large binaries — download separately)
+*.pt
+iris_processing/models/
+iris_processing/output/
+iris_processing/*.png

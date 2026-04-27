@@ -1,23 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Sparkles, Brain } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function SignupPage() {
   const router = useRouter()
-  const { saveUser } = useAuth()
+  const { saveUser, startSession, isOnboarded, storedUser, ready } = useAuth()
   const [name, setName]           = useState('')
   const [birthdate, setBirthdate] = useState('')
   const [error, setError]         = useState('')
+
+  // 이전 세션 프로필이 있으면 폼에 미리 채우기
+  useEffect(() => {
+    if (!ready) return
+    const prev = storedUser()
+    if (prev) {
+      setName(prev.name)
+      setBirthdate(prev.birthdate)
+    }
+  }, [ready, storedUser])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!name.trim()) { setError('이름을 입력해주세요.'); return }
     if (!birthdate)   { setError('생년월일을 입력해주세요.'); return }
-    saveUser({ name: name.trim(), birthdate, careTypes: [] })
-    router.push('/onboarding')
+
+    const prev = storedUser()
+    if (prev && prev.name === name.trim() && prev.birthdate === birthdate) {
+      // 기존 사용자 — 프로필 유지, 세션만 시작
+      startSession()
+      router.push(isOnboarded ? '/' : '/onboarding')
+    } else {
+      // 신규 또는 정보 변경
+      saveUser({ name: name.trim(), birthdate, careTypes: [] })
+      startSession()
+      router.push('/onboarding')
+    }
   }
 
   return (
