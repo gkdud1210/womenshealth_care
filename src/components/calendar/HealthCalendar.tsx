@@ -208,29 +208,28 @@ export function HealthCalendar({
   const [showModal,    setShowModal]    = useState(false)
   const [modeData,     setModeData]     = useState<ModeData>({ mode: 'normal' })
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
-  const [flipAnim,     setFlipAnim]     = useState<{ phase: 'out' | 'in'; dir: 'next' | 'prev' } | null>(null)
+  const [flipState, setFlipState] = useState<{
+    outgoing: Date; incoming: Date; dir: 'next' | 'prev'
+  } | null>(null)
   const touchStartX = useRef<number | null>(null)
 
   function navigateMonth(dir: 'next' | 'prev') {
-    if (flipAnim) return
-    setFlipAnim({ phase: 'out', dir })
-    setTimeout(() => {
-      setCurrentMonth(m => dir === 'next' ? addMonths(m, 1) : subMonths(m, 1))
-      setFlipAnim({ phase: 'in', dir })
-    }, 220)
-    setTimeout(() => setFlipAnim(null), 440)
+    if (flipState) return
+    const outgoing = currentMonth
+    const incoming = dir === 'next' ? addMonths(outgoing, 1) : subMonths(outgoing, 1)
+    setCurrentMonth(incoming)
+    setFlipState({ outgoing, incoming, dir })
+    setTimeout(() => setFlipState(null), 520)
   }
 
   function navigateToToday() {
     const today = new Date()
     if (isSameMonth(today, currentMonth)) return
-    const dir = today > currentMonth ? 'next' : 'prev'
-    setFlipAnim({ phase: 'out', dir })
-    setTimeout(() => {
-      setCurrentMonth(today)
-      setFlipAnim({ phase: 'in', dir })
-    }, 220)
-    setTimeout(() => setFlipAnim(null), 440)
+    const outgoing = currentMonth
+    const dir = today > outgoing ? 'next' : 'prev'
+    setCurrentMonth(today)
+    setFlipState({ outgoing, incoming: today, dir })
+    setTimeout(() => setFlipState(null), 520)
   }
 
   function handleTouchStart(e: React.TouchEvent) {
@@ -275,6 +274,14 @@ export function HealthCalendar({
     const end   = endOfWeek(endOfMonth(currentMonth),     { weekStartsOn: 0 })
     return eachDayOfInterval({ start, end })
   }, [currentMonth])
+
+  const outgoingDays = useMemo(() => {
+    if (!flipState) return []
+    const m = flipState.outgoing
+    const start = startOfWeek(startOfMonth(m), { weekStartsOn: 0 })
+    const end   = endOfWeek(endOfMonth(m),     { weekStartsOn: 0 })
+    return eachDayOfInterval({ start, end })
+  }, [flipState])
 
   function getDayPhase(date: Date): CyclePhase | undefined {
     if (!effectiveCycleStart) return undefined
@@ -321,6 +328,98 @@ export function HealthCalendar({
 
   const selectedLog   = selectedDate ? logs[getKey(selectedDate)] : undefined
   const selectedPhase = selectedDate ? getDayPhase(selectedDate) : undefined
+
+  function renderCalGrid(days: Date[], forMonth: Date) {
+    return days.map((day, i) => {
+      const inMonth = isSameMonth(day, forMonth)
+      const isNow   = isToday(day)
+      const isSel   = selectedDate ? isSameDay(day, selectedDate) : false
+      const log     = inMonth ? logs[getKey(day)] : undefined
+      const phase   = modeData.mode === 'normal' ? getDayPhase(day) : undefined
+      const dow     = day.getDay()
+
+      const { bg: modeBg, label: modeLabel, isWarning, isDue } =
+        (inMonth && modeData.mode !== 'normal')
+          ? getModeCellInfo(day)
+          : { bg: undefined, label: null, isWarning: false, isDue: false }
+
+      const isPredicted = inMonth && modeData.mode === 'normal'
+        && phase === 'menstrual' && !log?.isPeriod
+      const predDayInCycle = isPredicted && effectiveCycleStart
+        ? ((Math.floor((day.getTime() - effectiveCycleStart.getTime()) / 86400000)) % cycleLength) + 1
+        : 0
+      const isPredictedStart = isPredicted && predDayInCycle === 1
+      const isPredictedEnd   = isPredicted && predDayInCycle === periodLength
+
+      const background = modeData.mode === 'normal'
+        ? isPredicted && !isSel ? 'rgba(255,179,179,0.38)' : cellBgFor(phase, isSel)
+        : isSel ? (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)') : modeBg
+
+      const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444'
+        : phase ? getPhaseColor(phase) : '#f43f75'
+
+      return (
+        <button key={i}
+          onClick={() => { if (!inMonth) return; setSelectedDate(isSel ? null : day) }}
+          disabled={!inMonth}
+          className={cn(
+            'relative flex flex-col items-center py-1.5 gap-0.5 transition-all duration-150',
+            'min-h-[4.5rem] sm:min-h-[5.5rem] active:scale-95',
+            'border-r border-b border-slate-100',
+            !inMonth && 'opacity-0 pointer-events-none',
+          )}
+          style={{
+            background: background ?? 'transparent',
+            outline: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.3)' : undefined,
+            outlineOffset: '-1px',
+            boxShadow: isSel
+              ? `inset 0 0 0 2px ${ringColor}`
+              : isNow   ? 'inset 0 0 0 2px #f43f75'
+                : isDue ? `inset 0 0 0 1.5px #f59e0b88`
+                  : undefined,
+          }}>
+          <span className={cn(
+            'text-sm font-semibold leading-none mt-0.5 z-10',
+            isNow
+              ? 'w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold'
+              : isDue  ? 'text-amber-600 font-bold'
+                : dow === 0 ? 'text-rose-700'
+                  : dow === 6 ? 'text-blue-600'
+                    : 'text-slate-700'
+          )}>
+            {format(day, 'd')}
+          </span>
+          {isPredictedStart && <span className="text-[7px] font-semibold text-rose-400 leading-none">예상시작</span>}
+          {isPredictedEnd   && <span className="text-[7px] font-semibold text-rose-400 leading-none">예상종료</span>}
+          {modeLabel && (
+            <span className={cn('text-[8px] font-semibold leading-none',
+              isWarning ? 'text-amber-700' : isDue ? 'text-amber-600' : 'text-emerald-700')}>
+              {modeLabel}
+            </span>
+          )}
+          {log && (
+            <div className="flex items-center gap-0.5 z-10">
+              {log.isPeriod && (
+                <div className="w-4 h-4 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(217,79,92,0.2)' }}>
+                  <Droplets className="w-2.5 h-2.5 text-rose-600" />
+                </div>
+              )}
+              {log.mood && (
+                <span className="text-[11px] leading-none">
+                  {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
+                </span>
+              )}
+            </div>
+          )}
+          {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
+            <div className="w-1.5 h-1.5 rounded-full absolute bottom-1 right-1.5 z-10"
+              style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
+          )}
+        </button>
+      )
+    })
+  }
 
   return (
     <>
@@ -379,16 +478,8 @@ export function HealthCalendar({
           onSwitchIrregular={() => setPendingMode('irregular')}
         />
 
-        {/* ── Animated flip wrapper ── */}
-        <div style={flipAnim ? {
-          transformOrigin: flipAnim.phase === 'out'
-            ? (flipAnim.dir === 'next' ? 'right center' : 'left center')
-            : (flipAnim.dir === 'next' ? 'left center'  : 'right center'),
-          animation: `cal-flip-${flipAnim.phase}-${flipAnim.dir} 220ms ${flipAnim.phase === 'out' ? 'ease-in' : 'ease-out'} forwards`,
-        } : undefined}>
-
         {/* ── Weekday headers ── */}
-        <div className="grid grid-cols-7 border-b border-slate-100 mb-0">
+        <div className="grid grid-cols-7 border-b border-slate-100">
           {WEEKDAYS.map((day, i) => (
             <div key={day} className={cn('text-center text-xs font-semibold py-1.5',
               i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-slate-400')}>
@@ -397,120 +488,50 @@ export function HealthCalendar({
           ))}
         </div>
 
-        {/* ── Calendar grid ── */}
-        <div
-          className="grid grid-cols-7 border-l border-t border-slate-100"
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
-        >
-          {calendarDays.map((day, i) => {
-            const inMonth = isSameMonth(day, currentMonth)
-            const isNow   = isToday(day)
-            const isSel   = selectedDate ? isSameDay(day, selectedDate) : false
-            const log     = inMonth ? logs[getKey(day)] : undefined
-            const phase   = modeData.mode === 'normal' ? getDayPhase(day) : undefined
-            const dow     = day.getDay()
+        {/* ── Calendar grid — page-flip layer ── */}
+        <div style={{ position: 'relative', overflow: 'hidden' }}>
 
-            const { bg: modeBg, label: modeLabel, isWarning, isDue } =
-              (inMonth && modeData.mode !== 'normal')
-                ? getModeCellInfo(day)
-                : { bg: undefined, label: null, isWarning: false, isDue: false }
+          {/* Incoming / static grid (always rendered, sets height) */}
+          <div
+            className="grid grid-cols-7 border-l border-t border-slate-100"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            {renderCalGrid(calendarDays, currentMonth)}
+          </div>
 
-            // Predicted period: menstrual phase day not yet confirmed in logs
-            const isPredicted = inMonth && modeData.mode === 'normal'
-              && phase === 'menstrual' && !log?.isPeriod
-            const predDayInCycle = isPredicted && effectiveCycleStart
-              ? ((Math.floor((day.getTime() - effectiveCycleStart.getTime()) / 86400000)) % cycleLength) + 1
-              : 0
-            const isPredictedStart = isPredicted && predDayInCycle === 1
-            const isPredictedEnd   = isPredicted && predDayInCycle === periodLength
-
-            const background = modeData.mode === 'normal'
-              ? isPredicted && !isSel
-                ? 'rgba(255,179,179,0.38)'   // lighter for unconfirmed predicted period
-                : cellBgFor(phase, isSel)
-              : isSel
-                ? (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)')
-                : modeBg
-
-            const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444'
-              : phase ? getPhaseColor(phase) : '#f43f75'
-
-            return (
-              <button key={i}
-                onClick={() => { if (!inMonth) return; setSelectedDate(isSel ? null : day) }}
-                disabled={!inMonth}
-                className={cn(
-                  'relative flex flex-col items-center py-1.5 gap-0.5 transition-all duration-150',
-                  'min-h-[4.5rem] sm:min-h-[5.5rem] active:scale-95',
-                  'border-r border-b border-slate-100',
-                  !inMonth && 'opacity-0 pointer-events-none',
-                )}
+          {/* Outgoing page — folds away on top, revealing incoming beneath */}
+          {flipState && (
+            <>
+              <div
+                className="grid grid-cols-7 border-l border-t border-slate-100"
                 style={{
-                  background: background ?? 'transparent',
-                  outline: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.3)' : undefined,
-                  outlineOffset: '-1px',
-                  boxShadow: isSel
-                    ? `inset 0 0 0 2px ${ringColor}`
-                    : isNow   ? 'inset 0 0 0 2px #f43f75'
-                      : isDue ? `inset 0 0 0 1.5px #f59e0b88`
-                        : undefined,
-                }}>
-
-                <span className={cn(
-                  'text-sm font-semibold leading-none mt-0.5 z-10',
-                  isNow
-                    ? 'w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold'
-                    : isDue  ? 'text-amber-600 font-bold'
-                      : dow === 0 ? 'text-rose-700'
-                        : dow === 6 ? 'text-blue-600'
-                          : 'text-slate-700'
-                )}>
-                  {format(day, 'd')}
-                </span>
-
-                {/* Predicted period label: start / end */}
-                {isPredictedStart && (
-                  <span className="text-[7px] font-semibold text-rose-400 leading-none">예상시작</span>
-                )}
-                {isPredictedEnd && (
-                  <span className="text-[7px] font-semibold text-rose-400 leading-none">예상종료</span>
-                )}
-
-                {modeLabel && (
-                  <span className={cn(
-                    'text-[8px] font-semibold leading-none',
-                    isWarning ? 'text-amber-700' : isDue ? 'text-amber-600' : 'text-emerald-700',
-                  )}>
-                    {modeLabel}
-                  </span>
-                )}
-
-                {log && (
-                  <div className="flex items-center gap-0.5 z-10">
-                    {log.isPeriod && (
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center"
-                        style={{ background: 'rgba(217,79,92,0.2)' }}>
-                        <Droplets className="w-2.5 h-2.5 text-rose-600" />
-                      </div>
-                    )}
-                    {log.mood && (
-                      <span className="text-[11px] leading-none">
-                        {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
-                  <div className="w-1.5 h-1.5 rounded-full absolute bottom-1 right-1.5 z-10"
-                    style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
-                )}
-              </button>
-            )
-          })}
+                  position: 'absolute', inset: 0, zIndex: 10,
+                  backgroundColor: 'rgba(255,255,255,0.98)',
+                  transformOrigin: flipState.dir === 'next' ? 'right center' : 'left center',
+                  animation: `page-fold-${flipState.dir} 520ms cubic-bezier(0.4,0,0.6,1) forwards`,
+                  pointerEvents: 'none',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                }}
+              >
+                {renderCalGrid(outgoingDays, flipState.outgoing)}
+              </div>
+              {/* Shadow that folds with the page to simulate depth */}
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 11,
+                pointerEvents: 'none',
+                transformOrigin: flipState.dir === 'next' ? 'right center' : 'left center',
+                animation: `page-fold-${flipState.dir} 520ms cubic-bezier(0.4,0,0.6,1) forwards`,
+                background: flipState.dir === 'next'
+                  ? 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 25%, transparent 55%)'
+                  : 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 25%, transparent 55%)',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+              }} />
+            </>
+          )}
         </div>
-        </div>{/* end flip wrapper */}
 
         {/* ── Phase legend ── */}
         {modeData.mode === 'normal' && (

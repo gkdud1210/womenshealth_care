@@ -825,21 +825,15 @@
 }
 
 /* ----------------------------------------------------------------
-   6. CALENDAR PAGE-FLIP KEYFRAMES
+   6. CALENDAR BOOK PAGE-TURN KEYFRAMES
+   page-fold-next : current page folds away from right edge (→ next month)
+   page-fold-prev : current page folds away from left edge  (→ prev month)
    ---------------------------------------------------------------- */
-@keyframes cal-flip-out-next {
-  from { transform: perspective(1000px) rotateY(0deg); }
-  to   { transform: perspective(1000px) rotateY(-90deg); }
+@keyframes page-fold-next {
+  0%   { transform: perspective(1400px) rotateY(0deg); }
+  100% { transform: perspective(1400px) rotateY(-92deg); }
 }
-@keyframes cal-flip-in-next {
-  from { transform: perspective(1000px) rotateY(90deg); }
-  to   { transform: perspective(1000px) rotateY(0deg); }
-}
-@keyframes cal-flip-out-prev {
-  from { transform: perspective(1000px) rotateY(0deg); }
-  to   { transform: perspective(1000px) rotateY(90deg); }
-}
-@keyframes cal-flip-in-prev {
-  from { transform: perspective(1000px) rotateY(-90deg); }
-  to   { transform: perspective(1000px) rotateY(0deg); }
+@keyframes page-fold-prev {
+  0%   { transform: perspective(1400px) rotateY(0deg); }
+  100% { transform: perspective(1400px) rotateY(92deg); }
 }
