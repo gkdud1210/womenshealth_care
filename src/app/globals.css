@@ -823,3 +823,23 @@
   .safe-top    { padding-top: env(safe-area-inset-top); }
   .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 }
+
+/* ----------------------------------------------------------------
+   6. CALENDAR PAGE-FLIP KEYFRAMES
+   ---------------------------------------------------------------- */
+@keyframes cal-flip-out-next {
+  from { transform: perspective(1000px) rotateY(0deg); }
+  to   { transform: perspective(1000px) rotateY(-90deg); }
+}
+@keyframes cal-flip-in-next {
+  from { transform: perspective(1000px) rotateY(90deg); }
+  to   { transform: perspective(1000px) rotateY(0deg); }
+}
+@keyframes cal-flip-out-prev {
+  from { transform: perspective(1000px) rotateY(0deg); }
+  to   { transform: perspective(1000px) rotateY(90deg); }
+}
+@keyframes cal-flip-in-prev {
+  from { transform: perspective(1000px) rotateY(-90deg); }
+  to   { transform: perspective(1000px) rotateY(0deg); }
+}

@@ -208,7 +208,30 @@ export function HealthCalendar({
   const [showModal,    setShowModal]    = useState(false)
   const [modeData,     setModeData]     = useState<ModeData>({ mode: 'normal' })
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
+  const [flipAnim,     setFlipAnim]     = useState<{ phase: 'out' | 'in'; dir: 'next' | 'prev' } | null>(null)
   const touchStartX = useRef<number | null>(null)
+
+  function navigateMonth(dir: 'next' | 'prev') {
+    if (flipAnim) return
+    setFlipAnim({ phase: 'out', dir })
+    setTimeout(() => {
+      setCurrentMonth(m => dir === 'next' ? addMonths(m, 1) : subMonths(m, 1))
+      setFlipAnim({ phase: 'in', dir })
+    }, 220)
+    setTimeout(() => setFlipAnim(null), 440)
+  }
+
+  function navigateToToday() {
+    const today = new Date()
+    if (isSameMonth(today, currentMonth)) return
+    const dir = today > currentMonth ? 'next' : 'prev'
+    setFlipAnim({ phase: 'out', dir })
+    setTimeout(() => {
+      setCurrentMonth(today)
+      setFlipAnim({ phase: 'in', dir })
+    }, 220)
+    setTimeout(() => setFlipAnim(null), 440)
+  }
 
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX
@@ -217,7 +240,7 @@ export function HealthCalendar({
     if (touchStartX.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartX.current
     if (Math.abs(delta) > 50) {
-      setCurrentMonth(m => delta < 0 ? addMonths(m, 1) : subMonths(m, 1))
+      navigateMonth(delta < 0 ? 'next' : 'prev')
     }
     touchStartX.current = null
   }
@@ -309,15 +332,15 @@ export function HealthCalendar({
             {format(currentMonth, 'yyyy년 M월', { locale: ko })}
           </h2>
           <div className="flex gap-1.5">
-            <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            <button onClick={() => navigateMonth('prev')}
               className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
               <ChevronLeft className="w-4 h-4 text-rose-500" />
             </button>
-            <button onClick={() => setCurrentMonth(new Date())}
+            <button onClick={navigateToToday}
               className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-500 transition-colors">
               오늘
             </button>
-            <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            <button onClick={() => navigateMonth('next')}
               className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
               <ChevronRight className="w-4 h-4 text-rose-500" />
             </button>
@@ -355,6 +378,14 @@ export function HealthCalendar({
           userName={userName}
           onSwitchIrregular={() => setPendingMode('irregular')}
         />
+
+        {/* ── Animated flip wrapper ── */}
+        <div style={flipAnim ? {
+          transformOrigin: flipAnim.phase === 'out'
+            ? (flipAnim.dir === 'next' ? 'right center' : 'left center')
+            : (flipAnim.dir === 'next' ? 'left center'  : 'right center'),
+          animation: `cal-flip-${flipAnim.phase}-${flipAnim.dir} 220ms ${flipAnim.phase === 'out' ? 'ease-in' : 'ease-out'} forwards`,
+        } : undefined}>
 
         {/* ── Weekday headers ── */}
         <div className="grid grid-cols-7 border-b border-slate-100 mb-0">
@@ -479,6 +510,7 @@ export function HealthCalendar({
             )
           })}
         </div>
+        </div>{/* end flip wrapper */}
 
         {/* ── Phase legend ── */}
         {modeData.mode === 'normal' && (
