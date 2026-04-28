@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -208,6 +208,19 @@ export function HealthCalendar({
   const [showModal,    setShowModal]    = useState(false)
   const [modeData,     setModeData]     = useState<ModeData>({ mode: 'normal' })
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
+  const touchStartX = useRef<number | null>(null)
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return
+    const delta = e.changedTouches[0].clientX - touchStartX.current
+    if (Math.abs(delta) > 50) {
+      setCurrentMonth(m => delta < 0 ? addMonths(m, 1) : subMonths(m, 1))
+    }
+    touchStartX.current = null
+  }
 
   useEffect(() => {
     try {
@@ -344,9 +357,9 @@ export function HealthCalendar({
         />
 
         {/* ── Weekday headers ── */}
-        <div className="grid grid-cols-7 mb-1">
+        <div className="grid grid-cols-7 border-b border-slate-100 mb-0">
           {WEEKDAYS.map((day, i) => (
-            <div key={day} className={cn('text-center text-xs font-semibold py-1',
+            <div key={day} className={cn('text-center text-xs font-semibold py-1.5',
               i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-slate-400')}>
               {day}
             </div>
@@ -354,7 +367,11 @@ export function HealthCalendar({
         </div>
 
         {/* ── Calendar grid ── */}
-        <div className="grid grid-cols-7 gap-1">
+        <div
+          className="grid grid-cols-7 border-l border-t border-slate-100"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
           {calendarDays.map((day, i) => {
             const inMonth = isSameMonth(day, currentMonth)
             const isNow   = isToday(day)
@@ -393,17 +410,19 @@ export function HealthCalendar({
                 onClick={() => { if (!inMonth) return; setSelectedDate(isSel ? null : day) }}
                 disabled={!inMonth}
                 className={cn(
-                  'relative rounded-2xl flex flex-col items-center py-1.5 gap-0.5 transition-all duration-150',
+                  'relative flex flex-col items-center py-1.5 gap-0.5 transition-all duration-150',
                   'min-h-[4.5rem] sm:min-h-[5.5rem] active:scale-95',
+                  'border-r border-b border-slate-100',
                   !inMonth && 'opacity-0 pointer-events-none',
                 )}
                 style={{
-                  background,
-                  border: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.3)' : undefined,
+                  background: background ?? 'transparent',
+                  outline: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.3)' : undefined,
+                  outlineOffset: '-1px',
                   boxShadow: isSel
-                    ? `0 0 0 2px ${ringColor}, 0 4px 14px ${ringColor}30`
-                    : isNow   ? '0 0 0 2px #f43f75'
-                      : isDue ? '0 0 0 1.5px #f59e0b88'
+                    ? `inset 0 0 0 2px ${ringColor}`
+                    : isNow   ? 'inset 0 0 0 2px #f43f75'
+                      : isDue ? `inset 0 0 0 1.5px #f59e0b88`
                         : undefined,
                 }}>
 
