@@ -15,7 +15,7 @@ const ENCOURAGE: { threshold: number; msg: string }[] = [
   { threshold: 26,  msg: '좋아요! 루디아가 점점 알아가고 있어요 🌸' },
   { threshold: 51,  msg: '절반 왔어요! 거의 다 왔어요 ✨' },
   { threshold: 76,  msg: '루디아가 당신을 거의 다 이해했어요 💪' },
-  { threshold: 91,  msg: '마지막 질문이에요! 조금만 더 🎉' },
+  { threshold: 91,  msg: '마지막 질문이에요!' },
 ]
 
 function getEncourageMsg(pct: number) {
