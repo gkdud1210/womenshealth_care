@@ -21,11 +21,23 @@ export function getCyclePhase(
 }
 
 export function getPhaseColor(phase: CyclePhase): string {
+  // Accent colors used for rings, text, badges
   const colors: Record<CyclePhase, string> = {
-    menstrual: '#f43f75',
-    follicular: '#fb923c',
-    ovulation: '#22c55e',
-    luteal: '#a855f7',
+    menstrual:  '#d94f5c',
+    follicular: '#3d8b56',
+    ovulation:  '#7048c0',
+    luteal:     '#b8870b',
+  }
+  return colors[phase]
+}
+
+export function getPhaseCellBg(phase: CyclePhase): string {
+  // Pastel background colors for calendar cells
+  const colors: Record<CyclePhase, string> = {
+    menstrual:  '#FFB3B3',
+    follicular: '#D4EDDA',
+    ovulation:  '#E2D1F9',
+    luteal:     '#FFF3CD',
   }
   return colors[phase]
 }

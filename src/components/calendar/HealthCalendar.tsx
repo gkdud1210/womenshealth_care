@@ -1,36 +1,98 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Droplets, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths, addDays
 } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
-import { getCyclePhase, getPhaseColor, getPhaseLabel } from '@/lib/cycle-utils'
+import { getCyclePhase, getPhaseColor, getPhaseCellBg, getPhaseLabel } from '@/lib/cycle-utils'
 import type { DailyLogFormData, CyclePhase } from '@/types/health'
 import { DailyLogModal } from './DailyLogModal'
 
-// ── Types ────────────────────────────────────────────────────────────────────
-type CycleMode = 'normal' | 'pregnancy' | 'menopause' | 'irregular'
+// ── Types ─────────────────────────────────────────────────────────────────────
+type CycleMode       = 'normal' | 'pregnancy' | 'menopause' | 'irregular'
+type IrregularType   = 'none' | 'frequent' | 'delayed' | 'amenorrhea'
 
 interface ModeData {
   mode: CycleMode
-  pregnancyLMP?: string   // YYYY-MM-DD — last menstrual period
-  menopauseDate?: string  // YYYY-MM-DD — when periods stopped
+  pregnancyLMP?: string
+  menopauseDate?: string
 }
 
 const MODE_STORAGE_KEY = 'ludia_cycle_mode_v1'
 
 const MODES: { id: CycleMode; label: string; emoji: string; color: string }[] = [
-  { id: 'normal',    label: '일반 모드',  emoji: '🩸', color: '#f43f75' },
-  { id: 'pregnancy', label: '임신/출산', emoji: '🌿', color: '#10b981' },
-  { id: 'menopause', label: '완경',      emoji: '🌸', color: '#8b5cf6' },
+  { id: 'normal',    label: '일반 모드',   emoji: '🩸', color: '#f43f75' },
+  { id: 'pregnancy', label: '임신/출산',  emoji: '🌿', color: '#10b981' },
+  { id: 'menopause', label: '완경',       emoji: '🌸', color: '#8b5cf6' },
   { id: 'irregular', label: '무월경/불순', emoji: '⚡', color: '#f59e0b' },
 ]
 
-// ── Props ────────────────────────────────────────────────────────────────────
+// ── Cycle detection helpers ───────────────────────────────────────────────────
+
+/** Find the most recent period start date from logs (first day of a consecutive run). */
+function detectCycleStart(logs: Record<string, DailyLogFormData>): Date | undefined {
+  const periodKeys = Object.keys(logs)
+    .filter(k => logs[k]?.isPeriod)
+    .sort()
+    .reverse()
+
+  for (const key of periodKeys) {
+    const date    = new Date(key)
+    const prevKey = format(new Date(date.getTime() - 86400000), 'yyyy-MM-dd')
+    if (!logs[prevKey]?.isPeriod) return date
+  }
+  return undefined
+}
+
+/** Detect irregular cycle patterns from logs. */
+function detectIrregular(
+  logs: Record<string, DailyLogFormData>,
+  cycleLength: number,
+  lastStart?: Date,
+): { type: IrregularType; days: number } {
+  if (!lastStart) return { type: 'none', days: 0 }
+
+  const today      = new Date()
+  const daysSince  = Math.floor((today.getTime() - lastStart.getTime()) / 86400000)
+
+  if (daysSince >= 90)               return { type: 'amenorrhea', days: daysSince }
+  if (daysSince > cycleLength + 10)  return { type: 'delayed',    days: daysSince - cycleLength }
+
+  // Detect all period start dates
+  const starts: Date[] = []
+  const sorted = Object.keys(logs).filter(k => logs[k]?.isPeriod).sort()
+  for (const key of sorted) {
+    const date    = new Date(key)
+    const prevKey = format(new Date(date.getTime() - 86400000), 'yyyy-MM-dd')
+    if (!logs[prevKey]?.isPeriod) starts.push(date)
+  }
+
+  for (let i = 1; i < starts.length; i++) {
+    const interval = Math.floor((starts[i].getTime() - starts[i - 1].getTime()) / 86400000)
+    if (interval < 21) return { type: 'frequent', days: interval }
+  }
+
+  return { type: 'none', days: 0 }
+}
+
+// ── Cell color helpers ────────────────────────────────────────────────────────
+const PHASE_SEL_BG: Record<CyclePhase, string> = {
+  menstrual:  '#FF9494',
+  follicular: '#B8E0C2',
+  ovulation:  '#CEB5F5',
+  luteal:     '#FFE89A',
+}
+
+function cellBgFor(phase: CyclePhase | undefined, selected: boolean): string | undefined {
+  if (!phase) return selected ? 'rgba(244,63,117,0.1)' : undefined
+  return selected ? PHASE_SEL_BG[phase] : getPhaseCellBg(phase)
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface Props {
   logs: Record<string, DailyLogFormData>
   lastPeriodStart?: Date
@@ -52,25 +114,15 @@ const MOODS = [
 
 const PAIN_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
-function phaseBg(phase: CyclePhase, opacity = 0.14): string {
-  const map: Record<CyclePhase, string> = {
-    menstrual:  `rgba(244,63,117,${opacity})`,
-    follicular: `rgba(251,146,60,${opacity})`,
-    ovulation:  `rgba(34,197,94,${opacity})`,
-    luteal:     `rgba(168,85,247,${opacity})`,
-  }
-  return map[phase]
-}
-
-// ── HealthCalendar ───────────────────────────────────────────────────────────
+// ── HealthCalendar ────────────────────────────────────────────────────────────
 export function HealthCalendar({
   logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님'
 }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [showModal, setShowModal]       = useState(false)
-  const [modeData, setModeData]         = useState<ModeData>({ mode: 'normal' })
-  const [pendingMode, setPendingMode]   = useState<CycleMode | null>(null)
+  const [showModal,    setShowModal]    = useState(false)
+  const [modeData,     setModeData]     = useState<ModeData>({ mode: 'normal' })
+  const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
 
   useEffect(() => {
     try {
@@ -84,6 +136,18 @@ export function HealthCalendar({
     try { localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(data)) } catch {}
   }
 
+  // Effective cycle start: prefer real logged data over the prop
+  const effectiveCycleStart = useMemo(
+    () => detectCycleStart(logs) ?? lastPeriodStart,
+    [logs, lastPeriodStart],
+  )
+
+  // Irregular pattern detection (normal mode only)
+  const irregularStatus = useMemo(() => {
+    if (modeData.mode !== 'normal') return { type: 'none' as IrregularType, days: 0 }
+    return detectIrregular(logs, cycleLength, effectiveCycleStart)
+  }, [logs, cycleLength, modeData.mode, effectiveCycleStart])
+
   const calendarDays = useMemo(() => {
     const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 })
     const end   = endOfWeek(endOfMonth(currentMonth),     { weekStartsOn: 0 })
@@ -91,23 +155,21 @@ export function HealthCalendar({
   }, [currentMonth])
 
   function getDayPhase(date: Date): CyclePhase | undefined {
-    if (!lastPeriodStart) return undefined
-    const diff = Math.floor((date.getTime() - lastPeriodStart.getTime()) / 86400000)
+    if (!effectiveCycleStart) return undefined
+    const diff = Math.floor((date.getTime() - effectiveCycleStart.getTime()) / 86400000)
     if (diff < 0) return undefined
     return getCyclePhase((diff % cycleLength) + 1, cycleLength, periodLength)
   }
 
   function getKey(date: Date) { return format(date, 'yyyy-MM-dd') }
 
-  // derived values
   const dueDate = modeData.mode === 'pregnancy' && modeData.pregnancyLMP
-    ? addDays(new Date(modeData.pregnancyLMP), 280)
-    : null
+    ? addDays(new Date(modeData.pregnancyLMP), 280) : null
 
-  const expectedPeriod = lastPeriodStart ? addDays(lastPeriodStart, cycleLength) : null
+  const expectedPeriod = effectiveCycleStart ? addDays(effectiveCycleStart, cycleLength) : null
 
-  // per-cell info based on current mode
-  function getCellInfo(day: Date): {
+  // Per-cell info for non-normal modes
+  function getModeCellInfo(day: Date): {
     bg: string | undefined; label: string | null; isWarning: boolean; isDue: boolean
   } {
     if (modeData.mode === 'pregnancy' && modeData.pregnancyLMP) {
@@ -118,27 +180,20 @@ export function HealthCalendar({
       if (diff >= 0 && diff < 290) {
         const w = Math.floor(diff / 7) + 1
         const d = diff % 7
-        return { bg: 'rgba(16,185,129,0.12)', label: `${w}주${d > 0 ? d + 'd' : ''}`, isWarning: false, isDue: false }
+        return { bg: 'rgba(16,185,129,0.13)', label: `${w}주${d > 0 ? d + 'd' : ''}`, isWarning: false, isDue: false }
       }
       return { bg: 'rgba(16,185,129,0.06)', label: null, isWarning: false, isDue: false }
     }
-
     if (modeData.mode === 'menopause') {
       return { bg: 'rgba(139,92,246,0.10)', label: null, isWarning: false, isDue: false }
     }
-
     if (modeData.mode === 'irregular' && expectedPeriod) {
       const overdue = Math.floor((day.getTime() - expectedPeriod.getTime()) / 86400000)
-      if (overdue > 0) {
-        return {
-          bg: overdue > 15 ? 'rgba(239,68,68,0.13)' : 'rgba(245,158,11,0.13)',
-          label: `D+${overdue}`,
-          isWarning: true,
-          isDue: false,
-        }
+      if (overdue > 0) return {
+        bg: overdue > 15 ? 'rgba(239,68,68,0.13)' : 'rgba(245,158,11,0.13)',
+        label: `D+${overdue}`, isWarning: true, isDue: false,
       }
     }
-
     return { bg: undefined, label: null, isWarning: false, isDue: false }
   }
 
@@ -170,7 +225,7 @@ export function HealthCalendar({
           </div>
         </div>
 
-        {/* ── Mode switcher strip ── */}
+        {/* ── Mode strip ── */}
         <div className="flex gap-2 mb-3 overflow-x-auto pb-0.5 scrollbar-none">
           {MODES.map(({ id, label, emoji, color }) => {
             const active = id === modeData.mode
@@ -196,8 +251,10 @@ export function HealthCalendar({
           modeData={modeData}
           dueDate={dueDate}
           expectedPeriod={expectedPeriod}
-          lastPeriodStart={lastPeriodStart}
+          effectiveCycleStart={effectiveCycleStart}
+          irregularStatus={irregularStatus}
           userName={userName}
+          onSwitchIrregular={() => setPendingMode('irregular')}
         />
 
         {/* ── Weekday headers ── */}
@@ -213,21 +270,26 @@ export function HealthCalendar({
         {/* ── Calendar grid ── */}
         <div className="grid grid-cols-7 gap-1">
           {calendarDays.map((day, i) => {
-            const inMonth  = isSameMonth(day, currentMonth)
-            const isNow    = isToday(day)
-            const isSel    = selectedDate ? isSameDay(day, selectedDate) : false
-            const log      = inMonth ? logs[getKey(day)] : undefined
-            const phase    = modeData.mode === 'normal' ? getDayPhase(day) : undefined
-            const phColor  = phase ? getPhaseColor(phase) : '#f43f75'
-            const dow      = day.getDay()
-            const { bg: modeBg, label: cellLabel, isWarning, isDue } =
-              inMonth ? getCellInfo(day) : { bg: undefined, label: null, isWarning: false, isDue: false }
+            const inMonth = isSameMonth(day, currentMonth)
+            const isNow   = isToday(day)
+            const isSel   = selectedDate ? isSameDay(day, selectedDate) : false
+            const log     = inMonth ? logs[getKey(day)] : undefined
+            const phase   = modeData.mode === 'normal' ? getDayPhase(day) : undefined
+            const dow     = day.getDay()
 
-            const cellBg = isSel
-              ? (phase ? phaseBg(phase, 0.30) : modeBg ? modeBg.replace(/[\d.]+\)$/, '0.28)') : 'rgba(244,63,117,0.1)')
-              : (phase ? phaseBg(phase, 0.15) : modeBg)
+            const { bg: modeBg, label: modeLabel, isWarning, isDue } =
+              (inMonth && modeData.mode !== 'normal')
+                ? getModeCellInfo(day)
+                : { bg: undefined, label: null, isWarning: false, isDue: false }
 
-            const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444' : (phase ? phColor : '#f43f75')
+            const background = modeData.mode === 'normal'
+              ? cellBgFor(phase, isSel)
+              : isSel
+                ? (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)')
+                : modeBg
+
+            const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444'
+              : phase ? getPhaseColor(phase) : '#f43f75'
 
             return (
               <button key={i}
@@ -239,44 +301,41 @@ export function HealthCalendar({
                   !inMonth && 'opacity-0 pointer-events-none',
                 )}
                 style={{
-                  background: cellBg,
+                  background,
                   boxShadow: isSel
                     ? `0 0 0 2px ${ringColor}, 0 4px 14px ${ringColor}30`
-                    : isNow ? '0 0 0 2px #f43f75'
+                    : isNow   ? '0 0 0 2px #f43f75'
                       : isDue ? '0 0 0 1.5px #f59e0b88'
                         : undefined,
                 }}>
 
-                {/* date number */}
                 <span className={cn(
                   'text-sm font-semibold leading-none mt-0.5 z-10',
                   isNow
                     ? 'w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold'
-                    : isDue ? 'text-amber-600 font-bold'
-                      : dow === 0 ? 'text-rose-600'
-                        : dow === 6 ? 'text-blue-500'
+                    : isDue  ? 'text-amber-600 font-bold'
+                      : dow === 0 ? 'text-rose-700'
+                        : dow === 6 ? 'text-blue-600'
                           : 'text-slate-700'
                 )}>
                   {format(day, 'd')}
                 </span>
 
-                {/* mode extra label (pregnancy week / D+N overdue) */}
-                {cellLabel && (
+                {modeLabel && (
                   <span className={cn(
                     'text-[8px] font-semibold leading-none',
-                    isWarning ? 'text-amber-600' : isDue ? 'text-amber-600' : 'text-emerald-600',
+                    isWarning ? 'text-amber-700' : isDue ? 'text-amber-600' : 'text-emerald-700',
                   )}>
-                    {cellLabel}
+                    {modeLabel}
                   </span>
                 )}
 
-                {/* log indicators */}
                 {log && (
                   <div className="flex items-center gap-0.5 z-10">
                     {log.isPeriod && (
                       <div className="w-4 h-4 rounded-full flex items-center justify-center"
-                        style={{ background: 'rgba(244,63,117,0.2)' }}>
-                        <Droplets className="w-2.5 h-2.5 text-rose-500" />
+                        style={{ background: 'rgba(217,79,92,0.2)' }}>
+                        <Droplets className="w-2.5 h-2.5 text-rose-600" />
                       </div>
                     )}
                     {log.mood && (
@@ -287,7 +346,6 @@ export function HealthCalendar({
                   </div>
                 )}
 
-                {/* pain dot */}
                 {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
                   <div className="w-1.5 h-1.5 rounded-full absolute bottom-1 right-1.5 z-10"
                     style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
@@ -297,12 +355,13 @@ export function HealthCalendar({
           })}
         </div>
 
-        {/* ── Phase legend (normal only) ── */}
+        {/* ── Phase legend ── */}
         {modeData.mode === 'normal' && (
-          <div className="mt-3 pt-3 border-t border-rose-100/50 flex flex-wrap gap-x-3 gap-y-1">
+          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-x-3 gap-y-1">
             {(['menstrual','follicular','ovulation','luteal'] as CyclePhase[]).map(p => (
               <div key={p} className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ background: phaseBg(p, 0.7) }} />
+                <div className="w-3 h-3 rounded-sm border border-slate-200"
+                  style={{ background: getPhaseCellBg(p) }} />
                 <span className="text-[10px] text-slate-400">{getPhaseLabel(p)}</span>
               </div>
             ))}
@@ -351,16 +410,49 @@ export function HealthCalendar({
   )
 }
 
-// ── ModeBanner ───────────────────────────────────────────────────────────────
-function ModeBanner({ modeData, dueDate, expectedPeriod, lastPeriodStart, userName }: {
+// ── ModeBanner ────────────────────────────────────────────────────────────────
+function ModeBanner({ modeData, dueDate, expectedPeriod, effectiveCycleStart,
+  irregularStatus, userName, onSwitchIrregular }: {
   modeData: ModeData
   dueDate: Date | null
   expectedPeriod: Date | null
-  lastPeriodStart?: Date
+  effectiveCycleStart?: Date
+  irregularStatus: { type: IrregularType; days: number }
   userName: string
+  onSwitchIrregular: () => void
 }) {
   const today = new Date()
 
+  /* ── normal mode: show irregular warning if detected ── */
+  if (modeData.mode === 'normal' && irregularStatus.type !== 'none') {
+    const MSGS: Record<Exclude<IrregularType, 'none'>, string> = {
+      frequent:   `주기가 ${irregularStatus.days}일로 짧아졌어요 (빈발월경)`,
+      delayed:    `예정일보다 ${irregularStatus.days}일 늦어지고 있어요 (희발월경)`,
+      amenorrhea: `마지막 생리 후 ${irregularStatus.days}일 경과 (무월경)`,
+    }
+    const msg = MSGS[irregularStatus.type as Exclude<IrregularType, 'none'>]
+    return (
+      <div className="mb-3 px-3 py-2.5 rounded-2xl"
+        style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.28)' }}>
+        <div className="flex items-start gap-2">
+          <AlertCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-semibold text-amber-700">{msg}</p>
+            <p className="text-[11px] text-amber-600 mt-0.5">
+              {userName}님, 몸이 조금 지쳤나 봐요. 호르몬 리듬을 함께 살펴볼게요.
+            </p>
+          </div>
+          <button onClick={onSwitchIrregular}
+            className="flex-shrink-0 text-[10px] font-semibold px-2 py-1 rounded-full whitespace-nowrap"
+            style={{ background: 'rgba(245,158,11,0.15)', color: '#b45309' }}>
+            불순 모드 →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  /* ── pregnancy ── */
   if (modeData.mode === 'pregnancy' && modeData.pregnancyLMP) {
     const lmp      = new Date(modeData.pregnancyLMP)
     const diff     = Math.floor((today.getTime() - lmp.getTime()) / 86400000)
@@ -381,10 +473,10 @@ function ModeBanner({ modeData, dueDate, expectedPeriod, lastPeriodStart, userNa
     )
   }
 
+  /* ── menopause ── */
   if (modeData.mode === 'menopause') {
     const since    = modeData.menopauseDate ? new Date(modeData.menopauseDate) : null
-    const daysSince = since ? Math.floor((today.getTime() - since.getTime()) / 86400000) : null
-    const months   = daysSince !== null ? Math.floor(daysSince / 30) : null
+    const months   = since ? Math.floor((today.getTime() - since.getTime()) / (86400000 * 30)) : null
     return (
       <div className="mb-3 px-3 py-2.5 rounded-2xl text-xs leading-relaxed"
         style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}>
@@ -397,12 +489,13 @@ function ModeBanner({ modeData, dueDate, expectedPeriod, lastPeriodStart, userNa
     )
   }
 
+  /* ── irregular ── */
   if (modeData.mode === 'irregular') {
     const overdue = expectedPeriod
       ? Math.floor((today.getTime() - expectedPeriod.getTime()) / 86400000)
       : null
-    const daysSincePeriod = lastPeriodStart
-      ? Math.floor((today.getTime() - lastPeriodStart.getTime()) / 86400000)
+    const daysSince = effectiveCycleStart
+      ? Math.floor((today.getTime() - effectiveCycleStart.getTime()) / 86400000)
       : null
 
     if (overdue !== null && overdue > 0) {
@@ -420,12 +513,11 @@ function ModeBanner({ modeData, dueDate, expectedPeriod, lastPeriodStart, userNa
         </div>
       )
     }
-
-    if (daysSincePeriod !== null) {
+    if (daysSince !== null) {
       return (
         <div className="mb-3 px-3 py-2.5 rounded-2xl text-xs leading-relaxed"
           style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-          <span className="font-bold text-amber-600">⚡ 마지막 생리 후 {daysSincePeriod}일 경과</span>
+          <span className="font-bold text-amber-600">⚡ 마지막 생리 후 {daysSince}일 경과</span>
           <span className="text-amber-500 ml-2">· 호르몬 리듬을 모니터링 중이에요</span>
         </div>
       )
@@ -435,7 +527,7 @@ function ModeBanner({ modeData, dueDate, expectedPeriod, lastPeriodStart, userNa
   return null
 }
 
-// ── ModeDialog ───────────────────────────────────────────────────────────────
+// ── ModeDialog ────────────────────────────────────────────────────────────────
 function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel }: {
   targetMode: CycleMode
   userName: string
@@ -458,20 +550,14 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
   function handleConfirm() {
     onConfirm({
       mode:          targetMode,
-      pregnancyLMP:  targetMode === 'pregnancy' ? (lmpDate || undefined)       : undefined,
+      pregnancyLMP:  targetMode === 'pregnancy' ? (lmpDate || undefined) : undefined,
       menopauseDate: targetMode === 'menopause' ? (menopauseDate || undefined) : undefined,
     })
-  }
-
-  const inputStyle = {
-    background: modeInfo.color + '0a',
-    border:     `1.5px solid ${modeInfo.color}35`,
   }
 
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" onClick={onCancel} />
-
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm rounded-3xl shadow-2xl overflow-hidden"
         style={{
           background:     'rgba(255,255,255,0.97)',
@@ -479,7 +565,6 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
           border:         `1px solid ${modeInfo.color}20`,
         }}>
 
-        {/* header */}
         <div className="px-5 pt-5 pb-4"
           style={{ background: modeInfo.color + '0d', borderBottom: `1.5px solid ${modeInfo.color}18` }}>
           <div className="flex items-center justify-between mb-3">
@@ -488,7 +573,7 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
               <span className="font-bold text-slate-800 text-[15px]">{modeInfo.label}</span>
             </div>
             <button onClick={onCancel}
-              className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center flex-shrink-0 transition-colors">
+              className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
               <X className="w-3.5 h-3.5 text-slate-500" />
             </button>
           </div>
@@ -496,36 +581,24 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
         </div>
 
         <div className="px-5 py-4 space-y-4">
-
-          {/* pregnancy: LMP */}
           {targetMode === 'pregnancy' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                마지막 생리 시작일 (LMP)
-              </label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">마지막 생리 시작일 (LMP)</label>
               <input type="date" value={lmpDate} onChange={e => setLmpDate(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none transition-all"
-                style={inputStyle}
-              />
+                style={{ background: modeInfo.color + '0a', border: `1.5px solid ${modeInfo.color}35` }} />
               <p className="text-[11px] text-slate-400 mt-1">출산 예정일 자동 계산에 사용돼요</p>
             </div>
           )}
-
-          {/* menopause: last period */}
           {targetMode === 'menopause' && (
             <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                마지막 생리 날짜 (기억나는 경우)
-              </label>
+              <label className="block text-xs font-semibold text-slate-500 mb-1.5">마지막 생리 날짜 (기억나는 경우)</label>
               <input type="date" value={menopauseDate} onChange={e => setMenopauseDate(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none transition-all"
-                style={inputStyle}
-              />
+                style={{ background: modeInfo.color + '0a', border: `1.5px solid ${modeInfo.color}35` }} />
               <p className="text-[11px] text-slate-400 mt-1">모르셔도 괜찮아요. 나중에 설정할 수 있어요</p>
             </div>
           )}
-
-          {/* actions */}
           <div className="flex gap-2 pt-1">
             <button onClick={onCancel}
               className="flex-1 py-2.5 rounded-2xl text-sm text-slate-400 border border-slate-100 hover:border-slate-200 transition-colors">
@@ -546,7 +619,7 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
   )
 }
 
-// ── QuickLogPopup ────────────────────────────────────────────────────────────
+// ── QuickLogPopup ─────────────────────────────────────────────────────────────
 function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
   date: Date
   log?: DailyLogFormData
@@ -575,15 +648,9 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20 backdrop-blur-[2px]" onClick={onClose} />
-
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm rounded-3xl shadow-2xl overflow-hidden"
-        style={{
-          background:     'rgba(255,255,255,0.97)',
-          backdropFilter: 'blur(24px)',
-          border:         '1px solid rgba(255,255,255,0.9)',
-        }}>
+        style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.9)' }}>
 
-        {/* header */}
         <div className="px-5 pt-5 pb-3.5 flex items-start justify-between"
           style={{ borderBottom: `1.5px solid ${phaseColor}20` }}>
           <div>
@@ -592,7 +659,7 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </p>
             {phase && (
               <span className="text-[11px] font-medium px-2 py-0.5 rounded-full inline-block mt-1"
-                style={{ background: phaseColor + '18', color: phaseColor }}>
+                style={{ background: getPhaseCellBg(phase), color: getPhaseColor(phase) }}>
                 {getPhaseLabel(phase)}
               </span>
             )}
@@ -604,8 +671,6 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
         </div>
 
         <div className="px-5 py-4 space-y-4">
-
-          {/* 생리 중 */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-2">생리 중인가요?</p>
             <div className="flex gap-2">
@@ -621,7 +686,6 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </div>
           </div>
 
-          {/* 기분 */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-2">오늘 기분은?</p>
             <div className="flex gap-1.5">
@@ -636,7 +700,6 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </div>
           </div>
 
-          {/* 통증 */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-slate-500">통증 강도</p>
@@ -656,7 +719,6 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </div>
           </div>
 
-          {/* actions */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-2xl text-sm text-slate-400 border border-slate-100 hover:border-slate-200 transition-colors">
@@ -664,10 +726,7 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </button>
             <button onClick={handleSave}
               className="flex-1 py-2.5 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
-              style={{
-                background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
-                boxShadow: '0 4px 16px rgba(244,63,117,0.35)',
-              }}>
+              style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)', boxShadow: '0 4px 16px rgba(244,63,117,0.35)' }}>
               저장하기 ✓
             </button>
           </div>
