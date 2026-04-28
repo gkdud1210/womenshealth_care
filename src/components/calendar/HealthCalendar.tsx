@@ -114,6 +114,91 @@ const MOODS = [
 
 const PAIN_LEVELS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
+// ── Pregnancy stage data ──────────────────────────────────────────────────────
+interface PregnancyStageData {
+  id: string
+  minWeek: number
+  maxWeek: number
+  emoji: string
+  title: string
+  subtitle: string
+  getMessage: (name: string) => string
+  nutrients: { name: string; reason: string }[]
+  bodyChanges: string[]
+  products: { label: string; tag: string; color: string }[]
+}
+
+const PREGNANCY_STAGES: PregnancyStageData[] = [
+  {
+    id: 'early', minWeek: 1, maxWeek: 12,
+    emoji: '🌱', title: '임신 초기', subtitle: '1 ~ 12주',
+    getMessage: (n) =>
+      `${n}님, 새 생명이 싹트기 시작했어요! 아기의 뇌와 심장이 형성되는 가장 중요한 시기예요. 입덧이 힘드시더라도 엽산과 B6는 꼭 챙겨주세요 💜`,
+    nutrients: [
+      { name: '엽산', reason: '신경관 형성' },
+      { name: '비타민 B6', reason: '입덧 완화' },
+      { name: '철분', reason: '혈액 생성' },
+      { name: '비타민 C', reason: '면역 강화' },
+    ],
+    bodyChanges: ['입덧', '유방 민감도 ↑', '잦은 소변', '극심한 피로', '감정 기복'],
+    products: [
+      { label: '루디아 임산부 엽산', tag: '필수', color: '#10b981' },
+      { label: '산전 복합비타민', tag: '추천', color: '#6366f1' },
+    ],
+  },
+  {
+    id: 'mid', minWeek: 13, maxWeek: 27,
+    emoji: '🌿', title: '임신 중기', subtitle: '13 ~ 27주',
+    getMessage: (n) =>
+      `${n}님, 이제 안정기예요! 입덧도 줄고 에너지가 돌아오는 시기예요. 아기 뇌 발달을 위한 DHA를 놓치지 마세요. 곧 태동을 느끼는 설레는 순간이 다가오고 있어요 🌿`,
+    nutrients: [
+      { name: 'DHA', reason: '아기 뇌 발달' },
+      { name: '철분', reason: '빈혈 예방' },
+      { name: '칼슘', reason: '골격 형성' },
+      { name: '단백질', reason: '조직 성장' },
+    ],
+    bodyChanges: ['배가 뚜렷이 커짐', '태동 시작', '허리 통증', '다리 붓기', '피부 변화'],
+    products: [
+      { label: '루디아 DHA 오메가3', tag: '뇌 발달', color: '#10b981' },
+      { label: '임산부 철분제', tag: '필수', color: '#ef4444' },
+    ],
+  },
+  {
+    id: 'late', minWeek: 28, maxWeek: 40,
+    emoji: '🍃', title: '임신 후기', subtitle: '28 ~ 40주',
+    getMessage: (n) =>
+      `${n}님, 거의 다 왔어요! 아기도 ${n}님도 마지막 준비를 하고 있어요. 칼슘과 비타민 D로 아기 뼈를 튼튼히 하고 충분한 휴식을 취해주세요 🌙`,
+    nutrients: [
+      { name: '칼슘', reason: '아기 뼈 발달' },
+      { name: '비타민 D', reason: '칼슘 흡수' },
+      { name: '식이섬유', reason: '변비 예방' },
+      { name: 'DHA', reason: '뇌 완성' },
+    ],
+    bodyChanges: ['잦은 태동', '골반 압박감', '수면 어려움', '가진통', '부종 심화'],
+    products: [
+      { label: '루디아 칼슘+D', tag: '추천', color: '#f59e0b' },
+      { label: '출산 준비 패키지', tag: 'NEW', color: '#10b981' },
+    ],
+  },
+  {
+    id: 'postpartum', minWeek: 41, maxWeek: Infinity,
+    emoji: '🌸', title: '산후조리기', subtitle: '출산 후',
+    getMessage: (n) =>
+      `정말 수고하셨어요, ${n}님! 이제 회복이 가장 중요한 시기예요. 모유 수유 중이시라면 단백질과 요오드를 충분히 챙겨주세요. 루디아가 회복 과정을 함께 지켜볼게요 💜`,
+    nutrients: [
+      { name: '단백질', reason: '회복 & 모유 생성' },
+      { name: '요오드', reason: '모유 수유 지원' },
+      { name: '철분', reason: '출혈 후 회복' },
+      { name: '오메가3', reason: '산후 우울 완화' },
+    ],
+    bodyChanges: ['오로 분비', '유방 충혈', '산후 통증', '감정 기복', '호르몬 급변'],
+    products: [
+      { label: '루디아 산후 복합비타민', tag: '추천', color: '#8b5cf6' },
+      { label: '모유 수유 지원 영양제', tag: '인기', color: '#10b981' },
+    ],
+  },
+]
+
 // ── HealthCalendar ────────────────────────────────────────────────────────────
 export function HealthCalendar({
   logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님'
@@ -393,6 +478,11 @@ export function HealthCalendar({
           </div>
         )}
       </div>
+
+      {/* ── Pregnancy stage info card ── */}
+      {modeData.mode === 'pregnancy' && modeData.pregnancyLMP && (
+        <PregnancyInfoCard lmpDate={modeData.pregnancyLMP} userName={userName} />
+      )}
 
       {/* ── Quick log popup ── */}
       {selectedDate && !showModal && (
@@ -759,5 +849,106 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
         </div>
       </div>
     </>
+  )
+}
+
+// ── PregnancyInfoCard ─────────────────────────────────────────────────────────
+function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: string }) {
+  const lmp   = new Date(lmpDate)
+  const today = new Date()
+  const diff  = Math.floor((today.getTime() - lmp.getTime()) / 86400000)
+  const week  = Math.max(1, Math.floor(diff / 7) + 1)
+
+  const stage = PREGNANCY_STAGES.find(s => week >= s.minWeek && week <= s.maxWeek)
+    ?? PREGNANCY_STAGES[PREGNANCY_STAGES.length - 1]
+
+  const accent = stage.id === 'postpartum' ? '#8b5cf6' : '#10b981'
+
+  return (
+    <div className="mt-3 rounded-3xl overflow-hidden"
+      style={{
+        background:  'rgba(255,255,255,0.92)',
+        border:      `1px solid ${accent}28`,
+        boxShadow:   `0 4px 20px ${accent}10`,
+      }}>
+
+      {/* ── Header ── */}
+      <div className="px-4 pt-4 pb-3"
+        style={{ background: `${accent}0b`, borderBottom: `1px solid ${accent}18` }}>
+        <div className="flex items-start gap-2.5">
+          <span className="text-3xl leading-none mt-0.5">{stage.emoji}</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-slate-800 text-[15px] leading-none">{stage.title}</p>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                style={{ background: `${accent}18`, color: accent }}>
+                {stage.subtitle}
+              </span>
+            </div>
+            {week < 41 && (
+              <p className="text-[11px] font-semibold mt-1" style={{ color: accent }}>
+                현재 {week}주차
+              </p>
+            )}
+          </div>
+        </div>
+        <p className="text-[12px] text-slate-600 leading-relaxed mt-2.5">
+          {stage.getMessage(userName)}
+        </p>
+      </div>
+
+      <div className="px-4 py-3 space-y-3.5">
+
+        {/* ── Nutrients ── */}
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">💊 주요 영양소</p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {stage.nutrients.map(({ name, reason }) => (
+              <div key={name} className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                style={{ background: `${accent}0d` }}>
+                <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: accent }} />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-slate-700 leading-none">{name}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5 leading-none">{reason}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Body changes ── */}
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">🌡 이 시기 몸의 변화</p>
+          <div className="flex flex-wrap gap-1.5">
+            {stage.bodyChanges.map(change => (
+              <span key={change}
+                className="text-[11px] font-medium px-2.5 py-1 rounded-full"
+                style={{ background: 'rgba(148,163,184,0.12)', color: '#64748b' }}>
+                {change}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Product recs ── */}
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">✨ 루디아 추천</p>
+          <div className="flex gap-2">
+            {stage.products.map(({ label, tag, color }) => (
+              <button key={label}
+                className="flex-1 py-2.5 px-3 rounded-2xl text-left transition-all active:scale-95"
+                style={{ background: `${color}10`, border: `1px solid ${color}2e` }}>
+                <span className="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1"
+                  style={{ background: color, color: '#fff' }}>
+                  {tag}
+                </span>
+                <p className="text-[11px] font-semibold text-slate-700 leading-snug">{label}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
   )
 }
