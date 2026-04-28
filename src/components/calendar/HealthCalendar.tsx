@@ -136,10 +136,11 @@ export function HealthCalendar({
     try { localStorage.setItem(MODE_STORAGE_KEY, JSON.stringify(data)) } catch {}
   }
 
-  // Effective cycle start: prefer real logged data over the prop
+  // Effective cycle start: only from actual logged period data.
+  // Colors stay hidden until the user logs their first period day.
   const effectiveCycleStart = useMemo(
-    () => detectCycleStart(logs) ?? lastPeriodStart,
-    [logs, lastPeriodStart],
+    () => detectCycleStart(logs),
+    [logs],
   )
 
   // Irregular pattern detection (normal mode only)
