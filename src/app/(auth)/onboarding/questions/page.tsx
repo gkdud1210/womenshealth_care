@@ -80,10 +80,11 @@ export default function QuestionsPage() {
       {isFirst && (
         <div className="mb-5 px-4 py-3.5 rounded-2xl text-sm text-slate-600 leading-relaxed"
           style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(168,85,247,0.15)' }}>
-          <p className="font-semibold text-purple-600 mb-1">{user!.name}님,</p>
-          고민되는 부분을 선택해 주셔서 감사해요. 루디아가 당신의 몸을 더 깊이 이해하고,
-          홍채와 자궁 온도를 분석할 때 정확한 단서를 찾을 수 있도록 몇 가지만 더 물어볼게요.
-          <span className="block text-[11px] text-slate-400 mt-1">기억나는 만큼만 편하게 답해 주세요 💜</span>
+          <p className="font-semibold text-purple-600 mb-1">반가워요, {user!.name}님!</p>
+          선택하신 카드들을 보니 평소에 어떤 부분을 소중히 관리하고 싶으신지 루디아가 잘 알 것 같아요.
+          더 정확한 <span className="font-semibold text-purple-600">'호르몬 지도'</span>를 그려드리기 위해,
+          루디아에게만 살짝 들려주실 이야기가 있나요?
+          <span className="block text-[11px] text-slate-400 mt-1">아는 만큼만 편하게 답해주세요 💜</span>
         </div>
       )}
 
