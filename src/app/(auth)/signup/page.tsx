@@ -29,15 +29,14 @@ export default function SignupPage() {
 
     const prev = storedUser()
     if (prev && prev.name === name.trim() && prev.birthdate === birthdate) {
-      // 기존 사용자 — 프로필 유지, 세션만 시작
+      // 기존 사용자 — 프로필 유지, 세션 시작 후 카드 선택 화면으로
       startSession()
-      router.push(isOnboarded ? '/' : '/onboarding')
     } else {
       // 신규 또는 정보 변경
       saveUser({ name: name.trim(), birthdate, careTypes: [] })
       startSession()
-      router.push('/onboarding')
     }
+    router.push('/onboarding')
   }
 
   return (

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Eye, Thermometer, Brain, Activity, CheckCircle2,
   Camera, CameraOff, ChevronRight, Scan, Zap,
@@ -9,7 +9,6 @@ import {
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
-import { DEFAULT_MULTIMODAL } from '@/components/calendar/MultimodalDataPanel'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 
 /* ── utils ──────────────────────────────────────────────────────── */
@@ -25,10 +24,19 @@ const STEPS = [
 ]
 
 /* ══════════════════════════════════════════════════════════════════
-   STEP 1 — IRIS SCAN
+   STEP 1 — IRIS SCAN  (오른쪽 눈 → 왼쪽 눈)
 ══════════════════════════════════════════════════════════════════ */
 
 type IrisPhase = 'idle' | 'scanning' | 'captured' | 'analyzing' | 'uploading' | 'done'
+type EyeStep   = 'right' | 'left'
+
+interface EyeData {
+  score: number
+  skinZone: number
+  thyroidZone: number
+  annotatedImg: string | null
+  isReal: boolean
+}
 
 function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
   const videoRef   = useRef<HTMLVideoElement>(null)
@@ -38,37 +46,42 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
   const streamRef  = useRef<MediaStream | null>(null)
   const rafRef     = useRef<number>()
 
-  const [cam, setCam]       = useState<'requesting' | 'live' | 'denied'>('requesting')
-  const [phase, setPhase]   = useState<IrisPhase>('idle')
-  const [pct, setPct]       = useState(0)
-  const [res, setRes]       = useState<MultimodalData['iris'] | null>(null)
-  const [uploadErr, setUploadErr]     = useState<string | null>(null)
-  const [isRealData, setIsRealData]   = useState(false)
-  const [annotatedImg, setAnnotatedImg] = useState<string | null>(null)
-  const [organPatterns, setOrganPatterns] = useState<Record<string, {
-    nameKo: string
-    patterns: Record<string, number>
-    patternsKo: Record<string, number>
-  }> | null>(null)
-  const [dominantPatterns, setDominantPatterns] = useState<Record<string, {
-    pattern: string; patternKo: string; confidence: number
-  }> | null>(null)
+  const [cam, setCam]     = useState<'idle' | 'requesting' | 'live' | 'denied'>('idle')
+  const [phase, setPhase] = useState<IrisPhase>('idle')
+  const [pct, setPct]     = useState(0)
+  const [eyeStep, setEyeStep]   = useState<EyeStep>('right')
+  const [rightData, setRightData] = useState<EyeData | null>(null)
+  const [leftData,  setLeftData]  = useState<EyeData | null>(null)
+  const [uploadErr, setUploadErr] = useState<string | null>(null)
 
-  /* camera */
+  const currentData = eyeStep === 'right' ? rightData : leftData
+
+  /* cleanup on unmount */
   useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } })
-      .then(stream => {
-        streamRef.current = stream
-        if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play() }
-        setCam('live')
-      })
-      .catch(() => setCam('denied'))
     return () => {
       streamRef.current?.getTracks().forEach(t => t.stop())
       cancelAnimationFrame(rafRef.current ?? 0)
     }
   }, [])
+
+  /* connect camera on demand */
+  async function startCamera() {
+    setCam('requesting')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      })
+      streamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+      setCam('live')
+      setPhase('scanning')
+    } catch {
+      setCam('denied')
+    }
+  }
 
   /* image upload handler */
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -82,11 +95,15 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       const resp = await fetch('/api/iris-analyze', { method: 'POST', body: fd })
       const data = await resp.json()
       if (data.error) throw new Error(data.error)
-      setRes({ leftScore: data.leftScore, rightScore: data.rightScore, skinZone: data.skinZone, thyroidZone: data.thyroidZone })
-      if (data.organPatterns)    setOrganPatterns(data.organPatterns)
-      if (data.dominantPatterns) setDominantPatterns(data.dominantPatterns)
-      if (data.annotatedImage)   setAnnotatedImg(data.annotatedImage)
-      setIsRealData(true)
+      const eyeData: EyeData = {
+        score:        eyeStep === 'right' ? data.rightScore : data.leftScore,
+        skinZone:     data.skinZone,
+        thyroidZone:  data.thyroidZone,
+        annotatedImg: data.annotatedImage ?? null,
+        isReal:       true,
+      }
+      if (eyeStep === 'right') setRightData(eyeData)
+      else                     setLeftData(eyeData)
       setPhase('done')
     } catch (err) {
       setUploadErr(err instanceof Error ? err.message : '분석 실패')
@@ -94,6 +111,26 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
     } finally {
       if (fileRef.current) fileRef.current.value = ''
     }
+  }
+
+  /* go to left eye */
+  function goToLeft() {
+    setEyeStep('left')
+    setPhase('idle')
+    setUploadErr(null)
+    // 카메라가 이미 연결돼 있으면 sim canvas useEffect가 phase 변화를 감지해 계속 표시
+  }
+
+  /* finish — combine both eye results */
+  function finish() {
+    const r = rightData!
+    const l = leftData!
+    onDone({
+      rightScore:  r.score,
+      leftScore:   l.score,
+      skinZone:    Math.round((r.skinZone  + l.skinZone)  / 2),
+      thyroidZone: Math.round((r.thyroidZone + l.thyroidZone) / 2),
+    })
   }
 
   /* overlay canvas for camera mode */
@@ -142,9 +179,9 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
     draw(); return () => cancelAnimationFrame(rafRef.current ?? 0)
   }, [cam, phase])
 
-  /* simulation canvas (no camera) */
+  /* simulation canvas (카메라 미연결 상태) */
   useEffect(() => {
-    if (cam !== 'denied') return
+    if (cam === 'live') return
     const cv = simRef.current!; if (!cv) return
     const ctx = cv.getContext('2d')!; const W = cv.width, H = cv.height
     let t = 0
@@ -214,7 +251,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
     draw(); return ()=>cancelAnimationFrame(rafRef.current??0)
   }, [cam, phase])
 
-  /* scan timer */
+  /* scan timer (카메라 시뮬레이션) */
   useEffect(() => {
     if (phase!=='scanning') return
     let p=0; const iv=setInterval(()=>{
@@ -224,52 +261,109 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         setTimeout(()=>{
           setPhase('analyzing')
           setTimeout(()=>{
-            setRes({ leftScore:rng(58,86), rightScore:rng(60,88), skinZone:rng(42,78), thyroidZone:rng(62,88) })
+            const eyeData: EyeData = {
+              score:        rng(58, 88),
+              skinZone:     rng(42, 78),
+              thyroidZone:  rng(62, 88),
+              annotatedImg: null,
+              isReal:       false,
+            }
+            if (eyeStep === 'right') setRightData(eyeData)
+            else                     setLeftData(eyeData)
             setPhase('done')
           },1800)
         },900)
       }
     },55)
     return ()=>clearInterval(iv)
-  },[phase])
+  },[phase, eyeStep])
+
+  const eyeLabel = eyeStep === 'right' ? '오른쪽 눈' : '왼쪽 눈'
+  const bothDone = phase === 'done' && eyeStep === 'left' && leftData !== null
 
   return (
     <div className="space-y-4">
-      <div className="relative rounded-2xl overflow-hidden bg-slate-950" style={{aspectRatio:'4/3',maxHeight:360}}>
-        {phase==='done' && annotatedImg ? (
-          /* 인식 결과 이미지 */
+
+      {/* ── 눈 단계 표시기 ── */}
+      <div className="flex items-center gap-2">
+        {(['right','left'] as EyeStep[]).map((eye, i) => {
+          const label  = eye === 'right' ? '오른쪽 눈' : '왼쪽 눈'
+          const done   = eye === 'right' ? rightData !== null : leftData !== null
+          const active = eyeStep === eye && !bothDone
+          return (
+            <div key={eye} className="flex items-center gap-2 flex-1">
+              <div className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold flex-1 justify-center transition-all',
+                done
+                  ? 'bg-green-100 text-green-600'
+                  : active
+                    ? 'text-white'
+                    : 'bg-slate-100 text-slate-400',
+              )} style={active ? {background:'linear-gradient(135deg,#a855f7,#7c3aed)'} : {}}>
+                {done
+                  ? <><CheckCircle2 className="w-3 h-3"/>{label} ✓</>
+                  : <><Eye className="w-3 h-3"/>{label}</>}
+              </div>
+              {i === 0 && <ChevronRight className="w-3 h-3 text-slate-300 flex-shrink-0"/>}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── 뷰파인더 ── */}
+      <div className="relative rounded-2xl overflow-hidden bg-slate-950" style={{aspectRatio:'4/3',maxHeight:340}}>
+        {/* 항상 video 엘리먼트를 DOM에 유지 (srcObject 할당을 위해) */}
+        <video ref={videoRef} autoPlay muted playsInline
+          className={cn('w-full h-full object-cover', cam !== 'live' && 'hidden')}
+          style={{transform:'scaleX(-1)'}} />
+        <canvas ref={overlayRef} width={640} height={480}
+          className={cn('absolute inset-0 w-full h-full pointer-events-none', cam !== 'live' && 'hidden')}
+          style={{transform:'scaleX(-1)'}} />
+
+        {/* 결과 이미지 */}
+        {phase==='done' && currentData?.annotatedImg && (
           <>
-            <img src={annotatedImg} alt="홍채 인식 결과" className="w-full h-full object-contain" />
+            <img src={currentData.annotatedImg} alt={`${eyeLabel} 홍채 인식 결과`} className="absolute inset-0 w-full h-full object-contain" />
             <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
               <Eye className="w-3 h-3 text-green-400"/>
-              <span className="text-[10px] text-white">홍채 인식 완료</span>
+              <span className="text-[10px] text-white">{eyeLabel} 인식 완료</span>
             </div>
             <div className="absolute bottom-3 right-3 flex items-center gap-3 px-2.5 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-[9px] text-white">
               <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#1edc5a'}}/> 홍채</span>
               <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#00c8ff'}}/> 동공</span>
             </div>
           </>
-        ) : cam==='live' ? (
-          <>
-            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover" style={{transform:'scaleX(-1)'}} />
-            <canvas ref={overlayRef} width={640} height={480} className="absolute inset-0 w-full h-full pointer-events-none" style={{transform:'scaleX(-1)'}} />
-          </>
-        ) : (
+        )}
+
+        {/* 시뮬레이션 캔버스 (카메라 미연결 상태) */}
+        {cam !== 'live' && !(phase==='done' && currentData?.annotatedImg) && (
           <canvas ref={simRef} width={420} height={320} className="w-full h-full" />
         )}
-        {!(phase==='done' && annotatedImg) && (
+
+        {/* 상태 배지 */}
+        {!(phase==='done' && currentData?.annotatedImg) && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
             {cam==='live'
-              ? <><Camera className="w-3 h-3 text-green-400"/><span className="text-[10px] text-white">카메라 연결</span></>
-              : <><CameraOff className="w-3 h-3 text-amber-400"/><span className="text-[10px] text-white">시뮬레이션 모드</span></>}
+              ? <><Camera className="w-3 h-3 text-green-400"/><span className="text-[10px] text-white">카메라 연결됨</span></>
+              : cam==='requesting'
+                ? <><div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"/><span className="text-[10px] text-white">카메라 연결 중...</span></>
+                : cam==='denied'
+                  ? <><CameraOff className="w-3 h-3 text-red-400"/><span className="text-[10px] text-red-300">카메라 권한 필요</span></>
+                  : <><CameraOff className="w-3 h-3 text-amber-400"/><span className="text-[10px] text-white">카메라 대기 중</span></>}
           </div>
         )}
-        {(phase==='scanning') && (
+        {phase==='scanning' && (
           <div className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
-            <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"/><span className="text-[10px] text-rose-300 font-medium">스캔 중 {pct}%</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse"/>
+            <span className="text-[10px] text-rose-300 font-medium">스캔 중 {pct}%</span>
           </div>
         )}
-        {phase==='captured' && <div className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm"><div className="w-1.5 h-1.5 rounded-full bg-green-400"/><span className="text-[10px] text-green-300 font-medium">캡처 완료</span></div>}
+        {phase==='captured' && (
+          <div className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400"/>
+            <span className="text-[10px] text-green-300 font-medium">캡처 완료</span>
+          </div>
+        )}
         {phase==='uploading' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
@@ -280,61 +374,75 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         )}
       </div>
 
-      {phase==='scanning' && <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full transition-all duration-75" style={{width:`${pct}%`}}/></div>}
-
-      {phase==='done' && res && (
-        <div className="space-y-3">
-          {/* 기본 점수 */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            {[['좌안 밀도',res.leftScore],['우안 밀도',res.rightScore],['피부 Zone',res.skinZone],['갑상선 Zone',res.thyroidZone]].map(([l,v])=>(
-              <div key={String(l)} className="rounded-xl p-2.5 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-                <div className={cn('text-xl font-bold font-display',(v as number)>=70?'text-green-600':'text-amber-600')}>{v}</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{l}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* 장기 패턴 (상세 분석 결과) */}
-          {dominantPatterns && (
-            <div className="rounded-xl p-3 space-y-2" style={{background:'rgba(168,85,247,.06)',border:'1px solid rgba(168,85,247,.2)'}}>
-              <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">장기 패턴 분석 (EfficientNet)</p>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(dominantPatterns).map(([organ, d]) => {
-                  const nameKo = organPatterns?.[organ]?.nameKo ?? organ
-                  const isNormal = d.pattern === 'normal'
-                  return (
-                    <div key={organ} className="rounded-lg p-2 flex items-center gap-2" style={{background:'rgba(255,255,255,.7)'}}>
-                      <div className={cn('w-2 h-2 rounded-full flex-shrink-0', isNormal ? 'bg-green-400' : 'bg-amber-400')}/>
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-semibold text-slate-600">{nameKo}</p>
-                        <p className={cn('text-[11px] font-bold', isNormal ? 'text-green-600' : 'text-amber-600')}>
-                          {d.patternKo} <span className="font-normal text-slate-400">({d.confidence.toFixed(1)}%)</span>
-                        </p>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+      {phase==='scanning' && (
+        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full transition-all duration-75" style={{width:`${pct}%`}}/>
         </div>
       )}
 
-      <div className="text-center text-sm text-slate-500 min-h-[28px]">
-        {phase==='idle'&&'카메라를 눈 앞에 위치시킨 후 스캔하거나, 홍채 사진을 업로드하세요'}
-        {phase==='scanning'&&'👁  홍채를 화면 중앙에 맞추고 가만히 있어 주세요...'}
-        {phase==='captured'&&'📸 이미지 캡처 완료 — 구역 분석 중...'}
-        {phase==='analyzing'&&'🔬 홍채 패턴 분석 중...'}
-        {phase==='uploading'&&'🔬 AI 홍채 분석 중... 잠시만 기다려 주세요'}
-        {phase==='done'&&(isRealData ? '✅ AI 홍채 분석 완료! (실제 데이터)' : '✅ 홍채 분석 완료!')}
+      {/* ── 현재 눈 결과 점수 ── */}
+      {phase==='done' && currentData && (
+        <div className="flex gap-2">
+          <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+            <div className={cn('text-2xl font-bold font-display', currentData.score>=70?'text-green-600':'text-amber-600')}>
+              {currentData.score}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">{eyeLabel} 밀도</div>
+          </div>
+          <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+            <div className={cn('text-2xl font-bold font-display', currentData.skinZone>=70?'text-green-600':'text-amber-600')}>
+              {currentData.skinZone}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">피부 Zone</div>
+          </div>
+          <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+            <div className={cn('text-2xl font-bold font-display', currentData.thyroidZone>=70?'text-green-600':'text-amber-600')}>
+              {currentData.thyroidZone}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">갑상선 Zone</div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 두 눈 모두 완료 — 최종 결과 ── */}
+      {bothDone && rightData && leftData && (
+        <div className="rounded-xl p-3 space-y-2" style={{background:'rgba(168,85,247,.06)',border:'1px solid rgba(168,85,247,.2)'}}>
+          <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">양안 종합 분석</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[['우안 밀도', rightData.score], ['좌안 밀도', leftData.score],
+              ['피부 Zone', Math.round((rightData.skinZone+leftData.skinZone)/2)],
+              ['갑상선 Zone', Math.round((rightData.thyroidZone+leftData.thyroidZone)/2)]
+            ].map(([l, v]) => (
+              <div key={String(l)} className="rounded-lg p-2 text-center" style={{background:'rgba(255,255,255,.7)'}}>
+                <div className={cn('text-lg font-bold font-display', (v as number)>=70?'text-green-600':'text-amber-600')}>{v}</div>
+                <div className="text-[10px] text-slate-500">{l}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 상태 메시지 ── */}
+      <div className="text-center text-sm text-slate-500 min-h-[24px]">
+        {phase==='idle'    && `👁 ${eyeLabel} 홍채 사진을 업로드하거나 카메라로 스캔하세요`}
+        {phase==='scanning'  && `👁 ${eyeLabel}을 화면 중앙에 맞추고 가만히 있어 주세요...`}
+        {phase==='captured'  && '📸 캡처 완료 — 구역 분석 중...'}
+        {phase==='analyzing' && '🔬 홍채 패턴 분석 중...'}
+        {phase==='uploading' && '🔬 AI 홍채 분석 중... 잠시만 기다려 주세요'}
+        {phase==='done' && eyeStep==='right' && '✅ 오른쪽 눈 완료! 이제 왼쪽 눈을 스캔하세요'}
+        {phase==='done' && eyeStep==='left'  && '✅ 양안 분석 완료!'}
       </div>
 
       {uploadErr && <p className="text-xs text-red-500 text-center">{uploadErr}</p>}
 
+      {/* ── 액션 버튼 ── */}
       {phase==='idle' && (
         <div className="flex gap-2">
-          <button onClick={()=>setPhase('scanning')} className="flex-1 btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
-            <Scan className="w-4 h-4"/>카메라 스캔
+          <button
+            onClick={() => cam === 'live' ? setPhase('scanning') : startCamera()}
+            className="flex-1 btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+            <Scan className="w-4 h-4"/>
+            {cam === 'live' ? '스캔 시작' : 'Go Live'}
           </button>
           <button onClick={()=>fileRef.current?.click()}
             className="flex-1 py-3 rounded-2xl text-sm flex items-center justify-center gap-2 font-medium transition-all hover:opacity-90 active:scale-95"
@@ -344,7 +452,22 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload}/>
         </div>
       )}
-      {phase==='done' && <button onClick={()=>onDone(res!)} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">다음 단계: 열화상 스캔<ChevronRight className="w-4 h-4"/></button>}
+
+      {/* 오른쪽 눈 완료 → 왼쪽 눈으로 */}
+      {phase==='done' && eyeStep==='right' && (
+        <button onClick={goToLeft}
+          className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+          다음: 왼쪽 눈 스캔 <ChevronRight className="w-4 h-4"/>
+        </button>
+      )}
+
+      {/* 양안 완료 → 다음 단계 */}
+      {bothDone && (
+        <button onClick={finish}
+          className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
+          다음 단계: 열화상 스캔 <ChevronRight className="w-4 h-4"/>
+        </button>
+      )}
     </div>
   )
 }

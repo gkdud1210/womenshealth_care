@@ -112,10 +112,14 @@ const CARE_CASES = [
 export default function OnboardingPage() {
   const router   = useRouter()
   const { user, saveUser, startSession, ready } = useAuth()
-  const [selected, setSelected]   = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (ready && !user) router.replace('/signup')
+    // 이전에 선택한 카드 복원
+    if (ready && user && user.careTypes.length > 0) {
+      setSelected(new Set(user.careTypes))
+    }
   }, [ready, user, router])
 
   if (!ready || !user) return null
@@ -132,7 +136,7 @@ export default function OnboardingPage() {
     if (selected.size === 0) return
     saveUser({ ...user!, careTypes: Array.from(selected) })
     startSession()
-    router.push('/')
+    router.push('/onboarding/questions')
   }
 
   return (
