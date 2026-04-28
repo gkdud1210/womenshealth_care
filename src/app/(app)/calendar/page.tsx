@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { CalendarHeart, Sparkles } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
+import { useAuth } from '@/hooks/useAuth'
 import type { DailyLogFormData } from '@/types/health'
 
 const MOCK_LAST_PERIOD = new Date(2026, 3, 8)
@@ -22,6 +23,7 @@ const MOCK_LOGS: Record<string, DailyLogFormData> = {
 }
 
 export default function CalendarPage() {
+  const { user } = useAuth()
   const [logs, setLogs] = useState<Record<string, DailyLogFormData>>(MOCK_LOGS)
 
   const handleLogSave = useCallback((data: DailyLogFormData) => {
@@ -59,6 +61,7 @@ export default function CalendarPage() {
         cycleLength={CYCLE_LENGTH}
         periodLength={PERIOD_LENGTH}
         onLogSave={handleLogSave}
+        userName={user?.name ?? '님'}
       />
     </div>
   )
