@@ -282,8 +282,19 @@ export function HealthCalendar({
                 ? getModeCellInfo(day)
                 : { bg: undefined, label: null, isWarning: false, isDue: false }
 
+            // Predicted period: menstrual phase day not yet confirmed in logs
+            const isPredicted = inMonth && modeData.mode === 'normal'
+              && phase === 'menstrual' && !log?.isPeriod
+            const predDayInCycle = isPredicted && effectiveCycleStart
+              ? ((Math.floor((day.getTime() - effectiveCycleStart.getTime()) / 86400000)) % cycleLength) + 1
+              : 0
+            const isPredictedStart = isPredicted && predDayInCycle === 1
+            const isPredictedEnd   = isPredicted && predDayInCycle === periodLength
+
             const background = modeData.mode === 'normal'
-              ? cellBgFor(phase, isSel)
+              ? isPredicted && !isSel
+                ? 'rgba(255,179,179,0.38)'   // lighter for unconfirmed predicted period
+                : cellBgFor(phase, isSel)
               : isSel
                 ? (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)')
                 : modeBg
@@ -302,6 +313,7 @@ export function HealthCalendar({
                 )}
                 style={{
                   background,
+                  border: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.3)' : undefined,
                   boxShadow: isSel
                     ? `0 0 0 2px ${ringColor}, 0 4px 14px ${ringColor}30`
                     : isNow   ? '0 0 0 2px #f43f75'
@@ -320,6 +332,14 @@ export function HealthCalendar({
                 )}>
                   {format(day, 'd')}
                 </span>
+
+                {/* Predicted period label: start / end */}
+                {isPredictedStart && (
+                  <span className="text-[7px] font-semibold text-rose-400 leading-none">예상시작</span>
+                )}
+                {isPredictedEnd && (
+                  <span className="text-[7px] font-semibold text-rose-400 leading-none">예상종료</span>
+                )}
 
                 {modeLabel && (
                   <span className={cn(
