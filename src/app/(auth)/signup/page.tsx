@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Sparkles, Brain } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { LudiaLogo } from '@/components/LudiaLogo'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -43,28 +43,8 @@ export default function SignupPage() {
     <div className="min-h-screen flex flex-col items-center justify-center px-5 py-12">
 
       {/* LUDIA Brand */}
-      <div className="flex flex-col items-center mb-10">
-        <div className="relative mb-5">
-          <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',
-              boxShadow: '0 8px 40px rgba(244,63,117,0.35)',
-            }}>
-            <Brain className="w-9 h-9 text-rose-300" />
-          </div>
-          <div className="absolute -top-1.5 -right-1.5 w-6 h-6 rounded-full flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #d4af37, #b8962e)', boxShadow: '0 3px 10px rgba(212,175,55,0.5)' }}>
-            <Sparkles className="w-3 h-3 text-white" />
-          </div>
-        </div>
-        <span className="text-2xl font-black tracking-[0.25em] uppercase mb-1"
-          style={{
-            background: 'linear-gradient(135deg, #d4af37 0%, #b8962e 45%, #e8d07a 70%, #d4af37 100%)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
-          }}>
-          LUDIA
-        </span>
-        <p className="text-sm text-slate-400 font-light tracking-wide">Women's Health Guardian</p>
+      <div className="flex flex-col items-center mb-8">
+        <LudiaLogo size={180} />
       </div>
 
       {/* Card */}

@@ -8,9 +8,14 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'LUDIA — Women\'s Health Guardian',
-  description: 'Comprehensive women\'s health management with IoT diagnostics',
-  icons: { icon: '/favicon.ico' },
+  title: 'LUDIA — AI Health Chaperone',
+  description: 'AI 기반 여성 건강 관리 서비스',
+  // icon.png / apple-icon.png in src/app/ are auto-detected by Next.js App Router
+  openGraph: {
+    title: 'LUDIA — AI Health Chaperone',
+    description: 'AI 기반 여성 건강 관리 서비스',
+    images: [{ url: '/og-image.png', width: 1200, height: 630 }],
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
