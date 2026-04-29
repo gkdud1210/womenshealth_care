@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, Thermometer, Brain, Activity, ChevronDown, ChevronUp, Sliders, RotateCcw, Info } from 'lucide-react'
+import { Eye, Thermometer, Zap, Activity, ChevronDown, ChevronUp, Sliders, RotateCcw, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MultimodalData } from './LudiaInsightCard'
 
 export const DEFAULT_MULTIMODAL: MultimodalData = {
   iris:      { leftScore: 67, rightScore: 71, skinZone: 48, thyroidZone: 71 },
   thermal:   { uterineTemp: 35.8, leftOvaryTemp: 36.4, rightOvaryTemp: 36.6 },
-  eeg:       { stressIndex: 68, alphaRatio: 65, betaRatio: 78, ansBalance: 42 },
-  biosignal: { hrv: 42, sleepHours: 7.5, heartRate: 72 },
+  eda:       { conductance: 8.4, stressIndex: 68, tensionLevel: 78, relaxationScore: 65, ansBalance: 42 },
+  biosignal: { hrv: 42, sleepHours: 7.5, heartRate: 72, weight: 58.0, bmi: 22.1 },
 }
 
 interface FieldDef {
@@ -61,28 +61,31 @@ const SECTIONS: SectionDef[] = [
     ],
   },
   {
-    id: 'eeg',
-    icon: Brain,
-    label: 'EEG 뇌파',
-    sublabel: 'Alpha / Beta Wave Ratios',
-    iconBg: 'bg-blue-100', iconColor: 'text-blue-600', accentColor: '#3b82f6',
+    id: 'eda',
+    icon: Zap,
+    label: 'EDA 피부전도',
+    sublabel: 'Conductance · Stress · ANS Balance',
+    iconBg: 'bg-cyan-100', iconColor: 'text-cyan-600', accentColor: '#06b6d4',
     fields: [
-      { key: 'stressIndex', label: '스트레스 지수', unit: '/100', min: 0, max: 100, step: 1, hint: '<45 정상', statusFn: v => v < 45 ? 'ok' : v < 65 ? 'warn' : 'critical' },
-      { key: 'alphaRatio',  label: '알파파 비율',  unit: '%',    min: 0, max: 100, step: 1, hint: '55%+ 이완', statusFn: v => v >= 55 ? 'ok' : v >= 40 ? 'warn' : 'critical' },
-      { key: 'betaRatio',   label: '베타파 비율',  unit: '%',    min: 0, max: 100, step: 1, hint: '<50% 정상', statusFn: v => v < 50 ? 'ok' : v < 70 ? 'warn' : 'critical' },
-      { key: 'ansBalance',  label: '부교감 균형',  unit: '%',    min: 0, max: 100, step: 1, hint: '45%+ 균형', statusFn: v => v >= 45 ? 'ok' : v >= 35 ? 'warn' : 'critical' },
+      { key: 'conductance',    label: '피부 전도도', unit: 'μS',   min: 0, max: 30,  step: 0.1, hint: '4-16μS 정상', statusFn: v => v >= 4 && v <= 16 ? 'ok' : v >= 2 && v <= 20 ? 'warn' : 'critical' },
+      { key: 'stressIndex',    label: '스트레스 지수', unit: '/100', min: 0, max: 100, step: 1,   hint: '<45 정상',   statusFn: v => v < 45 ? 'ok' : v < 65 ? 'warn' : 'critical' },
+      { key: 'tensionLevel',   label: '긴장도',      unit: '/100', min: 0, max: 100, step: 1,   hint: '<50 정상',   statusFn: v => v < 50 ? 'ok' : v < 70 ? 'warn' : 'critical' },
+      { key: 'relaxationScore',label: '이완도',      unit: '/100', min: 0, max: 100, step: 1,   hint: '55+ 양호',   statusFn: v => v >= 55 ? 'ok' : v >= 40 ? 'warn' : 'critical' },
+      { key: 'ansBalance',     label: '부교감 균형', unit: '%',    min: 0, max: 100, step: 1,   hint: '45%+ 균형',  statusFn: v => v >= 45 ? 'ok' : v >= 35 ? 'warn' : 'critical' },
     ],
   },
   {
     id: 'biosignal',
     icon: Activity,
     label: '바이오 신호',
-    sublabel: 'HRV · Sleep · Heart Rate',
+    sublabel: 'HRV · Sleep · Heart Rate · BMI',
     iconBg: 'bg-rose-100', iconColor: 'text-rose-600', accentColor: '#f43f75',
     fields: [
       { key: 'hrv',        label: 'HRV',      unit: 'ms',  min: 10, max: 100, step: 1,   hint: '40ms+ 양호', statusFn: v => v >= 40 ? 'ok' : v >= 28 ? 'warn' : 'critical' },
-      { key: 'sleepHours', label: '수면 시간', unit: '시간', min: 2,  max: 12,  step: 0.5, hint: '7h+ 권장', statusFn: v => v >= 7 ? 'ok' : v >= 6 ? 'warn' : 'critical' },
+      { key: 'sleepHours', label: '수면 시간', unit: '시간', min: 2,  max: 12,  step: 0.5, hint: '7h+ 권장',   statusFn: v => v >= 7 ? 'ok' : v >= 6 ? 'warn' : 'critical' },
       { key: 'heartRate',  label: '심박수',   unit: 'bpm', min: 40, max: 120, step: 1,   hint: '55-85 정상', statusFn: v => v >= 55 && v <= 85 ? 'ok' : v >= 45 && v <= 100 ? 'warn' : 'critical' },
+      { key: 'weight',     label: '체중',     unit: 'kg',  min: 30, max: 120, step: 0.1, hint: '',           statusFn: () => 'ok' },
+      { key: 'bmi',        label: 'BMI',      unit: '',    min: 10, max: 45,  step: 0.1, hint: '18.5-24.9 정상', statusFn: v => v >= 18.5 && v <= 24.9 ? 'ok' : v >= 17 && v <= 27.5 ? 'warn' : 'critical' },
     ],
   },
 ]
@@ -98,7 +101,7 @@ interface Props {
 
 export function MultimodalDataPanel({ value, onChange }: Props) {
   const [open, setOpen]  = useState(false)
-  const [expanded, setExpanded] = useState<Set<keyof MultimodalData>>(new Set<keyof MultimodalData>(['eeg', 'thermal']))
+  const [expanded, setExpanded] = useState<Set<keyof MultimodalData>>(new Set<keyof MultimodalData>(['eda', 'thermal']))
 
   function toggle(id: keyof MultimodalData) {
     setExpanded(prev => {
@@ -135,7 +138,7 @@ export function MultimodalDataPanel({ value, onChange }: Props) {
                 4-WAY FUSION
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">홍채 · 열화상 · EEG · 바이오신호 → AI 인사이트 연동</p>
+            <p className="text-xs text-slate-400 mt-0.5">홍채 · 열화상 · EDA · 바이오신호 → AI 인사이트 연동</p>
           </div>
         </div>
 

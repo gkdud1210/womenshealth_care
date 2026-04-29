@@ -80,7 +80,7 @@ const CARE_CASES = [
   {
     id: 'stress',
     label: '스트레스 관리',
-    desc: 'EEG 뇌파 · HRV · 자율신경 균형 · 회복 가이드',
+    desc: 'HRV · EDA · 자율신경 균형 · 회복 가이드',
     icon: Wind,
     gradient: 'linear-gradient(135deg, #06b6d4, #0891b2)',
     glow: 'rgba(6,182,212,0.3)',

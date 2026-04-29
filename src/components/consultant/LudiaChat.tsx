@@ -159,7 +159,7 @@ interface Props {
 const GREETING: Message = {
   id: 'greeting',
   role: 'ludia',
-  text: '안녕하세요! 저는 LUDIA예요. 홍채 · 열화상 · 뇌파 · 바이오신호 · 생리 주기 데이터를 종합 분석해서 맞춤형 건강 인사이트를 드려요. 무엇이든 물어보세요! 💬',
+  text: '안녕하세요! 저는 LUDIA예요. 홍채 · 열화상 · EDA · HRV · BMI · 생리 주기 데이터를 종합 분석해서 맞춤형 건강 인사이트를 드려요. 무엇이든 물어보세요! 💬',
   sources: [],
   ts: new Date(),
 }
@@ -220,7 +220,7 @@ export function LudiaChat({ data, phase, cycleDay }: Props) {
         </div>
         <div className="flex gap-2 items-center ml-auto">
           {[
-            { label: 'EEG', value: data.eeg.stressIndex, suffix: '', hi: 65 },
+            { label: 'EDA', value: data.eda.stressIndex, suffix: '', hi: 65 },
             { label: '자궁', value: data.thermal.uterineTemp, suffix: '°', lo: 36.2 },
             { label: 'HRV', value: data.biosignal.hrv, suffix: 'ms', lo: 38 },
           ].map(({ label, value, suffix, hi, lo }) => {

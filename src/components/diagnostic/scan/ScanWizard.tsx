@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import {
-  Eye, Thermometer, Brain, Activity, CheckCircle2,
+  Eye, Thermometer, Activity, CheckCircle2,
   Camera, CameraOff, ChevronRight, Scan, Zap,
   ArrowRight, MessageCircleHeart, BarChart2, Upload,
 } from 'lucide-react'
@@ -19,7 +19,7 @@ const rngF = (a: number, b: number, d = 1) => parseFloat((a + Math.random() * (b
 const STEPS = [
   { id: 1, key: 'iris',      label: '홍채 스캔',  icon: Eye,         color: '#a855f7' },
   { id: 2, key: 'thermal',   label: '열화상',     icon: Thermometer, color: '#f97316' },
-  { id: 3, key: 'eeg',       label: 'EEG 뇌파',   icon: Brain,       color: '#3b82f6' },
+  { id: 3, key: 'eda',       label: 'EDA 피부전도', icon: Zap,         color: '#06b6d4' },
   { id: 4, key: 'biosignal', label: '바이오신호', icon: Activity,    color: '#f43f75' },
 ]
 
@@ -622,83 +622,81 @@ function ThermalStep({ onDone }:{ onDone:(d:MultimodalData['thermal'])=>void }) 
       </div>
 
       {phase==='idle'&&<button onClick={()=>setPhase('scanning')} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2"><Thermometer className="w-4 h-4"/>열화상 스캔 시작</button>}
-      {phase==='done'&&<button onClick={()=>onDone(res!)} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">다음 단계: EEG 뇌파<ChevronRight className="w-4 h-4"/></button>}
+      {phase==='done'&&<button onClick={()=>onDone(res!)} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">다음 단계: EDA 피부전도<ChevronRight className="w-4 h-4"/></button>}
     </div>
   )
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   STEP 3 — EEG CAPTURE
+   STEP 3 — EDA CAPTURE
 ══════════════════════════════════════════════════════════════════ */
 
-const EEG_CH = [
-  { name:'Fp1', freqs:[11,22,4] },  { name:'Fp2', freqs:[12,19,3] },
-  { name:'F3',  freqs:[10,25,5] },  { name:'F4',  freqs:[9,28,4] },
-  { name:'C3',  freqs:[8,18,6] },   { name:'C4',  freqs:[9,20,5] },
-  { name:'O1',  freqs:[10,15,3] },  { name:'O2',  freqs:[11,14,4] },
-]
+type EDAPhase='idle'|'capturing'|'done'
 
-type EEGPhase='idle'|'capturing'|'done'
-
-function EEGStep({ onDone }:{ onDone:(d:MultimodalData['eeg'])=>void }) {
+function EDAStep({ onDone }:{ onDone:(d:MultimodalData['eda'])=>void }) {
   const cvRef  = useRef<HTMLCanvasElement>(null)
   const rafRef = useRef<number>()
-  const [phase,setPhase]=useState<EEGPhase>('idle')
+  const [phase,setPhase]=useState<EDAPhase>('idle')
   const [pct,setPct]=useState(0)
-  const [res,setRes]=useState<MultimodalData['eeg']|null>(null)
-  const bufRef = useRef<Float32Array[]>(EEG_CH.map(()=>new Float32Array(300)))
+  const [res,setRes]=useState<MultimodalData['eda']|null>(null)
+  const bufRef = useRef<number[]>([])
   const hRef   = useRef(0)
 
   useEffect(()=>{
     if(phase==='idle')return
     const cv=cvRef.current!; const ctx=cv.getContext('2d')!
     const W=cv.width, H=cv.height
-    const CH=EEG_CH.length, rowH=H/CH
     let t=0
 
     function draw(){
-      ctx.fillStyle='#060412'; ctx.fillRect(0,0,W,H)
+      ctx.fillStyle='#020f14'; ctx.fillRect(0,0,W,H)
 
-      EEG_CH.forEach((ch,ci)=>{
-        const y0=ci*rowH, mid=y0+rowH/2, amp=rowH*.35
-        // generate sample
-        let v=0
-        ch.freqs.forEach((f,fi)=>{ v+=Math.sin(t*f*.008+fi*1.2)*(1/(fi+1)) })
-        v+=( Math.random()-.5)*.3
-        const bi=hRef.current%300; bufRef.current[ci][bi]=v
+      // grid
+      ctx.strokeStyle='rgba(6,182,212,.06)'; ctx.lineWidth=.5
+      for(let y=0;y<H;y+=H/4){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke() }
+      for(let x=0;x<W;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke() }
 
-        // channel label
-        ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font=`bold ${W*.022}px monospace`; ctx.textAlign='left'
-        ctx.fillText(ch.name,6,mid+4)
+      // generate EDA sample (slow-moving conductance + occasional spikes)
+      const base = 8.4 + Math.sin(t*.004)*2.2
+      const spike = Math.random()<.008 ? (Math.random()*4) : 0
+      const v = Math.max(2, Math.min(22, base + spike + (Math.random()-.5)*.6))
+      bufRef.current.push(v)
+      if(bufRef.current.length>W) bufRef.current.shift()
 
-        // separator
-        ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=.5; ctx.beginPath()
-        ctx.moveTo(0,y0+rowH); ctx.lineTo(W,y0+rowH); ctx.stroke()
-
-        // waveform
+      // draw conductance trace
+      if(bufRef.current.length>1){
         ctx.beginPath()
-        const startX=40
-        for(let i=0;i<299;i++){
-          const idx=(hRef.current-299+i+300)%300
-          const px=startX+(i/(298))*(W-startX-6)
-          const py=mid-bufRef.current[ci][idx]*amp
+        bufRef.current.forEach((val,i)=>{
+          const px=i*(W/W)
+          const py=H-((val-2)/(22-2))*(H*.75)-H*.1
           i===0?ctx.moveTo(px,py):ctx.lineTo(px,py)
-        }
-        const alpha=phase==='done'?.6:.85
-        ctx.strokeStyle=`rgba(59,130,246,${alpha})`; ctx.lineWidth=1.2; ctx.stroke()
-      })
-
-      // band power overlay (right side, when capturing)
-      if(phase==='capturing'){
-        const bands=[{l:'δ',v:pct*.28,c:'#6366f1'},{l:'θ',v:pct*.38,c:'#3b82f6'},{l:'α',v:pct*.58,c:'#22c55e'},{l:'β',v:pct*.72,c:'#f59e0b'},{l:'γ',v:pct*.30,c:'#ef4444'}]
-        const bx=W-55, by=H*.08, bw=42, bh=H*.72/bands.length
-        bands.forEach(({l,v,c},i)=>{
-          const y=by+i*(bh+3)
-          ctx.fillStyle='rgba(255,255,255,.07)'; ctx.fillRect(bx,y,bw,bh*.8)
-          ctx.fillStyle=c; ctx.fillRect(bx,y+(bh*.8)*(1-v/100),bw,(bh*.8)*(v/100))
-          ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font=`bold ${W*.022}px monospace`; ctx.textAlign='center'
-          ctx.fillText(l,bx+bw/2,y+bh*.8+10)
         })
+        const alpha=phase==='done'?.55:.88
+        ctx.strokeStyle=`rgba(6,182,212,${alpha})`; ctx.lineWidth=2; ctx.stroke()
+
+        // fill area under curve
+        ctx.lineTo(bufRef.current.length-1,H); ctx.lineTo(0,H)
+        ctx.fillStyle='rgba(6,182,212,.08)'; ctx.fill()
+      }
+
+      // reference lines
+      ctx.strokeStyle='rgba(34,197,94,.4)'; ctx.setLineDash([4,4]); ctx.lineWidth=1
+      const lo=H-((4-2)/(22-2))*(H*.75)-H*.1
+      const hi=H-((16-2)/(22-2))*(H*.75)-H*.1
+      ctx.beginPath(); ctx.moveTo(0,lo); ctx.lineTo(W,lo); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(0,hi); ctx.lineTo(W,hi); ctx.stroke()
+      ctx.setLineDash([])
+
+      // labels
+      ctx.fillStyle='rgba(6,182,212,.7)'; ctx.font=`bold ${W*.022}px monospace`; ctx.textAlign='left'
+      ctx.fillText(`EDA ${v.toFixed(1)}μS`,8,20)
+      ctx.fillStyle='rgba(34,197,94,.7)'; ctx.font=`${W*.018}px monospace`
+      ctx.fillText('정상(4-16μS)',8,H-8)
+
+      // progress bar (capturing)
+      if(phase==='capturing'){
+        ctx.fillStyle='rgba(6,182,212,.18)'; ctx.fillRect(0,H-4,W*(pct/100),4)
+        ctx.fillStyle='rgba(6,182,212,.9)';  ctx.fillRect(0,H-4,W*(pct/100),4)
       }
 
       hRef.current++; t++
@@ -713,8 +711,12 @@ function EEGStep({ onDone }:{ onDone:(d:MultimodalData['eeg'])=>void }) {
       p+=1.2; setPct(Math.floor(p))
       if(p>=100){
         clearInterval(iv)
-        const stressIndex=rng(35,82), alphaRatio=rng(38,72), betaRatio=rng(35,78), ansBalance=rng(28,62)
-        setRes({ stressIndex, alphaRatio, betaRatio, ansBalance })
+        const conductance   = rngF(5,14,1)
+        const stressIndex   = rng(32,80)
+        const tensionLevel  = rng(30,82)
+        const relaxationScore = rng(40,78)
+        const ansBalance    = rng(28,62)
+        setRes({ conductance, stressIndex, tensionLevel, relaxationScore, ansBalance })
         setPhase('done')
       }
     },70)
@@ -723,36 +725,38 @@ function EEGStep({ onDone }:{ onDone:(d:MultimodalData['eeg'])=>void }) {
 
   return (
     <div className="space-y-4">
-      <div className="relative rounded-2xl overflow-hidden bg-slate-950" style={{aspectRatio:'16/9',maxHeight:280}}>
+      <div className="relative rounded-2xl overflow-hidden" style={{aspectRatio:'16/9',maxHeight:280,background:'#020f14'}}>
         <canvas ref={cvRef} width={560} height={320} className="w-full h-full"/>
-        {phase==='capturing'&&<div className="absolute bottom-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm"><div className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"/><span className="text-[10px] text-blue-300">뇌파 측정 중 {pct}%</span></div>}
-        {phase==='done'&&<div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/80 backdrop-blur-sm"><CheckCircle2 className="w-3 h-3 text-white"/><span className="text-[10px] text-white font-medium">캡처 완료</span></div>}
+        {phase==='capturing'&&<div className="absolute bottom-5 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm"><div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"/><span className="text-[10px] text-cyan-300">EDA 측정 중 {pct}%</span></div>}
+        {phase==='done'&&<div className="absolute top-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/80 backdrop-blur-sm"><CheckCircle2 className="w-3 h-3 text-white"/><span className="text-[10px] text-white font-medium">측정 완료</span></div>}
       </div>
 
-      {phase==='capturing'&&<div className="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-blue-400 to-indigo-600 rounded-full transition-all duration-75" style={{width:`${pct}%`}}/></div>}
+      {phase==='capturing'&&<div className="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-75" style={{width:`${pct}%`}}/></div>}
 
       {phase==='done'&&res&&(
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {([['스트레스',res.stressIndex],['알파파',res.alphaRatio],['베타파',res.betaRatio],['부교감균형',res.ansBalance]] as [string,number][]).map(([l,val],i)=>{
-            const ok=i===0?val<65:i===2?val<65:val>=45
-            const v=val
-            return (
-              <div key={String(l)} className="rounded-xl p-2.5 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(59,130,246,.15)'}}>
-                <div className={cn('text-xl font-bold font-display',ok?'text-green-600':'text-amber-500')}>{v}{i===0?'':i===1||i===3?'%':''}</div>
-                <div className="text-[10px] text-slate-500 mt-0.5">{l}</div>
-              </div>
-            )
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {([
+            ['전도도', res.conductance.toFixed(1)+'μS', res.conductance>=4&&res.conductance<=16],
+            ['스트레스', res.stressIndex+'점',           res.stressIndex<65],
+            ['긴장도',   res.tensionLevel+'점',          res.tensionLevel<70],
+            ['이완도',   res.relaxationScore+'점',       res.relaxationScore>=55],
+            ['부교감',   res.ansBalance+'%',             res.ansBalance>=45],
+          ] as [string,string,boolean][]).map(([l,v,ok])=>(
+            <div key={l} className="rounded-xl p-2.5 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(6,182,212,.15)'}}>
+              <div className={cn('text-lg font-bold font-display',ok?'text-green-600':'text-amber-500')}>{v}</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{l}</div>
+            </div>
+          ))}
         </div>
       )}
 
       <div className="text-center text-sm text-slate-500 min-h-[28px]">
-        {phase==='idle'&&'EEG 헤드셋을 착용하고 뇌파 측정을 시작합니다'}
-        {phase==='capturing'&&'🧠 뇌파 측정 중 — 눈을 감고 편안히 있어 주세요...'}
-        {phase==='done'&&'✅ EEG 뇌파 분석 완료!'}
+        {phase==='idle'&&'손가락 센서를 착용하고 피부 전도도 측정을 시작합니다'}
+        {phase==='capturing'&&'⚡ EDA 측정 중 — 편안하게 안정을 유지해 주세요...'}
+        {phase==='done'&&'✅ EDA 피부전도 분석 완료!'}
       </div>
 
-      {phase==='idle'&&<button onClick={()=>setPhase('capturing')} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2"><Zap className="w-4 h-4"/>EEG 측정 시작</button>}
+      {phase==='idle'&&<button onClick={()=>setPhase('capturing')} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2"><Zap className="w-4 h-4"/>EDA 측정 시작</button>}
       {phase==='done'&&<button onClick={()=>onDone(res!)} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">다음 단계: 바이오신호<ChevronRight className="w-4 h-4"/></button>}
     </div>
   )
@@ -848,7 +852,9 @@ function BioStep({ onDone }:{ onDone:(d:MultimodalData['biosignal'])=>void }) {
   },[phase])
 
   function handleSleepDone(){
-    const r:MultimodalData['biosignal']={ hrv:hrv!, sleepHours:sleep, heartRate:hr! }
+    const weight = rngF(52, 72, 1)
+    const bmi    = parseFloat((weight / (1.63 * 1.63)).toFixed(1))
+    const r:MultimodalData['biosignal']={ hrv:hrv!, sleepHours:sleep, heartRate:hr!, weight, bmi }
     setRes(r); setPhase('done')
   }
 
@@ -915,7 +921,7 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
         <div className="relative">
           <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
             style={{background:'linear-gradient(135deg,#0f0810,#2d1129)',boxShadow:'0 0 40px rgba(244,63,117,.35)'}}>
-            <Brain className="w-10 h-10 text-rose-300"/>
+            <Scan className="w-10 h-10 text-rose-300"/>
           </div>
           <div className="absolute inset-0 rounded-3xl animate-ping" style={{background:'rgba(244,63,117,.1)'}}/>
           <CheckCircle2 className="absolute -bottom-2 -right-2 w-8 h-8 text-green-500 bg-white rounded-full p-0.5"/>
@@ -925,7 +931,7 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
       <div>
         <div className="text-xs font-black tracking-[.2em] mb-1" style={{background:'linear-gradient(135deg,#d4af37,#b8962e,#e8d07a)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>LUDIA SCAN COMPLETE</div>
         <h3 className="font-display text-xl font-semibold text-slate-800">4-Way 진단 완료!</h3>
-        <p className="text-sm text-slate-400 mt-1">홍채 · 열화상 · EEG · 바이오신호 분석 결과가 LUDIA에 저장됐어요</p>
+        <p className="text-sm text-slate-400 mt-1">홍채 · 열화상 · EDA · 바이오신호 분석 결과가 LUDIA에 저장됐어요</p>
       </div>
 
       {/* summary */}
@@ -933,7 +939,7 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
         {[
           { icon:Eye, label:'홍채 분석', val:`평균 ${irisAvg}점`, ok:irisAvg>=70, color:'#a855f7' },
           { icon:Thermometer, label:'자궁 온도', val:`${results.thermal.uterineTemp.toFixed(1)}°C`, ok:results.thermal.uterineTemp>=36.2, color:'#f97316' },
-          { icon:Brain, label:'EEG 스트레스', val:`${results.eeg.stressIndex}/100`, ok:results.eeg.stressIndex<65, color:'#3b82f6' },
+          { icon:Zap,   label:'EDA 스트레스',  val:`${results.eda.stressIndex}/100`, ok:results.eda.stressIndex<65, color:'#06b6d4' },
           { icon:Activity, label:'HRV', val:`${results.biosignal.hrv}ms`, ok:results.biosignal.hrv>=38, color:'#f43f75' },
         ].map(({icon:Icon,label,val,ok,color})=>(
           <div key={label} className="glass-card-sm p-3 flex items-center gap-2.5">
@@ -1030,7 +1036,7 @@ export function ScanWizard() {
               <Scan className="w-8 h-8 text-rose-300"/>
             </div>
             <h2 className="font-display text-2xl font-semibold text-slate-800 mb-2">4-Way 진단 시작</h2>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">홍채 3D · 열화상 · EEG 뇌파 · 바이오신호를 순서대로 측정해 LUDIA AI가 종합 분석합니다</p>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">홍채 3D · 열화상 · EDA 피부전도 · 바이오신호를 순서대로 측정해 LUDIA AI가 종합 분석합니다</p>
             <div className="space-y-2.5 mb-6">
               {STEPS.map(s=>{
                 const Icon=s.icon
@@ -1042,7 +1048,7 @@ export function ScanWizard() {
                     <div>
                       <p className="text-xs font-semibold text-slate-700">Step {s.id} — {s.label}</p>
                       <p className="text-[10px] text-slate-400">
-                        {s.id===1?'홍채 3D 스캔으로 장기 밀도 분석':s.id===2?'자궁·난소 부위 체온 분포 측정':s.id===3?'뇌파로 스트레스·자율신경 분석':'HRV·심박수·수면 데이터 측정'}
+                        {s.id===1?'홍채 3D 스캔으로 장기 밀도 분석':s.id===2?'자궁·난소 부위 체온 분포 측정':s.id===3?'피부 전도도로 스트레스·자율신경 분석':'HRV·심박수·수면 데이터 측정'}
                       </p>
                     </div>
                   </div>
@@ -1070,12 +1076,12 @@ export function ScanWizard() {
             )}
             {step===1&&<IrisStep    onDone={d=>save('iris',d)}/>}
             {step===2&&<ThermalStep onDone={d=>save('thermal',d)}/>}
-            {step===3&&<EEGStep     onDone={d=>save('eeg',d)}/>}
+            {step===3&&<EDAStep     onDone={d=>save('eda',d)}/>}
             {step===4&&<BioStep     onDone={d=>save('biosignal',d)}/>}
           </div>
         )}
 
-        {step===5&&results.iris&&results.thermal&&results.eeg&&results.biosignal&&(
+        {step===5&&results.iris&&results.thermal&&results.eda&&results.biosignal&&(
           <div className="glass-card p-5 sm:p-6 max-w-md mx-auto">
             <CompleteStep results={results as MultimodalData}/>
           </div>

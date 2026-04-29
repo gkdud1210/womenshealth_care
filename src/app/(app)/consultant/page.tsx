@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Brain, Sparkles, Eye, Thermometer, Activity, ChevronDown, ChevronUp } from 'lucide-react'
+import { Zap, Sparkles, Eye, Thermometer, Activity, ChevronDown, ChevronUp } from 'lucide-react'
 import { useState } from 'react'
 import { LudiaChat } from '@/components/consultant/LudiaChat'
 import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
@@ -43,7 +43,7 @@ export default function ConsultantPage() {
                   background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',
                   boxShadow: '0 4px 20px rgba(244,63,117,0.28)',
                 }}>
-                <Brain className="w-5 h-5 text-rose-300" />
+                <Sparkles className="w-5 h-5 text-rose-300" />
               </div>
               <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, #d4af37, #b8962e)', boxShadow: '0 2px 8px rgba(212,175,55,0.4)' }}>
@@ -65,7 +65,7 @@ export default function ConsultantPage() {
               </div>
               <h1 className="font-display text-xl sm:text-2xl font-semibold text-slate-800 leading-tight">AI 건강 상담</h1>
               <p className="text-xs text-slate-400 mt-0.5 hidden sm:block">
-                홍채 · 열화상 · EEG · 바이오신호 · 생리 주기 통합 분석
+                홍채 · 열화상 · EDA · HRV · BMI · 생리 주기 통합 분석
               </p>
             </div>
           </div>
@@ -75,7 +75,7 @@ export default function ConsultantPage() {
             {[
               { icon: Eye,         label: '홍채 3D',   val: `${Math.round((data.iris.leftScore + data.iris.rightScore) / 2)}점`,  ok: Math.round((data.iris.leftScore + data.iris.rightScore) / 2) >= 70 },
               { icon: Thermometer, label: '자궁 온도', val: `${data.thermal.uterineTemp}°C`,  ok: data.thermal.uterineTemp >= 36.2 },
-              { icon: Brain,       label: 'EEG 스트레스', val: `${data.eeg.stressIndex}/100`, ok: data.eeg.stressIndex < 65 },
+              { icon: Zap,         label: 'EDA 스트레스', val: `${data.eda.stressIndex}/100`, ok: data.eda.stressIndex < 65 },
               { icon: Activity,    label: 'HRV',       val: `${data.biosignal.hrv}ms`,       ok: data.biosignal.hrv >= 38 },
             ].map(({ icon: Icon, label, val, ok }) => (
               <div key={label} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs"
@@ -153,11 +153,11 @@ export default function ConsultantPage() {
               ],
             },
             {
-              title: 'EEG 뇌파',
+              title: 'EDA 피부전도',
               items: [
-                { label: '스트레스', v: `${data.eeg.stressIndex}/100`, ok: data.eeg.stressIndex < 65 },
-                { label: '알파파', v: `${data.eeg.alphaRatio}%`, ok: data.eeg.alphaRatio >= 50 },
-                { label: '부교감', v: `${data.eeg.ansBalance}%`, ok: data.eeg.ansBalance >= 45 },
+                { label: '스트레스', v: `${data.eda.stressIndex}/100`, ok: data.eda.stressIndex < 65 },
+                { label: '이완도',   v: `${data.eda.relaxationScore}점`, ok: data.eda.relaxationScore >= 55 },
+                { label: '부교감',   v: `${data.eda.ansBalance}%`,       ok: data.eda.ansBalance >= 45 },
               ],
             },
             {

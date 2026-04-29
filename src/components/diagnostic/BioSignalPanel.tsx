@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine,
   AreaChart, Area, CartesianGrid
 } from 'recharts'
-import { Heart, Moon, Zap, Scale, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { Heart, Moon, Zap, Scale, TrendingUp, TrendingDown, Minus, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const HRV_DATA = [
@@ -36,6 +36,16 @@ const WEIGHT_DATA = [
   { day: '4/19', w: 57.9 },
   { day: '4/20', w: 58.2 },
   { day: '4/21', w: 58.0 },
+]
+
+const EDA_DATA = [
+  { day: '월', conductance: 9.2, stress: 72 },
+  { day: '화', conductance: 8.1, stress: 65 },
+  { day: '수', conductance: 11.5, stress: 80 },
+  { day: '목', conductance: 7.4, stress: 58 },
+  { day: '금', conductance: 8.8, stress: 68 },
+  { day: '토', conductance: 6.2, stress: 48 },
+  { day: '일', conductance: 7.0, stress: 55 },
 ]
 
 const RADAR_DATA = [
@@ -171,6 +181,66 @@ export function BioSignalPanel() {
             </AreaChart>
           </ResponsiveContainer>
           <p className="text-[10px] text-slate-400 mt-1">— 권장 수면 (7시간)</p>
+        </div>
+      </div>
+
+      {/* EDA Charts */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* EDA Conductance */}
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Zap className="w-4 h-4 text-cyan-500" />
+            <span className="text-sm font-semibold text-slate-700">EDA 피부 전도도</span>
+          </div>
+          <ResponsiveContainer width="100%" height={110}>
+            <AreaChart data={EDA_DATA} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="edaGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#cffafe" />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[4, 16]} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: '1px solid #cffafe', fontSize: 12 }}
+                formatter={(v) => [`${v}μS`, '전도도']}
+              />
+              <ReferenceLine y={4}  stroke="#22c55e" strokeDasharray="3 3" strokeWidth={1} />
+              <ReferenceLine y={16} stroke="#22c55e" strokeDasharray="3 3" strokeWidth={1} />
+              <Area type="monotone" dataKey="conductance" stroke="#06b6d4" strokeWidth={2} fill="url(#edaGrad)" dot={{ r: 3, fill: '#06b6d4' }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <p className="text-[10px] text-slate-400 mt-1">— 정상 범위 (4-16μS)</p>
+        </div>
+
+        {/* EDA Stress Index */}
+        <div className="glass-card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-4 h-4 text-violet-500" />
+            <span className="text-sm font-semibold text-slate-700">EDA 스트레스 지수</span>
+          </div>
+          <ResponsiveContainer width="100%" height={110}>
+            <AreaChart data={EDA_DATA} margin={{ top: 5, right: 5, bottom: 0, left: -20 }}>
+              <defs>
+                <linearGradient id="edaStressGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+              <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 100]} />
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: '1px solid #ede9fe', fontSize: 12 }}
+                formatter={(v) => [`${v}점`, '스트레스']}
+              />
+              <ReferenceLine y={65} stroke="#f43f75" strokeDasharray="3 3" strokeWidth={1} />
+              <Area type="monotone" dataKey="stress" stroke="#8b5cf6" strokeWidth={2} fill="url(#edaStressGrad)" dot={{ r: 3, fill: '#8b5cf6' }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          <p className="text-[10px] text-slate-400 mt-1">— 주의 기준 (65점)</p>
         </div>
       </div>
 
