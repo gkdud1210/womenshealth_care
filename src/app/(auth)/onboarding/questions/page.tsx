@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { getQuestionsForCards, type Question } from '@/data/onboardingQuestions'
+import { Bluetooth, CheckCircle2 } from 'lucide-react'
 
 const ANSWERS_KEY = 'ludia_answers_v1'
 
@@ -30,7 +31,7 @@ export default function QuestionsPage() {
   const [idx, setIdx]                   = useState(0)
   const [answers, setAnswers]           = useState<Record<string, Answer>>({})
   const [current, setCurrent]           = useState<Answer | null>(null)
-  const [done, setDone]                 = useState(false)
+  const [step, setStep]                 = useState<'questions' | 'done' | 'device' | 'bluetooth'>('questions')
   const [animating, setAnimating]       = useState(false)
 
   useEffect(() => {
@@ -51,7 +52,7 @@ export default function QuestionsPage() {
       setCurrent(null)
       if (idx + 1 >= questions.length) {
         try { localStorage.setItem(ANSWERS_KEY, JSON.stringify(newAnswers)) } catch {}
-        setDone(true)
+        setStep('done')
       } else {
         setIdx(i => i + 1)
       }
@@ -59,10 +60,23 @@ export default function QuestionsPage() {
     }, 180)
   }, [questions, idx, answers])
 
-  if (!ready || (!done && questions.length === 0)) return null
+  if (!ready || (step === 'questions' && questions.length === 0)) return null
 
-  if (done) {
-    return <CompletionScreen userName={user!.name} onFinish={() => router.push('/')} />
+  if (step === 'done') {
+    return <CompletionScreen userName={user!.name} onFinish={() => setStep('device')} />
+  }
+
+  if (step === 'device') {
+    return (
+      <DeviceScreen
+        onHasDevice={() => setStep('bluetooth')}
+        onNoDevice={() => router.push('/calendar')}
+      />
+    )
+  }
+
+  if (step === 'bluetooth') {
+    return <BluetoothScreen onFinish={() => router.push('/')} />
   }
 
   const q        = questions[idx]
@@ -281,8 +295,161 @@ function CompletionScreen({ userName, onFinish }: { userName: string; onFinish: 
             background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
             boxShadow: '0 6px 24px rgba(244,63,117,0.4)',
           }}>
-          LUDIA 시작하기 →
+          다음 →
         </button>
+      </div>
+    </div>
+  )
+}
+
+/* ── 기기 선택 화면 ─────────────────────────────────────────── */
+function DeviceScreen({ onHasDevice, onNoDevice }: {
+  onHasDevice: () => void
+  onNoDevice: () => void
+}) {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+      style={{ background: 'linear-gradient(145deg, #fdf6f9, #fce9f0, #f8eeff)' }}>
+      <div className="space-y-8 max-w-sm w-full">
+
+        {/* 아이콘 */}
+        <div className="flex justify-center">
+          <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+              boxShadow: '0 8px 32px rgba(139,92,246,0.4)',
+            }}>
+            <Bluetooth className="w-10 h-10 text-white" />
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-2xl font-semibold text-slate-800 mb-3">
+            LUDIA 기기가 있으신가요?
+          </h2>
+          <p className="text-sm text-slate-500 leading-relaxed">
+            LUDIA 기기를 연결하면 체온 · 홍채 데이터를 기반으로<br />
+            <span className="font-semibold text-purple-600">정밀 진단</span>을 바로 시작할 수 있어요.
+          </p>
+        </div>
+
+        <div className="space-y-3 w-full">
+          <button onClick={onHasDevice}
+            className="w-full py-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
+            style={{
+              background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+              boxShadow: '0 6px 24px rgba(139,92,246,0.4)',
+            }}>
+            📲 기기 있어요 — Bluetooth 연결하기
+          </button>
+          <button onClick={onNoDevice}
+            className="w-full py-3.5 rounded-2xl text-sm font-medium text-slate-500 transition-all active:scale-95"
+            style={{
+              background: 'rgba(255,255,255,0.8)',
+              border: '1.5px solid rgba(200,200,210,0.6)',
+            }}>
+            기기가 없어요 — 캘린더로 바로 가기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Bluetooth 연결 화면 ────────────────────────────────────── */
+function BluetoothScreen({ onFinish }: { onFinish: () => void }) {
+  const [phase, setPhase] = useState<'scanning' | 'found' | 'connecting' | 'connected'>('scanning')
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('found'),      1600)
+    const t2 = setTimeout(() => setPhase('connecting'), 2800)
+    const t3 = setTimeout(() => setPhase('connected'),  4400)
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
+  }, [])
+
+  const connected = phase === 'connected'
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+      style={{ background: 'linear-gradient(145deg, #f0f0ff, #ede8ff, #f5eeff)' }}>
+      <div className="space-y-8 max-w-sm w-full">
+
+        {connected ? (
+          /* 연결 완료 */
+          <>
+            <div className="flex justify-center">
+              <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  boxShadow: '0 8px 32px rgba(16,185,129,0.4)',
+                }}>
+                <CheckCircle2 className="w-10 h-10 text-white" />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-800 mb-2">연결 완료! 🎉</h2>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                <span className="font-semibold text-emerald-600">LUDIA-001</span>과 연결됐어요.<br />
+                이제 정밀 진단을 시작할 수 있어요.
+              </p>
+            </div>
+            <button onClick={onFinish}
+              className="w-full py-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
+              style={{
+                background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
+                boxShadow: '0 6px 24px rgba(244,63,117,0.4)',
+              }}>
+              진단 시작하기 →
+            </button>
+          </>
+        ) : (
+          /* 검색 / 연결 중 */
+          <>
+            {/* 펄스 애니메이션 */}
+            <div className="flex justify-center">
+              <div className="relative w-32 h-32">
+                <div className="absolute inset-0 rounded-full animate-ping"
+                  style={{ background: 'rgba(139,92,246,0.15)', animationDuration: '1.4s' }} />
+                <div className="absolute inset-3 rounded-full animate-ping"
+                  style={{ background: 'rgba(139,92,246,0.2)', animationDuration: '1.4s', animationDelay: '0.35s' }} />
+                <div className="absolute inset-6 rounded-full animate-ping"
+                  style={{ background: 'rgba(139,92,246,0.25)', animationDuration: '1.4s', animationDelay: '0.7s' }} />
+                <div className="absolute inset-9 rounded-full flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg, #8b5cf6, #6d28d9)',
+                    boxShadow: '0 4px 20px rgba(139,92,246,0.5)',
+                  }}>
+                  <Bluetooth className="w-7 h-7 text-white" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800 mb-2">
+                {phase === 'scanning'   && 'LUDIA 기기 검색 중...'}
+                {phase === 'found'      && 'LUDIA-001 발견!'}
+                {phase === 'connecting' && 'LUDIA-001 연결 중...'}
+              </h2>
+              <p className="text-sm text-slate-400">
+                {phase === 'scanning'   && '기기 전원이 켜져 있는지 확인해주세요'}
+                {phase === 'found'      && '기기를 인식했어요. 연결을 시작할게요'}
+                {phase === 'connecting' && '잠시만 기다려주세요'}
+              </p>
+            </div>
+
+            {/* 단계 인디케이터 */}
+            <div className="flex justify-center gap-2">
+              {(['scanning', 'found', 'connecting', 'connected'] as const).map((p, i) => {
+                const phases = ['scanning', 'found', 'connecting', 'connected']
+                const done   = phases.indexOf(phase) >= i
+                return (
+                  <div key={p} className="w-2 h-2 rounded-full transition-all duration-500"
+                    style={{ background: done ? '#8b5cf6' : 'rgba(139,92,246,0.2)' }} />
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
