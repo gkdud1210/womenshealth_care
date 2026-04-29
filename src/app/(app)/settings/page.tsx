@@ -3,11 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { LogOut, User, Calendar, Shield, ChevronRight, X } from 'lucide-react'
+import { LogOut, Calendar, Shield, ChevronRight, X } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
-
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -16,7 +14,7 @@ export default function SettingsPage() {
 
   function handleLogout() {
     logout()
-    router.push(`${BASE}/signup`)
+    router.push('/signup')
   }
 
   return (
