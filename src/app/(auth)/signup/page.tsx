@@ -44,7 +44,13 @@ export default function SignupPage() {
 
       {/* LUDIA Brand */}
       <div className="flex flex-col items-center mb-8">
-        <LudiaLogo size={180} />
+        <div style={{
+          borderRadius: '28px',
+          overflow: 'hidden',
+          boxShadow: '0 16px 48px rgba(137,15,93,0.38), 0 4px 16px rgba(137,15,93,0.22)',
+        }}>
+          <LudiaLogo size={180} />
+        </div>
       </div>
 
       {/* Card */}

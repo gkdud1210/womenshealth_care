@@ -34,7 +34,13 @@ export function Sidebar() {
       {/* Logo */}
       <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(244,63,117,0.08)' }}>
         <Link href="/" className="flex items-center justify-center group transition-opacity hover:opacity-80">
-          <LudiaLogo size={140} />
+          <div style={{
+            borderRadius: '18px',
+            overflow: 'hidden',
+            boxShadow: '0 6px 20px rgba(137,15,93,0.28), 0 2px 8px rgba(137,15,93,0.16)',
+          }}>
+            <LudiaLogo size={140} />
+          </div>
         </Link>
       </div>
 
