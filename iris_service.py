@@ -32,7 +32,7 @@ from iris_processor import IrisNormalizer  # noqa: E402
 app = FastAPI(title="LUDIA Iris Service", version="2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
@@ -113,8 +113,14 @@ def _analyze(image_bytes: bytes) -> dict:
         pupil_cx, pupil_cy, pupil_r, iris_cx, iris_cy, iris_r = (
             normalizer._detect_circles_with_sam(image_rgb, gray)
         )
-    except Exception as exc:
-        return {"error": f"홍채 검출 실패: {exc}"}
+    except Exception:
+        # SAM 모델 없는 환경(배포 서버 등)에서는 MediaPipe+Hough 검출로 폴백
+        try:
+            pupil_cx, pupil_cy, pupil_r, iris_cx, iris_cy, iris_r = (
+                normalizer.detect(image_rgb)
+            )
+        except Exception as exc:
+            return {"error": f"홍채 검출 실패: {exc}"}
 
     # 다우그만 정규화 스트립 (512 × 64)
     norm_rgb  = normalizer.normalize(

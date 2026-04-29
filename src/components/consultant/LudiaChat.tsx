@@ -7,6 +7,7 @@ import { askLudia, SUGGESTED_QUESTIONS } from '@/lib/ludia-engine'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { CyclePhase } from '@/types/health'
 import { getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
+import { useOnboardingProfile } from '@/lib/onboarding-profile'
 
 /* ─── Types ──────────────────────────────────────────────────── */
 interface Message {
@@ -171,6 +172,7 @@ export function LudiaChat({ data, phase, cycleDay }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
+  const profile   = useOnboardingProfile()
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -186,7 +188,7 @@ export function LudiaChat({ data, phase, cycleDay }: Props) {
 
     // Simulate brief analysis delay
     setTimeout(() => {
-      const response = askLudia(text.trim(), data, phase, cycleDay)
+      const response = askLudia(text.trim(), data, phase, cycleDay, profile)
       const ludiaMsg: Message = {
         id: crypto.randomUUID(),
         role: 'ludia',

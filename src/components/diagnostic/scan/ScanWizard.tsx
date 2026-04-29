@@ -92,7 +92,11 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const resp = await fetch('/api/iris-analyze', { method: 'POST', body: fd })
+      const irisServiceUrl = process.env.NEXT_PUBLIC_IRIS_SERVICE_URL
+      const endpoint = irisServiceUrl
+        ? `${irisServiceUrl}/analyze/detailed`
+        : '/api/iris-analyze'
+      const resp = await fetch(endpoint, { method: 'POST', body: fd })
       const data = await resp.json()
       if (data.error) throw new Error(data.error)
       const eyeData: EyeData = {

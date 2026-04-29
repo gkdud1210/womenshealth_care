@@ -38,6 +38,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          NEXT_PUBLIC_IRIS_SERVICE_URL: ${{ secrets.IRIS_SERVICE_URL }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

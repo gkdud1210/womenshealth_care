@@ -7,6 +7,7 @@
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { CyclePhase } from '@/types/health'
 import { getPhaseLabel } from '@/lib/cycle-utils'
+import type { OnboardingProfile } from '@/lib/onboarding-profile'
 
 export interface LudiaResponse {
   text: string
@@ -23,7 +24,19 @@ export function askLudia(
   data: MultimodalData,
   phase: CyclePhase,
   cycleDay: number,
+  profile?: OnboardingProfile,
 ): LudiaResponse {
+  const careTypes = profile?.careTypes ?? []
+  const a         = profile?.answers ?? {}
+  // 온보딩 컨텍스트 헬퍼
+  const hasPainCare    = careTypes.includes('period_pain') || careTypes.includes('healthy_cycle')
+  const hasSkinCare    = careTypes.includes('skin_acne')
+  const hasFertility   = careTypes.includes('fertility')
+  const hasStressCare  = careTypes.includes('stress')
+  const hasThyroid     = careTypes.includes('thyroid_uterus')
+  const painLevel      = typeof a.period_pain_level === 'number' ? a.period_pain_level : 0
+  const coldReported   = a.period_coldness === '자주 그래요'
+  const thyroidAlert   = a.thyroid_checkup === '네, 있어요' || a.thyroid_swelling === '자주 그래요'
   const q = question.toLowerCase()
   const phaseName    = getPhaseLabel(phase)
   const irisAvg      = Math.round((data.iris.leftScore + data.iris.rightScore) / 2)
@@ -76,10 +89,13 @@ export function askLudia(
 
   // ── THERMAL / UTERUS / COLD ────────────────────────────────────
   if (hit(q, ['자궁', '냉기', '냉증', '온도', '열화상', '하복부', '복부', '따뜻', '차가', '차갑'])) {
+    const fertilityNote = hasFertility && coldUterus ? ' 임신 준비 중이라면 자궁 온도 36.5°C 이상 유지가 착상 성공률에 직접 영향을 줘요.' : ''
+    const painNote = hasPainCare && painLevel >= 7 ? ` 생리통이 ${painLevel}/10으로 심한 편이라고 하셨는데, 냉기가 주요 원인 중 하나일 수 있어요.` : ''
+    const coldConfirm = coldReported && coldUterus ? ' 문진에서도 아랫배 냉감을 자주 느낀다고 하셨기 때문에 지속적인 온열 케어가 중요해요.' : ''
     return {
       text: `열화상 스캔 데이터예요. 자궁 ${data.thermal.uterineTemp}°C ${coldUterus ? '— 정상(36.5°C)보다 낮아 냉기 패턴이에요' : '— 정상 범위예요'}, 좌측 난소 ${data.thermal.leftOvaryTemp}°C, 우측 난소 ${data.thermal.rightOvaryTemp}°C. ${
         coldUterus
-          ? `자궁 냉증은 혈액 순환 저하가 원인이에요. 핫팩을 하복부에 15-20분 적용하고, 생강·쑥·계피 차를 꾸준히 마시면 온도가 올라요. ${phase === 'menstrual' ? '생리 중에는 자궁 혈관이 더 예민해서 특히 보온이 중요해요.' : phase === 'luteal' ? '황체기에 자궁이 차면 프로게스테론 활성도도 떨어질 수 있어요.' : ''} 발바닥부터 따뜻하게 하는 족욕(40°C, 15분)도 자궁 혈류 개선에 매우 효과적이에요.`
+          ? `자궁 냉증은 혈액 순환 저하가 원인이에요. 핫팩을 하복부에 15-20분 적용하고, 생강·쑥·계피 차를 꾸준히 마시면 온도가 올라요. ${phase === 'menstrual' ? '생리 중에는 자궁 혈관이 더 예민해서 특히 보온이 중요해요.' : phase === 'luteal' ? '황체기에 자궁이 차면 프로게스테론 활성도도 떨어질 수 있어요.' : ''} 족욕(40°C, 15분)도 자궁 혈류 개선에 매우 효과적이에요.${coldConfirm}${painNote}${fertilityNote}`
           : `자궁 온도가 건강해요. ${phase === 'ovulation' ? 'LH 서지 영향으로 체온이 자연스럽게 높아진 상태예요.' : '보온 관리가 잘 되고 있어요.'}`
       }`,
       sources: ['열화상', '주기'],
@@ -108,12 +124,14 @@ export function askLudia(
   if (hit(q, ['홍채', '눈', '홍채 분석', '홍채 스캔', '홍채로'])) {
     const skinLow    = data.iris.skinZone < 65
     const thyLow     = data.iris.thyroidZone < 70
+    const skinContext = hasSkinCare && skinLow ? ' 피부 케어 관심사를 선택하셨는데, 호르몬성 트러블 케어가 지금 가장 효과적이에요.' : ''
+    const thyContext  = (hasThyroid || thyroidAlert) && thyLow ? ' 갑상선 케어 관심사 / 문진 결과를 고려하면 정기 혈액 검사(TSH, fT4)를 권장해요.' : ''
     return {
       text: `홍채 3D 스캔 결과: 좌안 밀도 ${data.iris.leftScore}점, 우안 밀도 ${data.iris.rightScore}점 (평균 ${irisAvg}점). ${
         irisAvg >= 75 ? '전반적으로 건강한 홍채 패턴이에요.'
         : irisAvg >= 60 ? '보통 수준이에요. 영양·수면 관리를 강화하면 개선될 수 있어요.'
         : '전반적 컨디션 저하 신호가 보여요. 종합적인 케어가 필요해요.'
-      } ${skinLow ? `피부 Zone ${data.iris.skinZone}점 — 호르몬 불균형으로 피부 장벽이 약해진 신호예요. 오메가-3와 아연이 도움이 돼요. ` : ''}${thyLow ? `갑상선 Zone ${data.iris.thyroidZone}점 — 모니터링이 필요한 구간이에요. 피로, 체중 변화, 탈모 같은 갑상선 증상이 있다면 전문의 상담을 권장해요.` : `갑상선 Zone ${data.iris.thyroidZone}점으로 정상이에요.`}`,
+      } ${skinLow ? `피부 Zone ${data.iris.skinZone}점 — 호르몬 불균형으로 피부 장벽이 약해진 신호예요. 오메가-3와 아연이 도움이 돼요.${skinContext} ` : ''}${thyLow ? `갑상선 Zone ${data.iris.thyroidZone}점 — 모니터링이 필요한 구간이에요.${thyContext}` : `갑상선 Zone ${data.iris.thyroidZone}점으로 정상이에요.`}`,
       sources: ['홍채 3D'],
       confidence: 'medium',
     }
