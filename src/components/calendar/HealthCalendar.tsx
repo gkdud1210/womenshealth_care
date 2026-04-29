@@ -199,6 +199,9 @@ const PREGNANCY_STAGES: PregnancyStageData[] = [
   },
 ]
 
+// ── Animation constant ────────────────────────────────────────────────────────
+const N_STRIPS = 6
+
 // ── HealthCalendar ────────────────────────────────────────────────────────────
 export function HealthCalendar({
   logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님'
@@ -212,6 +215,11 @@ export function HealthCalendar({
     outgoing: Date; incoming: Date; dir: 'next' | 'prev'
   } | null>(null)
   const touchStartX = useRef<number | null>(null)
+  const stripRefs   = useRef<(HTMLDivElement | null)[]>(Array(N_STRIPS).fill(null))
+  const frontRefs   = useRef<(HTMLDivElement | null)[]>(Array(N_STRIPS).fill(null))
+  const shadowRefs  = useRef<(HTMLDivElement | null)[]>(Array(N_STRIPS).fill(null))
+  const backRefs    = useRef<(HTMLDivElement | null)[]>(Array(N_STRIPS).fill(null))
+  const rafRef      = useRef<number | null>(null)
 
   function navigateMonth(dir: 'next' | 'prev') {
     if (flipState) return
@@ -219,7 +227,7 @@ export function HealthCalendar({
     const incoming = dir === 'next' ? addMonths(outgoing, 1) : subMonths(outgoing, 1)
     setCurrentMonth(incoming)
     setFlipState({ outgoing, incoming, dir })
-    setTimeout(() => setFlipState(null), 520)
+    setTimeout(() => setFlipState(null), 980)
   }
 
   function navigateToToday() {
@@ -229,7 +237,7 @@ export function HealthCalendar({
     const dir = today > outgoing ? 'next' : 'prev'
     setCurrentMonth(today)
     setFlipState({ outgoing, incoming: today, dir })
-    setTimeout(() => setFlipState(null), 520)
+    setTimeout(() => setFlipState(null), 980)
   }
 
   function handleTouchStart(e: React.TouchEvent) {
@@ -250,6 +258,72 @@ export function HealthCalendar({
       if (saved) setModeData(JSON.parse(saved))
     } catch {}
   }, [])
+
+  // RAF-driven paper curl animation — full 0°→170° with front/back face switching
+  useEffect(() => {
+    if (!flipState) return
+
+    const dir        = flipState.dir
+    const STRIP_ANIM = 700  // ms per strip (0° → ±170°)
+    const DELAY_STEP = 50   // ms stagger between strips
+    const MAX_ANGLE  = 170
+    const start      = performance.now()
+
+    function easeInOut(t: number) {
+      return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
+    }
+
+    function tick(now: number) {
+      const elapsed = now - start
+
+      for (let i = 0; i < N_STRIPS; i++) {
+        const el  = stripRefs.current[i]
+        const fnt = frontRefs.current[i]
+        const shd = shadowRefs.current[i]
+        const bck = backRefs.current[i]
+        if (!el) continue
+
+        // rightmost strip leads on 'next'; leftmost leads on 'prev'
+        const delay    = dir === 'next' ? (N_STRIPS - 1 - i) * DELAY_STEP : i * DELAY_STEP
+        const t        = Math.max(0, elapsed - delay)
+        const progress = Math.min(1, t / STRIP_ANIM)
+        const eased    = easeInOut(progress)
+        const angle    = dir === 'next' ? -MAX_ANGLE * eased : MAX_ANGLE * eased
+        const absAngle = Math.abs(angle)
+
+        el.style.transform = `rotateY(${angle}deg)`
+        // fade out strip in the final 15° of travel
+        el.style.opacity = absAngle > 155 ? String(Math.max(0, 1 - (absAngle - 155) / 15)) : '1'
+
+        if (absAngle < 90) {
+          // ── Front face: outgoing content darkens toward the fold ──
+          if (fnt) fnt.style.display = 'block'
+          if (bck) bck.style.display = 'none'
+          if (shd) {
+            // shadow gradient deepens on the fold-axis edge
+            const dark = (absAngle / 90) * 0.62
+            shd.style.background = dir === 'next'
+              ? `linear-gradient(to right, rgba(0,0,0,${dark.toFixed(3)}), rgba(0,0,0,${(dark * 0.22).toFixed(3)}))`
+              : `linear-gradient(to left,  rgba(0,0,0,${dark.toFixed(3)}), rgba(0,0,0,${(dark * 0.22).toFixed(3)}))`
+          }
+        } else {
+          // ── Back face: translucent paper — incoming calendar shines through ──
+          if (fnt) fnt.style.display = 'none'
+          if (bck) bck.style.display = 'block'
+          if (shd) shd.style.background = 'transparent'
+        }
+      }
+
+      if (elapsed < STRIP_ANIM + (N_STRIPS - 1) * DELAY_STEP + 16) {
+        rafRef.current = requestAnimationFrame(tick)
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
+  }, [flipState])
 
   function saveMode(data: ModeData) {
     setModeData(data)
@@ -488,10 +562,10 @@ export function HealthCalendar({
           ))}
         </div>
 
-        {/* ── Calendar grid — page-flip layer ── */}
-        <div style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* ── Calendar grid — book page-turn layer ── */}
+        <div style={{ position: 'relative', overflow: 'hidden', perspective: '2200px' }}>
 
-          {/* Incoming / static grid (always rendered, sets height) */}
+          {/* Incoming page — always rendered beneath, sets container height */}
           <div
             className="grid grid-cols-7 border-l border-t border-slate-100"
             onTouchStart={handleTouchStart}
@@ -500,35 +574,73 @@ export function HealthCalendar({
             {renderCalGrid(calendarDays, currentMonth)}
           </div>
 
-          {/* Outgoing page — folds away on top, revealing incoming beneath */}
           {flipState && (
             <>
-              <div
-                className="grid grid-cols-7 border-l border-t border-slate-100"
-                style={{
-                  position: 'absolute', inset: 0, zIndex: 10,
-                  backgroundColor: 'rgba(255,255,255,0.98)',
-                  transformOrigin: flipState.dir === 'next' ? 'right center' : 'left center',
-                  animation: `page-fold-${flipState.dir} 520ms cubic-bezier(0.4,0,0.6,1) forwards`,
-                  pointerEvents: 'none',
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                }}
-              >
-                {renderCalGrid(outgoingDays, flipState.outgoing)}
-              </div>
-              {/* Shadow that folds with the page to simulate depth */}
+              {/* Shadow cast on incoming page */}
               <div style={{
-                position: 'absolute', inset: 0, zIndex: 11,
-                pointerEvents: 'none',
-                transformOrigin: flipState.dir === 'next' ? 'right center' : 'left center',
-                animation: `page-fold-${flipState.dir} 520ms cubic-bezier(0.4,0,0.6,1) forwards`,
+                position: 'absolute', inset: 0, zIndex: 6, pointerEvents: 'none',
                 background: flipState.dir === 'next'
-                  ? 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 25%, transparent 55%)'
-                  : 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 25%, transparent 55%)',
-                backfaceVisibility: 'hidden',
-                WebkitBackfaceVisibility: 'hidden',
+                  ? 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.05) 55%, transparent 85%)'
+                  : 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.05) 55%, transparent 85%)',
+                animation: `${flipState.dir === 'next' ? 'book-shadow-next' : 'book-shadow-prev'} 870ms ease-out forwards`,
               }} />
+
+              {/* Paper curl — N_STRIPS strips, each with front/back face */}
+              {Array.from({ length: N_STRIPS }, (_, i) => {
+                const clipLeft  = (i / N_STRIPS) * 100
+                const clipRight = ((N_STRIPS - i - 1) / N_STRIPS) * 100
+                return (
+                  <div
+                    key={i}
+                    ref={el => { stripRefs.current[i] = el }}
+                    style={{
+                      position: 'absolute', top: 0, bottom: 0,
+                      left: `${(i / N_STRIPS) * 100}%`,
+                      width: `${100 / N_STRIPS}%`,
+                      zIndex: 10,
+                      transformOrigin: flipState.dir === 'next' ? 'left center' : 'right center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    {/* ── Front face: outgoing month content ── */}
+                    <div
+                      ref={el => { frontRefs.current[i] = el }}
+                      style={{ position: 'absolute', inset: 0 }}
+                    >
+                      {/* Full-width grid, clipped to this strip's horizontal slice */}
+                      <div style={{
+                        position: 'absolute', top: 0, bottom: 0,
+                        left: `${-i * 100}%`,
+                        width: `${N_STRIPS * 100}%`,
+                        clipPath: `inset(0 ${clipRight}% 0 ${clipLeft}%)`,
+                      }}>
+                        <div
+                          className="grid grid-cols-7 border-l border-t border-slate-100"
+                          style={{ position: 'absolute', inset: 0, backgroundColor: '#ffffff' }}
+                        >
+                          {renderCalGrid(outgoingDays, flipState.outgoing)}
+                        </div>
+                      </div>
+                      {/* Fold shadow — animated in RAF loop */}
+                      <div
+                        ref={el => { shadowRefs.current[i] = el }}
+                        style={{ position: 'absolute', inset: 0 }}
+                      />
+                    </div>
+
+                    {/* ── Back face: translucent paper, incoming calendar shines through ── */}
+                    <div
+                      ref={el => { backRefs.current[i] = el }}
+                      style={{
+                        position: 'absolute', inset: 0,
+                        display: 'none',
+                        background: 'linear-gradient(to bottom, rgba(255,252,249,0.60) 0%, rgba(250,247,244,0.56) 100%)',
+                        boxShadow: 'inset 0 0 20px rgba(200,190,180,0.25)',
+                      }}
+                    />
+                  </div>
+                )
+              })}
             </>
           )}
         </div>
