@@ -96,14 +96,38 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       const endpoint = irisServiceUrl
         ? `${irisServiceUrl}/analyze/detailed`
         : '/api/iris-analyze'
-      const resp = await fetch(endpoint, { method: 'POST', body: fd })
-      const data = await resp.json()
-      if (data.error) throw new Error(data.error)
+
+      let data: Record<string, unknown> | null = null
+      try {
+        const resp = await fetch(endpoint, { method: 'POST', body: fd })
+        if (resp.ok) {
+          const text = await resp.text()
+          if (text) data = JSON.parse(text)
+        }
+      } catch {
+        // 서비스 미연결 — 시뮬레이션 폴백
+      }
+
+      // 서비스 응답이 없거나 에러면 시뮬레이션 데이터 사용
+      if (!data || data.error) {
+        const eyeData: EyeData = {
+          score:        rng(58, 88),
+          skinZone:     rng(42, 78),
+          thyroidZone:  rng(62, 88),
+          annotatedImg: null,
+          isReal:       false,
+        }
+        if (eyeStep === 'right') setRightData(eyeData)
+        else                     setLeftData(eyeData)
+        setPhase('done')
+        return
+      }
+
       const eyeData: EyeData = {
-        score:        eyeStep === 'right' ? data.rightScore : data.leftScore,
-        skinZone:     data.skinZone,
-        thyroidZone:  data.thyroidZone,
-        annotatedImg: data.annotatedImage ?? null,
+        score:        eyeStep === 'right' ? (data.rightScore as number) : (data.leftScore as number),
+        skinZone:     data.skinZone as number,
+        thyroidZone:  data.thyroidZone as number,
+        annotatedImg: (data.annotatedImage as string) ?? null,
         isReal:       true,
       }
       if (eyeStep === 'right') setRightData(eyeData)
@@ -372,7 +396,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
             <div className="flex flex-col items-center gap-2">
               <div className="w-8 h-8 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"/>
-              <span className="text-xs text-white font-medium">AI 분석 중...</span>
+              <span className="text-xs text-white font-medium">홍채 분석 중...</span>
             </div>
           </div>
         )}
@@ -386,26 +410,33 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
 
       {/* ── 현재 눈 결과 점수 ── */}
       {phase==='done' && currentData && (
-        <div className="flex gap-2">
-          <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-            <div className={cn('text-2xl font-bold font-display', currentData.score>=70?'text-green-600':'text-amber-600')}>
-              {currentData.score}
+        <>
+          <div className="flex gap-2">
+            <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+              <div className={cn('text-2xl font-bold font-display', currentData.score>=70?'text-green-600':'text-amber-600')}>
+                {currentData.score}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{eyeLabel} 밀도</div>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">{eyeLabel} 밀도</div>
-          </div>
-          <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-            <div className={cn('text-2xl font-bold font-display', currentData.skinZone>=70?'text-green-600':'text-amber-600')}>
-              {currentData.skinZone}
+            <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+              <div className={cn('text-2xl font-bold font-display', currentData.skinZone>=70?'text-green-600':'text-amber-600')}>
+                {currentData.skinZone}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">피부 Zone</div>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">피부 Zone</div>
-          </div>
-          <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-            <div className={cn('text-2xl font-bold font-display', currentData.thyroidZone>=70?'text-green-600':'text-amber-600')}>
-              {currentData.thyroidZone}
+            <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+              <div className={cn('text-2xl font-bold font-display', currentData.thyroidZone>=70?'text-green-600':'text-amber-600')}>
+                {currentData.thyroidZone}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-0.5">갑상선 Zone</div>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5">갑상선 Zone</div>
           </div>
-        </div>
+          {!currentData.isReal && (
+            <p className="text-[10px] text-center text-slate-400">
+              * 데모 모드 — 로컬 실행 시 실제 AI 홍채 분석 결과가 표시됩니다
+            </p>
+          )}
+        </>
       )}
 
       {/* ── 두 눈 모두 완료 — 최종 결과 ── */}

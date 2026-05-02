@@ -195,24 +195,34 @@ export default function OnboardingPage() {
         })}
       </div>
 
-      {/* CTA */}
-      <div className="w-full max-w-2xl">
-        <button onClick={handleStart}
-          disabled={selected.size === 0}
-          className="w-full py-4 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95 disabled:opacity-40"
+      {/* 하단 여백 (fixed 버튼이 카드를 가리지 않도록) */}
+      {selected.size > 0 && <div className="h-28" />}
+
+      {/* Fixed bottom CTA — 카드 하나 이상 선택 시 슬라이드 업 */}
+      <div
+        className="fixed bottom-0 left-0 right-0 transition-all duration-300 ease-out"
+        style={{
+          transform: selected.size > 0 ? 'translateY(0)' : 'translateY(110%)',
+          pointerEvents: selected.size > 0 ? 'auto' : 'none',
+        }}
+      >
+        <div className="px-4 pb-6 pt-3"
           style={{
-            background: selected.size > 0
-              ? 'linear-gradient(135deg, #f43f75, #e11d5a)'
-              : 'rgba(200,200,210,0.6)',
-            boxShadow: selected.size > 0 ? '0 6px 24px rgba(244,63,117,0.4)' : 'none',
+            background: 'linear-gradient(to top, rgba(255,248,250,0.98) 70%, transparent)',
+            backdropFilter: 'blur(12px)',
           }}>
-          {selected.size > 0
-            ? `${selected.size}개 선택 완료 · LUDIA 시작하기 →`
-            : '항목을 선택해주세요'}
-        </button>
-        <p className="text-[11px] text-slate-300 text-center mt-3">
-          언제든지 설정에서 변경할 수 있어요
-        </p>
+          <button onClick={handleStart}
+            className="w-full max-w-2xl mx-auto block py-4 rounded-2xl text-sm font-semibold text-white active:scale-95 transition-transform"
+            style={{
+              background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
+              boxShadow: '0 6px 28px rgba(244,63,117,0.45)',
+            }}>
+            {selected.size}개 선택 완료 · LUDIA 시작하기 →
+          </button>
+          <p className="text-[11px] text-slate-300 text-center mt-2">
+            언제든지 설정에서 변경할 수 있어요
+          </p>
+        </div>
       </div>
     </div>
   )

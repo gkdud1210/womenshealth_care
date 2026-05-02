@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { getPhaseLabel, getPhaseColor, getCyclePhase } from '@/lib/cycle-utils'
 import { LudiaInsightCard } from '@/components/calendar/LudiaInsightCard'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
+import { useAuth } from '@/hooks/useAuth'
+import { LudiaVoice } from '@/components/voice/LudiaVoice'
 import type { CyclePhase } from '@/types/health'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 
@@ -236,6 +238,7 @@ function QuickLinks() {
 // ── 메인 ──────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const { data, ready } = useMultimodalData()
+  const { user }        = useAuth()
   const today    = useMemo(() => new Date(), [])
   const cycleDay = useMemo(() => computeCycleDay(MOCK_LAST_PERIOD, today, CYCLE_LENGTH), [today])
   const phase    = useMemo(() => getCyclePhase(cycleDay, CYCLE_LENGTH, PERIOD_LENGTH), [cycleDay])
@@ -274,7 +277,18 @@ export default function DashboardPage() {
 
         {/* 5. 빠른 이동 */}
         <QuickLinks />
+
+        {/* 하단 여백 — 음성 버튼 공간 확보 */}
+        <div className="h-24" />
       </div>
+
+      {/* 음성 대화 */}
+      <LudiaVoice
+        data={data}
+        phase={phase}
+        cycleDay={cycleDay}
+        userName={user?.name ?? '루디아'}
+      />
     </div>
   )
 }
