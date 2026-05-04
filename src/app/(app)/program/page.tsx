@@ -4,8 +4,8 @@ import { TrendingUp, Construction } from 'lucide-react'
 
 export default function ProgramPage() {
   return (
-    <div className="min-h-screen p-8 flex flex-col items-center justify-center">
-      <div className="glass-card p-12 text-center max-w-md">
+    <div className="min-h-screen p-4 sm:p-8 flex flex-col items-center justify-center">
+      <div className="glass-card p-6 sm:p-12 text-center max-w-md w-full">
         <div className="w-16 h-16 rounded-2xl bg-green-100 flex items-center justify-center mx-auto mb-4">
           <TrendingUp className="w-8 h-8 text-green-500" />
         </div>

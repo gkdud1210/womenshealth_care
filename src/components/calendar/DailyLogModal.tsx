@@ -369,7 +369,8 @@ export function DailyLogModal({ date, existingLog, cyclePhase, onSave, onClose }
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-rose-100/60 flex items-center justify-between bg-rose-50/30">
+        <div className="px-6 pt-4 border-t border-rose-100/60 flex items-center justify-between bg-rose-50/30"
+          style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}>
           <div className="flex gap-1">
             {TABS.map((_, i) => (
               <div key={i} className={cn(

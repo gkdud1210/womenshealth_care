@@ -4,8 +4,8 @@ import { ShoppingBag, Construction } from 'lucide-react'
 
 export default function ShopPage() {
   return (
-    <div className="min-h-screen p-8 flex flex-col items-center justify-center">
-      <div className="glass-card p-12 text-center max-w-md">
+    <div className="min-h-screen p-4 sm:p-8 flex flex-col items-center justify-center">
+      <div className="glass-card p-6 sm:p-12 text-center max-w-md w-full">
         <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
           <ShoppingBag className="w-8 h-8 text-amber-500" />
         </div>

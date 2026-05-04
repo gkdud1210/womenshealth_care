@@ -12,7 +12,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 lg:ml-64 min-h-screen pb-20 lg:pb-0">
+      <main className="flex-1 lg:ml-64 min-h-screen pb-safe-nav">
         {children}
       </main>
 

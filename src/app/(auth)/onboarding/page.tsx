@@ -140,7 +140,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-10 sm:py-14">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-4 py-10 sm:py-14">
 
       {/* Header */}
       <div className="flex flex-col items-center mb-8 text-center">

@@ -13,7 +13,7 @@ const NAV_ITEMS = [
   { href: '/calendar',   icon: CalendarHeart,      label: '캘린더' },
   { href: '/diagnostic', icon: Microscope,         label: '진단' },
   { href: '/program',    icon: TrendingUp,         label: '프로그램' },
-  { href: '/consultant', icon: MessageCircleHeart, label: 'LUDIA상담' },
+  { href: '/consultant', icon: MessageCircleHeart, label: 'AI상담' },
   { href: '/shop',       icon: ShoppingBag,        label: '케어샵' },
 ]
 
@@ -21,7 +21,7 @@ export function MobileNav() {
   const pathname = usePathname()
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden safe-bottom"
+    <nav className="fixed bottom-0 left-0 right-0 z-40 lg:hidden safe-bottom"
       style={{
         background: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(16px)',

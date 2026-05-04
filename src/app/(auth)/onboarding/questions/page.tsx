@@ -87,7 +87,7 @@ export default function QuestionsPage() {
   const canNext  = q.type === 'slider' || current !== null
 
   return (
-    <div className="min-h-screen flex flex-col px-5 py-8 sm:py-12"
+    <div className="min-h-[100dvh] flex flex-col px-5 py-8 sm:py-12"
       style={{ background: 'linear-gradient(145deg, #fdf6f9 0%, #fce9f0 35%, #f8eeff 70%, #fdf0f8 100%)' }}>
 
       {/* ── 오프닝 메시지 (첫 질문만) ── */}
@@ -274,7 +274,7 @@ function MultiSelectInput({ options, value, onChange }: {
 /* ── 완료 화면 ──────────────────────────────────────────────── */
 function CompletionScreen({ userName, onFinish }: { userName: string; onFinish: () => void }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center"
       style={{ background: 'linear-gradient(145deg, #fdf6f9, #fce9f0, #f8eeff)' }}>
       <div className="space-y-6 max-w-sm">
         <div className="text-6xl animate-bounce">🌸</div>
@@ -308,7 +308,7 @@ function DeviceScreen({ onHasDevice, onNoDevice }: {
   onNoDevice: () => void
 }) {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 text-center"
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center"
       style={{ background: 'linear-gradient(145deg, #fdf6f9, #fce9f0, #f8eeff)' }}>
       <div className="space-y-8 max-w-sm w-full">
 

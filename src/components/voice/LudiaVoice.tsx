@@ -188,7 +188,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
 
       {/* Panel */}
       {isOpen && (
-        <div className="fixed bottom-28 inset-x-4 z-50 max-w-lg mx-auto">
+        <div className="fixed bottom-above-voice inset-x-4 z-50 max-w-lg mx-auto">
           <div className="rounded-3xl overflow-hidden" style={{
             background: 'linear-gradient(145deg, rgba(12,5,18,0.97), rgba(28,10,38,0.97))',
             border: '1px solid rgba(244,63,117,0.18)',
@@ -315,7 +315,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         onClick={handleMic}
         aria-label="루디아 음성 대화"
         className={cn(
-          'fixed bottom-6 right-5 z-50 w-16 h-16 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all duration-300',
+          'fixed bottom-above-nav right-5 z-50 w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all duration-300',
           vs === 'listening' ? 'scale-110' : 'hover:scale-105 active:scale-95'
         )}
         style={{

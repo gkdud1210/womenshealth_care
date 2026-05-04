@@ -40,7 +40,7 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-5 py-12">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-5 py-12">
 
       {/* LUDIA Brand */}
       <div className="flex flex-col items-center mb-8">
