@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle, Pencil, Check } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths, addDays
@@ -217,7 +217,7 @@ export function HealthCalendar({
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
 
   // ── Voice schedule state ──
-  const { addEvents, getEventsByDate, deleteEvent } = useSchedule()
+  const { addEvents, getEventsByDate, deleteEvent, updateEvent } = useSchedule()
   const [scheduleSheetDate, setScheduleSheetDate] = useState<Date | null>(null)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [flipState, setFlipState] = useState<{
@@ -763,6 +763,7 @@ export function HealthCalendar({
           date={scheduleSheetDate}
           events={getEventsByDate(getKey(scheduleSheetDate))}
           onDelete={deleteEvent}
+          onUpdate={updateEvent}
           onClose={() => setScheduleSheetDate(null)}
         />
       )}
@@ -1287,15 +1288,39 @@ function fmtHHMM(t: string) {
   return `오후 ${h-12}:${String(m).padStart(2,'0')}`
 }
 
+const CATEGORY_OPTIONS: { value: ScheduleEvent['category']; label: string }[] = [
+  { value: 'work',     label: '업무' },
+  { value: 'study',    label: '공부' },
+  { value: 'exercise', label: '운동' },
+  { value: 'social',   label: '약속' },
+  { value: 'medical',  label: '의료' },
+  { value: 'rest',     label: '휴식' },
+  { value: 'other',    label: '기타' },
+]
+
 function ScheduleSheet({
-  date, events, onDelete, onClose,
+  date, events, onDelete, onUpdate, onClose,
 }: {
   date: Date
   events: ScheduleEvent[]
   onDelete: (id: string) => void
+  onUpdate: (id: string, patch: Partial<ScheduleEvent>) => void
   onClose: () => void
 }) {
   const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<Partial<ScheduleEvent>>({})
+
+  function startEdit(ev: ScheduleEvent) {
+    setEditingId(ev.id)
+    setEditForm({ title: ev.title, startTime: ev.startTime, endTime: ev.endTime, category: ev.category })
+  }
+
+  function saveEdit(id: string) {
+    if (!editForm.title?.trim()) return
+    onUpdate(id, editForm)
+    setEditingId(null)
+  }
 
   return (
     <>
@@ -1306,7 +1331,7 @@ function ScheduleSheet({
           background: 'rgba(255,248,255,0.98)',
           backdropFilter: 'blur(24px)',
           border: '1px solid rgba(168,85,247,0.14)',
-          maxHeight: '70dvh',
+          maxHeight: '80dvh',
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -1335,27 +1360,99 @@ function ScheduleSheet({
             <p className="text-sm text-slate-400 text-center py-8">이 날에 등록된 일정이 없어요</p>
           ) : events.map(ev => {
             const color = SCHEDULE_CATEGORY_COLORS[ev.category]
+            const isEditing = editingId === ev.id
+
             return (
               <div key={ev.id}
-                className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
-                style={{ background: `${color}0d`, border: `1.5px solid ${color}2a` }}>
-                <div className="w-1 self-stretch rounded-full flex-none" style={{ background: color }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {fmtHHMM(ev.startTime)} – {fmtHHMM(ev.endTime)}
-                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
-                      style={{ background: `${color}18`, color }}>
-                      {SCHEDULE_CATEGORY_LABELS[ev.category]}
-                    </span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => onDelete(ev.id)}
-                  className="w-7 h-7 rounded-full flex items-center justify-center flex-none transition-colors hover:bg-red-50"
-                  aria-label="삭제">
-                  <X className="w-3.5 h-3.5 text-slate-300 hover:text-red-400" />
-                </button>
+                className="rounded-2xl overflow-hidden transition-all"
+                style={{ background: `${color}0d`, border: `1.5px solid ${isEditing ? color + '55' : color + '2a'}` }}>
+
+                {isEditing ? (
+                  /* ── Edit form ── */
+                  <div className="px-4 py-3.5 space-y-3">
+                    {/* Title */}
+                    <input
+                      autoFocus
+                      value={editForm.title ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                      placeholder="일정 이름"
+                      className="w-full text-sm font-semibold text-slate-800 bg-white/80 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400 transition-colors"
+                    />
+                    {/* Time row */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <p className="text-[10px] text-slate-400 mb-1 font-medium">시작</p>
+                        <input
+                          type="time"
+                          value={editForm.startTime ?? ''}
+                          onChange={e => setEditForm(f => ({ ...f, startTime: e.target.value }))}
+                          className="w-full text-sm text-slate-700 bg-white/80 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400 transition-colors"
+                        />
+                      </div>
+                      <span className="text-slate-300 mt-4">–</span>
+                      <div className="flex-1">
+                        <p className="text-[10px] text-slate-400 mb-1 font-medium">종료</p>
+                        <input
+                          type="time"
+                          value={editForm.endTime ?? ''}
+                          onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
+                          className="w-full text-sm text-slate-700 bg-white/80 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400 transition-colors"
+                        />
+                      </div>
+                    </div>
+                    {/* Category */}
+                    <select
+                      value={editForm.category ?? 'other'}
+                      onChange={e => setEditForm(f => ({ ...f, category: e.target.value as ScheduleEvent['category'] }))}
+                      className="w-full text-sm text-slate-700 bg-white/80 border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400 transition-colors"
+                    >
+                      {CATEGORY_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                    {/* Action buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="flex-1 py-2 rounded-xl text-xs text-slate-400 border border-slate-200 transition-colors hover:bg-slate-50">
+                        취소
+                      </button>
+                      <button
+                        onClick={() => saveEdit(ev.id)}
+                        className="flex-1 py-2 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1 transition-all active:scale-95"
+                        style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 3px 12px rgba(168,85,247,0.35)' }}>
+                        <Check className="w-3.5 h-3.5" /> 저장
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── View row ── */
+                  <div className="flex items-center gap-3 px-4 py-3.5">
+                    <div className="w-1 self-stretch rounded-full flex-none" style={{ background: color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {fmtHHMM(ev.startTime)} – {fmtHHMM(ev.endTime)}
+                        <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                          style={{ background: `${color}18`, color }}>
+                          {SCHEDULE_CATEGORY_LABELS[ev.category]}
+                        </span>
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => startEdit(ev)}
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-none transition-colors hover:bg-purple-50"
+                      aria-label="수정">
+                      <Pencil className="w-3.5 h-3.5 text-slate-300 hover:text-purple-400" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(ev.id)}
+                      className="w-7 h-7 rounded-full flex items-center justify-center flex-none transition-colors hover:bg-red-50"
+                      aria-label="삭제">
+                      <X className="w-3.5 h-3.5 text-slate-300 hover:text-red-400" />
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
