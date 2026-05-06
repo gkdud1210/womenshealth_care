@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard, CalendarHeart, Microscope, TrendingUp,
+  LayoutDashboard, CalendarHeart, Microscope,
   ShoppingBag, Settings
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -13,7 +13,7 @@ const navItems = [
   { href: '/dashboard',  icon: LayoutDashboard,   label: '대시보드' },
   { href: '/calendar',   icon: CalendarHeart,      label: '건강 캘린더' },
   { href: '/diagnostic', icon: Microscope,         label: '진단 분석' },
-  { href: '/program',    icon: TrendingUp,  label: '3개월 프로그램' },
+  { href: '/settings',   icon: Settings,    label: '설정' },
   { href: '/shop',       icon: ShoppingBag, label: '맞춤 케어샵' },
 ]
 
