@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Mic, MicOff, Volume2, CalendarCheck } from 'lucide-react'
+import { Mic, MicOff, Volume2, CalendarCheck, Send, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { askLudia } from '@/lib/ludia-engine'
 import { useOnboardingProfile } from '@/lib/onboarding-profile'
@@ -23,6 +23,10 @@ const ANIMATION_CSS = `
 @keyframes ludia-msg {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes ludia-bar {
+  0%, 100% { transform: scaleY(0.4); }
+  50%       { transform: scaleY(1); }
 }
 `
 
@@ -67,13 +71,11 @@ function today(): string {
 function pickKoreanFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices()
   const korean = voices.filter(v => v.lang.startsWith('ko'))
-  // Prefer known female voice names across platforms
   const femaleNames = ['Yuna', 'Google 한국의', '미나', 'Heami', 'Nari', 'Sora', 'Hyuna']
   for (const name of femaleNames) {
     const match = korean.find(v => v.name.includes(name))
     if (match) return match
   }
-  // Fall back to first Korean voice available
   return korean[0] ?? null
 }
 
@@ -84,15 +86,12 @@ function speak(text: string, onEnd?: () => void) {
   u.lang = 'ko-KR'
   u.rate = 1.05
   u.pitch = 1.15
-
   const doSpeak = () => {
     const voice = pickKoreanFemaleVoice()
     if (voice) u.voice = voice
     if (onEnd) u.onend = onEnd
     window.speechSynthesis.speak(u)
   }
-
-  // voices may not be loaded yet on first call
   if (window.speechSynthesis.getVoices().length > 0) {
     doSpeak()
   } else {
@@ -138,31 +137,43 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   const phaseColor    = getPhaseColor(phase)
   const phaseAccent   = PHASE_ACCENT[phase]
 
-  const [vs, setVs]           = useState<VoiceState>('idle')
+  const [vs, setVs]             = useState<VoiceState>('idle')
   const [messages, setMessages] = useState<Message[]>(() => [welcome(userName, cycleDay, phase)])
   const [interim, setInterim]   = useState('')
+  const [inputText, setInputText] = useState('')
 
   const vsRef    = useRef<VoiceState>('idle')
   const recogRef = useRef<any>(null)
   const chatRef  = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const updateVs = useCallback((s: VoiceState) => {
     vsRef.current = s
     setVs(s)
   }, [])
 
+  /* Auto-scroll chat */
   useEffect(() => {
     const el = chatRef.current
     if (!el) return
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [messages, interim, vs])
 
+  /* Auto-resize textarea */
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 96)}px`
+  }, [inputText])
+
+  /* Cleanup on unmount */
   useEffect(() => () => {
     recogRef.current?.stop()
     if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
   }, [])
 
-  /* Save a parsed calendar event to localStorage */
+  /* Save a parsed calendar event */
   const saveEvent = useCallback((ev: ParsedEvent) => {
     if (!ev.hasEvent || !ev.title) return
     const dateKey = ev.date ?? today()
@@ -180,7 +191,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     })
   }, [setLogs])
 
-  /* Build conversation history for Claude API */
+  /* Build conversation history */
   const buildHistory = useCallback(() =>
     messages
       .filter(m => m.id !== 'welcome')
@@ -191,16 +202,14 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
       })),
   [messages])
 
-  /* Process user speech/text */
+  /* Core: send text to API and get reply */
   const processText = useCallback(async (text: string) => {
     const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', text }
     setMessages(prev => [...prev, userMsg])
     updateVs('thinking')
 
     let reply = ''
-    let parsedEvent: ParsedEvent = {
-      hasEvent: false, title: null, date: null, time: null,
-    }
+    let parsedEvent: ParsedEvent = { hasEvent: false, title: null, date: null, time: null }
 
     try {
       const res = await fetch('/api/ludia/chat/', {
@@ -222,7 +231,6 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
           },
         }),
       })
-
       if (res.ok) {
         const json = await res.json()
         reply = json.reply ?? ''
@@ -234,20 +242,14 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
       reply = askLudia(text, data, phase, cycleDay, profile).text
     }
 
-    if (parsedEvent.hasEvent && parsedEvent.title) {
-      saveEvent(parsedEvent)
-    }
+    if (parsedEvent.hasEvent && parsedEvent.title) saveEvent(parsedEvent)
 
     const ludiaMsg: Message = {
       id: `l-${Date.now()}`,
       role: 'ludia',
       text: reply,
       event: parsedEvent.hasEvent && parsedEvent.title
-        ? {
-            title: parsedEvent.title,
-            date: parsedEvent.date ?? today(),
-            time: parsedEvent.time,
-          }
+        ? { title: parsedEvent.title, date: parsedEvent.date ?? today(), time: parsedEvent.time }
         : undefined,
     }
     setMessages(prev => [...prev, ludiaMsg])
@@ -255,11 +257,25 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     speak(reply, () => updateVs('idle'))
   }, [data, phase, cycleDay, userName, profile, buildHistory, saveEvent, updateVs])
 
+  /* Text send handler */
+  const handleTextSend = useCallback(() => {
+    const text = inputText.trim()
+    if (!text) return
+    setInputText('')
+    processText(text)
+  }, [inputText, processText])
+
+  /* Enter key sends (Shift+Enter = newline) */
+  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleTextSend()
+    }
+  }, [handleTextSend])
+
   /* STT */
   const startListening = useCallback(() => {
-    const SR =
-      (window as any).SpeechRecognition ??
-      (window as any).webkitSpeechRecognition
+    const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
     if (!SR) {
       processText('오늘 내 컨디션 어때')
       return
@@ -290,49 +306,43 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   }, [processText, updateVs])
 
   const handleMic = useCallback(() => {
-    if (vs === 'idle')      { startListening() }
+    if (vs === 'idle')           { startListening() }
     else if (vs === 'listening') { recogRef.current?.stop() }
-    else if (vs === 'speaking')  {
-      window.speechSynthesis.cancel()
-      updateVs('idle')
-    }
-    // 'thinking' → do nothing (wait for response)
+    else if (vs === 'speaking')  { window.speechSynthesis.cancel(); updateVs('idle') }
   }, [vs, startListening, updateVs])
 
-  /* ─── Mic button visual state ────────────────────────────────── */
-  const micBg = {
-    idle:      'linear-gradient(145deg, #160b20, #2d1240)',
-    listening: 'linear-gradient(135deg, #f43f75, #e11d5a)',
-    thinking:  'linear-gradient(135deg, #7c3aed, #a855f7)',
-    speaking:  'linear-gradient(135deg, #f43f75, #a855f7)',
-  }[vs]
+  /* Button appearance */
+  const isBusy = vs === 'thinking'
+  const hasText = inputText.trim().length > 0
 
-  const micShadow = {
-    idle:      '0 8px 32px rgba(244,63,117,0.2), 0 0 0 1px rgba(244,63,117,0.12)',
-    listening: '0 8px 32px rgba(244,63,117,0.5)',
-    thinking:  '0 8px 32px rgba(168,85,247,0.5)',
-    speaking:  '0 8px 32px rgba(168,85,247,0.4)',
-  }[vs]
+  const btnBg = hasText
+    ? 'linear-gradient(135deg, #f43f75, #e11d5a)'
+    : {
+        idle:      'linear-gradient(145deg, #160b20, #2d1240)',
+        listening: 'linear-gradient(135deg, #f43f75, #e11d5a)',
+        thinking:  'linear-gradient(135deg, #7c3aed, #a855f7)',
+        speaking:  'linear-gradient(135deg, #f43f75, #a855f7)',
+      }[vs]
 
-  const statusText = {
-    idle:      '마이크 버튼을 눌러 말씀해보세요',
-    listening: '듣고 있어요...',
-    thinking:  '분석 중이에요...',
-    speaking:  '말하고 있어요...',
-  }[vs]
+  const btnShadow = vs === 'listening' || hasText
+    ? '0 4px 16px rgba(244,63,117,0.45)'
+    : vs === 'thinking' || vs === 'speaking'
+      ? '0 4px 16px rgba(168,85,247,0.4)'
+      : '0 4px 16px rgba(244,63,117,0.2), 0 0 0 1px rgba(244,63,117,0.1)'
+
+  const inputPlaceholder = vs === 'listening'
+    ? '말하고 있어요...'
+    : '메시지를 입력하거나 🎤로 말해보세요'
 
   return (
     <>
       <style>{ANIMATION_CSS}</style>
 
       {/* ─── Full-page container ──────────────────────────────────── */}
-      <div className="flex flex-col max-w-lg mx-auto"
-        style={{ minHeight: '100dvh' }}>
+      <div className="flex flex-col max-w-lg mx-auto" style={{ minHeight: '100dvh' }}>
 
         {/* ─── Header ────────────────────────────────────────────── */}
         <header className="flex-none flex items-center justify-between px-5 pt-5 pb-4">
-
-          {/* LUDIA wordmark */}
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl flex items-center justify-center"
               style={{
@@ -347,12 +357,8 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
             </div>
           </div>
 
-          {/* Cycle badge */}
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-            style={{
-              background: phaseAccent.badge,
-              border: `1px solid ${phaseColor}30`,
-            }}>
+            style={{ background: phaseAccent.badge, border: `1px solid ${phaseColor}30` }}>
             <div className="w-2 h-2 rounded-full" style={{ background: phaseColor }} />
             <span className="text-xs font-semibold" style={{ color: phaseAccent.text }}>
               D+{cycleDay} {getPhaseLabel(phase)}
@@ -364,21 +370,16 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         <div
           ref={chatRef}
           className="flex-1 overflow-y-auto px-4 space-y-3"
-          style={{ paddingBottom: '220px' }}
+          style={{ paddingBottom: '130px' }}
         >
           {messages.map(msg => (
             <div
               key={msg.id}
-              className={cn(
-                'flex gap-2',
-                msg.role === 'user' ? 'justify-end' : 'justify-start',
-              )}
+              className={cn('flex gap-2', msg.role === 'user' ? 'justify-end' : 'justify-start')}
               style={{ animation: 'ludia-msg 0.28s ease-out both' }}
             >
-              {/* LUDIA avatar */}
               {msg.role === 'ludia' && (
-                <div
-                  className="w-7 h-7 rounded-xl flex-none flex items-center justify-center self-end mb-0.5"
+                <div className="w-7 h-7 rounded-xl flex-none flex items-center justify-center self-end mb-0.5"
                   style={{
                     background: 'linear-gradient(135deg, #f43f75, #a855f7)',
                     boxShadow: '0 2px 8px rgba(244,63,117,0.25)',
@@ -387,13 +388,8 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                 </div>
               )}
 
-              <div
-                className={cn(
-                  'max-w-[78%] flex flex-col gap-1.5',
-                  msg.role === 'user' ? 'items-end' : 'items-start',
-                )}>
-
-                {/* Chat bubble */}
+              <div className={cn('max-w-[78%] flex flex-col gap-1.5',
+                msg.role === 'user' ? 'items-end' : 'items-start')}>
                 <div
                   className={cn(
                     'px-4 py-3 text-sm leading-relaxed',
@@ -402,8 +398,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                       : 'rounded-3xl rounded-bl-lg text-slate-700',
                   )}
                   style={msg.role === 'ludia' ? {
-                    background:
-                      'linear-gradient(135deg, rgba(255,241,245,0.97), rgba(253,240,255,0.97))',
+                    background: 'linear-gradient(135deg, rgba(255,241,245,0.97), rgba(253,240,255,0.97))',
                     border: '1px solid rgba(244,63,117,0.13)',
                     boxShadow: '0 2px 14px rgba(244,63,117,0.06)',
                   } : {
@@ -412,21 +407,12 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                   {msg.text}
                 </div>
 
-                {/* Saved event chip */}
                 {msg.event && (
-                  <div
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px]"
-                    style={{
-                      background: 'rgba(168,85,247,0.08)',
-                      border: '1px solid rgba(168,85,247,0.22)',
-                    }}>
-                    <CalendarCheck
-                      className="w-3 h-3 flex-none"
-                      style={{ color: '#a855f7' }}
-                    />
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px]"
+                    style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.22)' }}>
+                    <CalendarCheck className="w-3 h-3 flex-none" style={{ color: '#a855f7' }} />
                     <span className="font-semibold" style={{ color: '#7c3aed' }}>
-                      {msg.event.title}
-                      {msg.event.time ? ` · ${fmtTime(msg.event.time)}` : ''} 저장됨
+                      {msg.event.title}{msg.event.time ? ` · ${fmtTime(msg.event.time)}` : ''} 저장됨
                     </span>
                   </div>
                 )}
@@ -434,66 +420,40 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
             </div>
           ))}
 
-          {/* Interim speech (real-time) */}
-          {interim && (
-            <div className="flex justify-end"
-              style={{ animation: 'ludia-msg 0.18s ease-out both' }}>
-              <div
-                className="max-w-[78%] px-4 py-3 rounded-3xl rounded-br-lg text-sm text-slate-400 italic"
-                style={{
-                  background: 'rgba(255,255,255,0.75)',
-                  border: '1px solid rgba(244,63,117,0.08)',
-                }}>
-                {interim}…
-              </div>
-            </div>
-          )}
-
           {/* Thinking indicator */}
           {vs === 'thinking' && (
-            <div className="flex gap-2 items-end"
-              style={{ animation: 'ludia-msg 0.18s ease-out both' }}>
-              <div
-                className="w-7 h-7 rounded-xl flex-none flex items-center justify-center"
+            <div className="flex gap-2 items-end" style={{ animation: 'ludia-msg 0.18s ease-out both' }}>
+              <div className="w-7 h-7 rounded-xl flex-none flex items-center justify-center"
                 style={{ background: 'linear-gradient(135deg, #f43f75, #a855f7)' }}>
                 <span className="text-[9px] font-black text-white">L</span>
               </div>
-              <div
-                className="px-4 py-3.5 rounded-3xl rounded-bl-lg"
+              <div className="px-4 py-3.5 rounded-3xl rounded-bl-lg"
                 style={{
-                  background:
-                    'linear-gradient(135deg, rgba(255,241,245,0.97), rgba(253,240,255,0.97))',
+                  background: 'linear-gradient(135deg, rgba(255,241,245,0.97), rgba(253,240,255,0.97))',
                   border: '1px solid rgba(244,63,117,0.13)',
                 }}>
                 <div className="flex items-center gap-1.5">
                   {[0, 0.18, 0.36].map((delay, i) => (
-                    <div
-                      key={i}
-                      className="w-2 h-2 rounded-full"
+                    <div key={i} className="w-2 h-2 rounded-full"
                       style={{
                         background: 'linear-gradient(135deg,#f43f75,#a855f7)',
                         animation: `ludia-dot 0.8s ease-in-out ${delay}s infinite`,
-                      }}
-                    />
+                      }} />
                   ))}
                 </div>
               </div>
             </div>
           )}
 
-          {/* Example chips — only when idle with no conversation */}
+          {/* Example chips */}
           {vs === 'idle' && messages.length <= 1 && (
-            <div
-              className="pt-3 pb-2"
-              style={{ animation: 'ludia-msg 0.35s ease-out both' }}>
+            <div className="pt-3 pb-2" style={{ animation: 'ludia-msg 0.35s ease-out both' }}>
               <p className="text-[11px] text-slate-400 text-center mb-3 leading-relaxed">
-                마이크 버튼을 눌러 말하거나 아래 예시를 탭해보세요
+                아래 예시를 탭하거나 직접 입력해보세요
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {EXAMPLES.map(ex => (
-                  <button
-                    key={ex}
-                    onClick={() => processText(ex)}
+                  <button key={ex} onClick={() => processText(ex)}
                     className="text-xs px-3.5 py-1.5 rounded-full transition-all hover:scale-105 active:scale-95"
                     style={{
                       background: 'rgba(244,63,117,0.07)',
@@ -509,84 +469,80 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         </div>
       </div>
 
-      {/* ─── Fixed mic section (above mobile nav) ─────────────────── */}
-      <div
-        className="fixed bottom-above-nav inset-x-0 flex flex-col items-center gap-3 pb-1 z-50"
-        style={{ pointerEvents: 'none' }}>
+      {/* ─── Fixed input bar (above mobile nav) ───────────────────── */}
+      <div className="fixed bottom-above-nav inset-x-0 z-50 flex flex-col items-stretch px-3 pb-1 max-w-lg mx-auto left-0 right-0">
 
-        {/* Status label */}
-        <p
-          className={cn(
-            'text-xs font-medium transition-all duration-300',
-            vs === 'idle' ? 'text-slate-400' : 'text-rose-500',
-          )}
-          style={{ pointerEvents: 'none' }}>
-          {statusText}
-        </p>
+        {/* Interim / status label */}
+        {(interim || vs !== 'idle') && (
+          <div className="text-center mb-2 px-2">
+            {interim ? (
+              <p className="text-sm text-slate-500 italic">{interim}…</p>
+            ) : (
+              <p className="text-xs font-medium"
+                style={{ color: vs === 'thinking' ? '#a855f7' : vs === 'speaking' ? '#a855f7' : '#f43f75' }}>
+                {vs === 'listening' ? '듣고 있어요...' : vs === 'thinking' ? '분석 중이에요...' : '말하고 있어요...'}
+              </p>
+            )}
+          </div>
+        )}
 
-        {/* Mic button + pulse rings */}
+        {/* Input bar */}
         <div
-          className="relative flex items-center justify-center"
-          style={{ pointerEvents: 'auto' }}>
+          className="flex items-end gap-2 px-3 py-2 rounded-3xl"
+          style={{
+            background: 'rgba(255,255,255,0.97)',
+            border: '1px solid rgba(244,63,117,0.15)',
+            boxShadow: '0 4px 24px rgba(244,63,117,0.1), 0 1px 8px rgba(0,0,0,0.06)',
+            backdropFilter: 'blur(16px)',
+          }}>
 
-          {/* Listening rings */}
-          {vs === 'listening' && [0, 0.5, 1].map((delay, i) => (
-            <div
-              key={i}
-              className="absolute w-20 h-20 rounded-full"
-              style={{
-                background: 'rgba(244,63,117,0.22)',
-                animation: `ludia-ring 1.8s ease-out ${delay}s infinite`,
-              }}
-            />
-          ))}
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={inputText}
+            onChange={e => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={inputPlaceholder}
+            rows={1}
+            disabled={isBusy || vs === 'listening'}
+            className="flex-1 resize-none bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none leading-relaxed py-1.5"
+            style={{ maxHeight: '96px', scrollbarWidth: 'none', minHeight: '24px' }}
+          />
 
-          {/* Speaking ring */}
-          {vs === 'speaking' && (
-            <div
-              className="absolute w-20 h-20 rounded-full"
-              style={{
-                background: 'rgba(168,85,247,0.18)',
-                animation: 'ludia-ring 2s ease-out 0s infinite',
-              }}
-            />
-          )}
-
+          {/* Action button */}
           <button
-            onClick={handleMic}
-            aria-label="루디아 음성 대화"
+            onClick={hasText ? handleTextSend : handleMic}
+            disabled={isBusy}
+            aria-label={hasText ? '전송' : vs === 'listening' ? '듣기 중지' : '음성 입력'}
             className={cn(
-              'relative w-20 h-20 rounded-full flex flex-col items-center justify-center gap-0.5',
+              'relative flex-none w-10 h-10 rounded-2xl flex items-center justify-center',
               'transition-all duration-300 select-none',
               vs === 'listening' ? 'scale-110' : 'hover:scale-105 active:scale-95',
+              isBusy && 'opacity-70 cursor-not-allowed',
             )}
-            style={{ background: micBg, boxShadow: micShadow }}>
+            style={{ background: btnBg, boxShadow: btnShadow }}>
 
-            {vs === 'listening' ? (
-              <MicOff className="w-7 h-7 text-white" />
+            {/* Pulse rings when listening */}
+            {vs === 'listening' && !hasText && [0, 0.7].map((delay, i) => (
+              <div key={i} className="absolute w-10 h-10 rounded-2xl pointer-events-none"
+                style={{
+                  background: 'rgba(244,63,117,0.25)',
+                  animation: `ludia-ring 1.8s ease-out ${delay}s infinite`,
+                }} />
+            ))}
+
+            {/* Icon */}
+            {isBusy ? (
+              <Loader2 className="w-4 h-4 text-white/80 animate-spin" />
+            ) : hasText ? (
+              <Send className="w-4 h-4 text-white" />
+            ) : vs === 'listening' ? (
+              <MicOff className="w-4 h-4 text-white" />
             ) : vs === 'speaking' ? (
-              <Volume2 className="w-7 h-7 text-white animate-pulse" />
-            ) : vs === 'thinking' ? (
-              <div className="flex gap-1">
-                {[0, 0.18, 0.36].map((d, i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 h-1.5 rounded-full bg-white/70"
-                    style={{ animation: `ludia-dot 0.8s ease-in-out ${d}s infinite` }}
-                  />
-                ))}
-              </div>
+              <Volume2 className="w-4 h-4 text-white animate-pulse" />
             ) : (
-              <Mic className="w-7 h-7 text-rose-300" />
+              <Mic className="w-4 h-4 text-rose-300" />
             )}
-
-            <span
-              className="text-[7px] font-bold tracking-widest"
-              style={{
-                color: vs === 'idle' ? 'rgba(255,180,200,0.5)' : 'rgba(255,255,255,0.7)',
-              }}>
-              LUDIA
-            </span>
           </button>
         </div>
       </div>
