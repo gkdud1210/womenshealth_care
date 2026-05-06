@@ -62,6 +62,70 @@ function fmtTime(t: string | null) {
 }
 const todayStr = () => new Date().toISOString().split('T')[0]
 
+function addDaysToStr(base: string, n: number): string {
+  const d = new Date(base); d.setDate(d.getDate() + n)
+  return d.toISOString().split('T')[0]
+}
+
+/* Local schedule parser — runs when Gemini API is unavailable */
+function parseEventLocally(text: string): ParsedEvent {
+  const base = { hasEvent: false, title: null, date: null, startTime: null, endTime: null, category: null }
+  const today = todayStr()
+
+  const SCHEDULE_KEYWORDS: { pattern: RegExp; category: string }[] = [
+    { pattern: /과외|수업|강의|레슨|강습|공부/, category: 'study' },
+    { pattern: /회의|미팅|업무|발표|출장|면접/, category: 'work' },
+    { pattern: /운동|헬스|요가|필라테스|수영|달리기/, category: 'exercise' },
+    { pattern: /병원|검진|진료|치과|약속/, category: 'medical' },
+    { pattern: /약속|모임|파티|데이트|만남/, category: 'social' },
+    { pattern: /미용실|헤어|네일|마사지/, category: 'other' },
+  ]
+
+  const matched = SCHEDULE_KEYWORDS.find(k => k.pattern.test(text))
+  if (!matched) return base
+
+  // Extract title: matched keyword
+  const titleMatch = text.match(matched.pattern)
+  const title = titleMatch?.[0] ?? '일정'
+
+  // Date parsing
+  let date = today
+  if (/내일/.test(text)) date = addDaysToStr(today, 1)
+  else if (/모레/.test(text)) date = addDaysToStr(today, 2)
+  else if (/글피/.test(text)) date = addDaysToStr(today, 3)
+  else {
+    const weekdays: Record<string, number> = { 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6, 일: 0 }
+    for (const [k, v] of Object.entries(weekdays)) {
+      if (new RegExp(k + '요일?').test(text)) {
+        const d = new Date(); const cur = d.getDay()
+        const diff = (v - cur + 7) % 7 || 7
+        date = addDaysToStr(today, diff); break
+      }
+    }
+  }
+
+  // Time parsing
+  let startTime: string | null = null
+  const pmMatch = text.match(/오후\s*(\d+)시(?:\s*(\d+)분)?/)
+  const amMatch = text.match(/오전\s*(\d+)시(?:\s*(\d+)분)?/)
+  const numMatch = text.match(/(\d+)시(?:\s*(\d+)분)?/)
+  if (pmMatch) {
+    const h = parseInt(pmMatch[1]) + (parseInt(pmMatch[1]) < 12 ? 12 : 0)
+    startTime = `${String(h).padStart(2,'0')}:${String(parseInt(pmMatch[2] ?? '0')).padStart(2,'0')}`
+  } else if (amMatch) {
+    startTime = `${String(parseInt(amMatch[1])).padStart(2,'0')}:${String(parseInt(amMatch[2] ?? '0')).padStart(2,'0')}`
+  } else if (numMatch) {
+    const h = parseInt(numMatch[1])
+    startTime = `${String(h < 9 ? h + 12 : h).padStart(2,'0')}:${String(parseInt(numMatch[2] ?? '0')).padStart(2,'0')}`
+  }
+
+  const endTime = startTime
+    ? (() => { const [h,m] = startTime!.split(':').map(Number); return `${String(Math.min(h+1,23)).padStart(2,'0')}:${String(m).padStart(2,'0')}` })()
+    : null
+
+  return { hasEvent: true, title, date, startTime, endTime, category: matched.category }
+}
+
 function pickKoreanFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices()
   const korean = voices.filter(v => v.lang.startsWith('ko'))
@@ -205,9 +269,9 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         }),
       })
       if (res.ok) { const j = await res.json(); reply = j.reply ?? ''; ev = { ...ev, ...(j.event ?? {}) } }
-      else reply = askLudia(text, data, phase, cycleDay, profile).text
+      else { reply = askLudia(text, data, phase, cycleDay, profile).text; ev = parseEventLocally(text) }
     } catch {
-      reply = askLudia(text, data, phase, cycleDay, profile).text
+      reply = askLudia(text, data, phase, cycleDay, profile).text; ev = parseEventLocally(text)
     }
 
     if (ev.hasEvent && ev.title) saveEvent(ev)
