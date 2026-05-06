@@ -16,16 +16,24 @@ function load(): Record<string, DailyLogFormData> {
 }
 
 export function usePersistedLogs() {
-  const [logs, setLogs] = useState<Record<string, DailyLogFormData>>(load)
+  const [logs, setLogs] = useState<Record<string, DailyLogFormData>>({})
+  const [hydrated, setHydrated] = useState(false)
 
+  // Load from localStorage only after mount to avoid SSR hydration mismatch
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    setLogs(load())
+    setHydrated(true)
+  }, [])
+
+  // Save only after hydration so we don't overwrite with the initial empty state
+  useEffect(() => {
+    if (!hydrated) return
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(logs))
     } catch {
       // storage quota exceeded — fail silently
     }
-  }, [logs])
+  }, [logs, hydrated])
 
   function clearLogs() {
     setLogs({})

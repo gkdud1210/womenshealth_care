@@ -23,9 +23,18 @@ function persist(events: ScheduleEvent[]) {
 }
 
 export function useSchedule() {
-  const [events, setEventsState] = useState<ScheduleEvent[]>(load)
+  const [events, setEventsState] = useState<ScheduleEvent[]>([])
+  const [hydrated, setHydrated] = useState(false)
 
-  useEffect(() => { persist(events) }, [events])
+  useEffect(() => {
+    setEventsState(load())
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    persist(events)
+  }, [events, hydrated])
 
   const addEvents = useCallback((incoming: ScheduleEvent[]) => {
     setEventsState(prev => {
