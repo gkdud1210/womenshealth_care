@@ -10,7 +10,7 @@ import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { getCyclePhase, getPhaseColor, getPhaseCellBg, getPhaseLabel } from '@/lib/cycle-utils'
 import type { DailyLogFormData, CyclePhase, FlowLevel, ScheduleEvent } from '@/types/health'
-import { SCHEDULE_CATEGORY_COLORS } from '@/types/health'
+import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '@/types/health'
 import { useSchedule } from '@/hooks/useSchedule'
 import { DailyLogModal } from './DailyLogModal'
 import { DailyDetailModal } from './DailyDetailModal'
@@ -219,7 +219,8 @@ export function HealthCalendar({
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
 
   // ── Voice schedule state ──
-  const { addEvents, getEventsByDate } = useSchedule()
+  const { addEvents, getEventsByDate, deleteEvent } = useSchedule()
+  const [scheduleSheetDate, setScheduleSheetDate] = useState<Date | null>(null)
   const [voiceEvents,     setVoiceEvents]     = useState<ScheduleEvent[]>([])
   const [voiceTranscript, setVoiceTranscript] = useState('')
   const [showVoiceModal,  setShowVoiceModal]  = useState(false)
@@ -566,9 +567,14 @@ export function HealthCalendar({
               style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
           )}
 
-          {/* ── Schedule event dots ── */}
+          {/* ── Schedule event dots — separate tap target ── */}
           {dayEvents.length > 0 && (
-            <div className="flex items-center justify-center gap-0.5 mt-auto z-10">
+            <button
+              onClick={e => { e.stopPropagation(); setScheduleSheetDate(day) }}
+              className="flex items-center justify-center gap-0.5 mt-auto z-10 w-full px-0.5 py-0.5 rounded-md transition-colors"
+              style={{ background: 'rgba(168,85,247,0.08)' }}
+              aria-label="일정 보기"
+            >
               {dayEvents.length <= 3
                 ? dayEvents.slice(0, 3).map(ev => (
                     <div key={ev.id}
@@ -577,12 +583,12 @@ export function HealthCalendar({
                   ))
                 : (
                   <span className="text-[8px] font-bold"
-                    style={{ color: SCHEDULE_CATEGORY_COLORS[dayEvents[0].category] }}>
+                    style={{ color: '#a855f7' }}>
                     +{dayEvents.length}
                   </span>
                 )
               }
-            </div>
+            </button>
           )}
         </button>
       )
@@ -802,6 +808,16 @@ export function HealthCalendar({
           onConfirm={handleVoiceConfirm}
           onRetry={handleVoiceRetry}
           onClose={handleVoiceClose}
+        />
+      )}
+
+      {/* ── Schedule sheet ── */}
+      {scheduleSheetDate && (
+        <ScheduleSheet
+          date={scheduleSheetDate}
+          events={getEventsByDate(getKey(scheduleSheetDate))}
+          onDelete={deleteEvent}
+          onClose={() => setScheduleSheetDate(null)}
         />
       )}
 
@@ -1313,5 +1329,92 @@ function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: s
 
       </div>
     </div>
+  )
+}
+
+// ── ScheduleSheet ─────────────────────────────────────────────────────────────
+function fmtHHMM(t: string) {
+  const [h, m] = t.split(':').map(Number)
+  if (h === 0)  return `오전 12:${String(m).padStart(2,'0')}`
+  if (h < 12)   return `오전 ${h}:${String(m).padStart(2,'0')}`
+  if (h === 12) return `오후 12:${String(m).padStart(2,'0')}`
+  return `오후 ${h-12}:${String(m).padStart(2,'0')}`
+}
+
+function ScheduleSheet({
+  date, events, onDelete, onClose,
+}: {
+  date: Date
+  events: ScheduleEvent[]
+  onDelete: (id: string) => void
+  onClose: () => void
+}) {
+  const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
+      <div
+        className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl"
+        style={{
+          background: 'rgba(255,248,255,0.98)',
+          backdropFilter: 'blur(24px)',
+          border: '1px solid rgba(168,85,247,0.14)',
+          maxHeight: '70dvh',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-none">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 2px 10px rgba(168,85,247,0.3)' }}>
+              <span className="text-sm">📅</span>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">{dateLabel} 일정</p>
+              <p className="text-xs text-slate-400">{events.length}개의 일정</p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center transition-colors hover:bg-slate-200">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        {/* Event list */}
+        <div className="flex-1 overflow-y-auto px-4 pb-6 space-y-2">
+          {events.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">이 날에 등록된 일정이 없어요</p>
+          ) : events.map(ev => {
+            const color = SCHEDULE_CATEGORY_COLORS[ev.category]
+            return (
+              <div key={ev.id}
+                className="flex items-center gap-3 px-4 py-3.5 rounded-2xl"
+                style={{ background: `${color}0d`, border: `1.5px solid ${color}2a` }}>
+                <div className="w-1 self-stretch rounded-full flex-none" style={{ background: color }} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {fmtHHMM(ev.startTime)} – {fmtHHMM(ev.endTime)}
+                    <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                      style={{ background: `${color}18`, color }}>
+                      {SCHEDULE_CATEGORY_LABELS[ev.category]}
+                    </span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => onDelete(ev.id)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center flex-none transition-colors hover:bg-red-50"
+                  aria-label="삭제">
+                  <X className="w-3.5 h-3.5 text-slate-300 hover:text-red-400" />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </>
   )
 }
