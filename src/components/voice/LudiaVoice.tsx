@@ -10,7 +10,7 @@ import { getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { CyclePhase, DailyLogFormData } from '@/types/health'
 
-/* ─── Keyframe styles ─────────────────────────────────────────────────── */
+/* ─── Keyframes ───────────────────────────────────────────────────────── */
 const ANIMATION_CSS = `
 @keyframes ludia-ring {
   0%   { transform: scale(1);   opacity: 0.55; }
@@ -24,10 +24,6 @@ const ANIMATION_CSS = `
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes ludia-bar {
-  0%, 100% { transform: scaleY(0.4); }
-  50%       { transform: scaleY(1); }
-}
 `
 
 /* ─── Types ───────────────────────────────────────────────────────────── */
@@ -39,14 +35,12 @@ interface Message {
   text: string
   event?: { title: string; date: string; time: string | null }
 }
-
 interface ParsedEvent {
   hasEvent: boolean
   title: string | null
   date: string | null
   time: string | null
 }
-
 interface Props {
   data: MultimodalData
   phase: CyclePhase
@@ -55,26 +49,22 @@ interface Props {
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
-function fmtTime(time: string | null): string {
-  if (!time) return ''
-  const [h, m] = time.split(':').map(Number)
-  if (h === 0)  return `오전 12:${String(m).padStart(2, '0')}`
-  if (h < 12)   return `오전 ${h}:${String(m).padStart(2, '0')}`
-  if (h === 12) return `오후 12:${String(m).padStart(2, '0')}`
-  return `오후 ${h - 12}:${String(m).padStart(2, '0')}`
+function fmtTime(t: string | null) {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  if (h === 0)  return `오전 12:${String(m).padStart(2,'0')}`
+  if (h < 12)   return `오전 ${h}:${String(m).padStart(2,'0')}`
+  if (h === 12) return `오후 12:${String(m).padStart(2,'0')}`
+  return `오후 ${h-12}:${String(m).padStart(2,'0')}`
 }
-
-function today(): string {
-  return new Date().toISOString().split('T')[0]
-}
+const todayStr = () => new Date().toISOString().split('T')[0]
 
 function pickKoreanFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices()
   const korean = voices.filter(v => v.lang.startsWith('ko'))
-  const femaleNames = ['Yuna', 'Google 한국의', '미나', 'Heami', 'Nari', 'Sora', 'Hyuna']
-  for (const name of femaleNames) {
-    const match = korean.find(v => v.name.includes(name))
-    if (match) return match
+  for (const name of ['Yuna','Google 한국의','미나','Heami','Nari','Sora','Hyuna']) {
+    const m = korean.find(v => v.name.includes(name))
+    if (m) return m
   }
   return korean[0] ?? null
 }
@@ -83,83 +73,65 @@ function speak(text: string, onEnd?: () => void) {
   if (typeof window === 'undefined') return
   window.speechSynthesis.cancel()
   const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'ko-KR'
-  u.rate = 1.05
-  u.pitch = 1.15
-  const doSpeak = () => {
-    const voice = pickKoreanFemaleVoice()
-    if (voice) u.voice = voice
+  u.lang = 'ko-KR'; u.rate = 1.05; u.pitch = 1.15
+  const go = () => {
+    const v = pickKoreanFemaleVoice()
+    if (v) u.voice = v
     if (onEnd) u.onend = onEnd
     window.speechSynthesis.speak(u)
   }
-  if (window.speechSynthesis.getVoices().length > 0) {
-    doSpeak()
-  } else {
-    window.speechSynthesis.addEventListener('voiceschanged', doSpeak, { once: true })
-  }
+  window.speechSynthesis.getVoices().length > 0
+    ? go()
+    : window.speechSynthesis.addEventListener('voiceschanged', go, { once: true })
 }
 
-function welcome(name: string, cycleDay: number, phase: CyclePhase): Message {
-  const phaseInfo: Record<CyclePhase, string> = {
+function makeWelcome(name: string, cycleDay: number, phase: CyclePhase): Message {
+  const info: Record<CyclePhase, string> = {
     menstrual:  '몸을 따뜻하게 챙기고 계신가요?',
     follicular: '에너지가 올라오는 시기예요!',
     ovulation:  '활력이 넘치는 시기예요.',
     luteal:     'PMS 관리가 중요한 시기예요.',
   }
   return {
-    id: 'welcome',
-    role: 'ludia',
-    text: `안녕하세요, ${name}님! 현재 D+${cycleDay}일 ${getPhaseLabel(phase)}이에요. ${phaseInfo[phase]} 건강에 대해 무엇이든 물어보세요.`,
+    id: 'welcome', role: 'ludia',
+    text: `안녕하세요, ${name}님! 현재 D+${cycleDay}일 ${getPhaseLabel(phase)}이에요. ${info[phase]} 건강에 대해 무엇이든 물어보세요.`,
   }
 }
 
-const EXAMPLES = [
-  '오늘 컨디션 어때?',
-  '스트레스가 너무 심해',
-  '다음 생리 언제야?',
-  '수면이 부족해',
-  '지금 단계에 뭐 먹으면 좋아?',
-  '피부 트러블이 심해',
-]
+const EXAMPLES = ['오늘 컨디션 어때?','스트레스가 너무 심해','다음 생리 언제야?','수면이 부족해','지금 단계에 뭐 먹으면 좋아?','피부 트러블이 심해']
 
-/* ─── Phase accent colors ─────────────────────────────────────────────── */
-const PHASE_ACCENT: Record<CyclePhase, { ring: string; badge: string; text: string }> = {
-  menstrual:  { ring: '#f43f75', badge: 'rgba(244,63,117,0.12)', text: '#d94f5c' },
-  follicular: { ring: '#fb923c', badge: 'rgba(251,146,60,0.12)',  text: '#3d8b56' },
-  ovulation:  { ring: '#a855f7', badge: 'rgba(168,85,247,0.12)', text: '#7048c0' },
-  luteal:     { ring: '#f59e0b', badge: 'rgba(245,158,11,0.12)', text: '#b8870b' },
+const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
+  menstrual:  { badge: 'rgba(244,63,117,0.12)', text: '#d94f5c' },
+  follicular: { badge: 'rgba(251,146,60,0.12)',  text: '#3d8b56' },
+  ovulation:  { badge: 'rgba(168,85,247,0.12)', text: '#7048c0' },
+  luteal:     { badge: 'rgba(245,158,11,0.12)', text: '#b8870b' },
 }
 
 /* ─── Component ───────────────────────────────────────────────────────── */
 export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
-  const profile       = useOnboardingProfile()
-  const { setLogs }   = usePersistedLogs()
-  const phaseColor    = getPhaseColor(phase)
-  const phaseAccent   = PHASE_ACCENT[phase]
+  const profile     = useOnboardingProfile()
+  const { setLogs } = usePersistedLogs()
+  const phaseColor  = getPhaseColor(phase)
+  const accent      = PHASE_ACCENT[phase]
 
-  const [vs, setVs]             = useState<VoiceState>('idle')
-  const [messages, setMessages] = useState<Message[]>(() => [welcome(userName, cycleDay, phase)])
-  const [interim, setInterim]   = useState('')
+  const [vs, setVs]               = useState<VoiceState>('idle')
+  const [messages, setMessages]   = useState<Message[]>(() => [makeWelcome(userName, cycleDay, phase)])
+  const [interim, setInterim]     = useState('')
   const [inputText, setInputText] = useState('')
 
-  const vsRef    = useRef<VoiceState>('idle')
-  const recogRef = useRef<any>(null)
-  const chatRef  = useRef<HTMLDivElement>(null)
+  const vsRef       = useRef<VoiceState>('idle')
+  const recogRef    = useRef<any>(null)
+  const chatRef     = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const updateVs = useCallback((s: VoiceState) => {
-    vsRef.current = s
-    setVs(s)
-  }, [])
+  const setVsSync = useCallback((s: VoiceState) => { vsRef.current = s; setVs(s) }, [])
 
-  /* Auto-scroll chat */
+  /* auto-scroll chat */
   useEffect(() => {
-    const el = chatRef.current
-    if (!el) return
-    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, interim, vs])
 
-  /* Auto-resize textarea */
+  /* auto-resize textarea */
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -167,182 +139,132 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     el.style.height = `${Math.min(el.scrollHeight, 96)}px`
   }, [inputText])
 
-  /* Cleanup on unmount */
   useEffect(() => () => {
     recogRef.current?.stop()
     if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
   }, [])
 
-  /* Save a parsed calendar event */
+  /* save calendar event */
   const saveEvent = useCallback((ev: ParsedEvent) => {
     if (!ev.hasEvent || !ev.title) return
-    const dateKey = ev.date ?? today()
+    const key = ev.date ?? todayStr()
     setLogs(prev => {
-      const existing: Partial<DailyLogFormData> = prev[dateKey] ?? {}
+      const ex: Partial<DailyLogFormData> = prev[key] ?? {}
       const note = `📅 ${ev.title}${ev.time ? ` ${fmtTime(ev.time)}` : ''}`
-      return {
-        ...prev,
-        [dateKey]: {
-          ...existing,
-          date: dateKey,
-          notes: existing.notes ? `${existing.notes}\n${note}` : note,
-        } as DailyLogFormData,
-      }
+      return { ...prev, [key]: { ...ex, date: key, notes: ex.notes ? `${ex.notes}\n${note}` : note } as DailyLogFormData }
     })
   }, [setLogs])
 
-  /* Build conversation history */
+  /* build history */
   const buildHistory = useCallback(() =>
-    messages
-      .filter(m => m.id !== 'welcome')
-      .slice(-10)
-      .map(m => ({
-        role: m.role === 'ludia' ? ('assistant' as const) : ('user' as const),
-        content: m.text,
-      })),
-  [messages])
+    messages.filter(m => m.id !== 'welcome').slice(-10).map(m => ({
+      role: m.role === 'ludia' ? ('assistant' as const) : ('user' as const),
+      content: m.text,
+    })), [messages])
 
-  /* Core: send text to API and get reply */
+  /* core: send to API */
   const processText = useCallback(async (text: string) => {
-    const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', text }
-    setMessages(prev => [...prev, userMsg])
-    updateVs('thinking')
+    setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', text }])
+    setVsSync('thinking')
 
     let reply = ''
-    let parsedEvent: ParsedEvent = { hasEvent: false, title: null, date: null, time: null }
+    let ev: ParsedEvent = { hasEvent: false, title: null, date: null, time: null }
 
     try {
       const res = await fetch('/api/ludia/chat/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
-          history: buildHistory(),
+          message: text, history: buildHistory(),
           context: {
-            phase,
-            cycleDay,
-            careTypes: profile.careTypes ?? [],
-            stressIndex: data.eda.stressIndex,
-            hrv: data.biosignal.hrv,
-            sleepHours: data.biosignal.sleepHours,
-            uterineTemp: data.thermal.uterineTemp,
-            today: today(),
-            userName,
+            phase, cycleDay, careTypes: profile.careTypes ?? [],
+            stressIndex: data.eda.stressIndex, hrv: data.biosignal.hrv,
+            sleepHours: data.biosignal.sleepHours, uterineTemp: data.thermal.uterineTemp,
+            today: todayStr(), userName,
           },
         }),
       })
-      if (res.ok) {
-        const json = await res.json()
-        reply = json.reply ?? ''
-        parsedEvent = json.event ?? parsedEvent
-      } else {
-        reply = askLudia(text, data, phase, cycleDay, profile).text
-      }
+      if (res.ok) { const j = await res.json(); reply = j.reply ?? ''; ev = j.event ?? ev }
+      else reply = askLudia(text, data, phase, cycleDay, profile).text
     } catch {
       reply = askLudia(text, data, phase, cycleDay, profile).text
     }
 
-    if (parsedEvent.hasEvent && parsedEvent.title) saveEvent(parsedEvent)
+    if (ev.hasEvent && ev.title) saveEvent(ev)
 
-    const ludiaMsg: Message = {
-      id: `l-${Date.now()}`,
-      role: 'ludia',
-      text: reply,
-      event: parsedEvent.hasEvent && parsedEvent.title
-        ? { title: parsedEvent.title, date: parsedEvent.date ?? today(), time: parsedEvent.time }
-        : undefined,
-    }
-    setMessages(prev => [...prev, ludiaMsg])
-    updateVs('speaking')
-    speak(reply, () => updateVs('idle'))
-  }, [data, phase, cycleDay, userName, profile, buildHistory, saveEvent, updateVs])
+    setMessages(prev => [...prev, {
+      id: `l-${Date.now()}`, role: 'ludia', text: reply,
+      event: ev.hasEvent && ev.title ? { title: ev.title, date: ev.date ?? todayStr(), time: ev.time } : undefined,
+    }])
+    setVsSync('speaking')
+    speak(reply, () => setVsSync('idle'))
+  }, [data, phase, cycleDay, userName, profile, buildHistory, saveEvent, setVsSync])
 
-  /* Text send handler */
+  /* text send */
   const handleTextSend = useCallback(() => {
-    const text = inputText.trim()
-    if (!text) return
+    const t = inputText.trim()
+    if (!t) return
     setInputText('')
-    processText(text)
+    processText(t)
   }, [inputText, processText])
 
-  /* Enter key sends (Shift+Enter = newline) */
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleTextSend()
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleTextSend() }
   }, [handleTextSend])
 
   /* STT */
   const startListening = useCallback(() => {
     const SR = (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
-    if (!SR) {
-      processText('오늘 내 컨디션 어때')
-      return
-    }
+    if (!SR) { processText('오늘 내 컨디션 어때'); return }
     const recog = new SR()
-    recog.lang = 'ko-KR'
-    recog.continuous = false
-    recog.interimResults = true
+    recog.lang = 'ko-KR'; recog.continuous = false; recog.interimResults = true
     recogRef.current = recog
-
     recog.onresult = (e: any) => {
       const r = e.results[e.results.length - 1]
-      if (r.isFinal) {
-        setInterim('')
-        processText(r[0].transcript)
-      } else {
-        setInterim(r[0].transcript)
-      }
+      r.isFinal ? (setInterim(''), processText(r[0].transcript)) : setInterim(r[0].transcript)
     }
-    recog.onerror = () => { setInterim(''); updateVs('idle') }
-    recog.onend   = () => {
-      setInterim('')
-      if (vsRef.current === 'listening') updateVs('idle')
-    }
-
-    updateVs('listening')
+    recog.onerror = () => { setInterim(''); setVsSync('idle') }
+    recog.onend   = () => { setInterim(''); if (vsRef.current === 'listening') setVsSync('idle') }
+    setVsSync('listening')
     try { recog.start() } catch {}
-  }, [processText, updateVs])
+  }, [processText, setVsSync])
 
   const handleMic = useCallback(() => {
-    if (vs === 'idle')           { startListening() }
-    else if (vs === 'listening') { recogRef.current?.stop() }
-    else if (vs === 'speaking')  { window.speechSynthesis.cancel(); updateVs('idle') }
-  }, [vs, startListening, updateVs])
+    if (vs === 'idle')           startListening()
+    else if (vs === 'listening') recogRef.current?.stop()
+    else if (vs === 'speaking')  { window.speechSynthesis.cancel(); setVsSync('idle') }
+  }, [vs, startListening, setVsSync])
 
-  /* Button appearance */
-  const isBusy = vs === 'thinking'
+  /* button style */
   const hasText = inputText.trim().length > 0
+  const isBusy  = vs === 'thinking'
 
-  const btnBg = hasText
+  const btnBg = hasText || vs === 'listening'
     ? 'linear-gradient(135deg, #f43f75, #e11d5a)'
-    : {
-        idle:      'linear-gradient(145deg, #160b20, #2d1240)',
-        listening: 'linear-gradient(135deg, #f43f75, #e11d5a)',
-        thinking:  'linear-gradient(135deg, #7c3aed, #a855f7)',
-        speaking:  'linear-gradient(135deg, #f43f75, #a855f7)',
-      }[vs]
+    : vs === 'thinking' || vs === 'speaking'
+      ? 'linear-gradient(135deg, #7c3aed, #a855f7)'
+      : 'linear-gradient(145deg, #160b20, #2d1240)'
 
-  const btnShadow = vs === 'listening' || hasText
+  const btnShadow = hasText || vs === 'listening'
     ? '0 4px 16px rgba(244,63,117,0.45)'
     : vs === 'thinking' || vs === 'speaking'
       ? '0 4px 16px rgba(168,85,247,0.4)'
       : '0 4px 16px rgba(244,63,117,0.2), 0 0 0 1px rgba(244,63,117,0.1)'
 
-  const inputPlaceholder = vs === 'listening'
-    ? '말하고 있어요...'
-    : '메시지를 입력하거나 🎤로 말해보세요'
-
+  /* ─── Render ──────────────────────────────────────────────────────── */
   return (
     <>
       <style>{ANIMATION_CSS}</style>
 
-      {/* ─── Full-page container ──────────────────────────────────── */}
-      <div className="flex flex-col max-w-lg mx-auto" style={{ minHeight: '100dvh' }}>
+      {/*
+        h-full fills AppShell main's content height (= 100dvh - pb-safe-nav).
+        flex-col: header | scrollable chat | input bar — no fixed positioning needed.
+        max-w-lg + mx-auto: centers on wide screens consistently.
+      */}
+      <div className="h-full flex flex-col max-w-lg mx-auto w-full">
 
-        {/* ─── Header ────────────────────────────────────────────── */}
-        <header className="flex-none flex items-center justify-between px-5 pt-5 pb-4">
+        {/* ── Header ───────────────────────────────────────────────── */}
+        <header className="flex-none flex items-center justify-between px-5 pt-4 pb-3 border-b border-rose-50">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl flex items-center justify-center"
               style={{
@@ -358,26 +280,24 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
           </div>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full"
-            style={{ background: phaseAccent.badge, border: `1px solid ${phaseColor}30` }}>
+            style={{ background: accent.badge, border: `1px solid ${phaseColor}30` }}>
             <div className="w-2 h-2 rounded-full" style={{ background: phaseColor }} />
-            <span className="text-xs font-semibold" style={{ color: phaseAccent.text }}>
+            <span className="text-xs font-semibold" style={{ color: accent.text }}>
               D+{cycleDay} {getPhaseLabel(phase)}
             </span>
           </div>
         </header>
 
-        {/* ─── Scrollable chat area ──────────────────────────────── */}
+        {/* ── Chat area — flex-1 + min-h-0 lets it shrink and scroll ── */}
         <div
           ref={chatRef}
-          className="flex-1 overflow-y-auto px-4 space-y-3"
-          style={{ paddingBottom: '130px' }}
+          className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-2 space-y-3"
         >
           {messages.map(msg => (
-            <div
-              key={msg.id}
+            <div key={msg.id}
               className={cn('flex gap-2', msg.role === 'user' ? 'justify-end' : 'justify-start')}
-              style={{ animation: 'ludia-msg 0.28s ease-out both' }}
-            >
+              style={{ animation: 'ludia-msg 0.28s ease-out both' }}>
+
               {msg.role === 'ludia' && (
                 <div className="w-7 h-7 rounded-xl flex-none flex items-center justify-center self-end mb-0.5"
                   style={{
@@ -391,19 +311,15 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
               <div className={cn('max-w-[78%] flex flex-col gap-1.5',
                 msg.role === 'user' ? 'items-end' : 'items-start')}>
                 <div
-                  className={cn(
-                    'px-4 py-3 text-sm leading-relaxed',
+                  className={cn('px-4 py-3 text-sm leading-relaxed',
                     msg.role === 'user'
                       ? 'rounded-3xl rounded-br-lg text-slate-700 bg-white border border-rose-100'
-                      : 'rounded-3xl rounded-bl-lg text-slate-700',
-                  )}
+                      : 'rounded-3xl rounded-bl-lg text-slate-700')}
                   style={msg.role === 'ludia' ? {
                     background: 'linear-gradient(135deg, rgba(255,241,245,0.97), rgba(253,240,255,0.97))',
                     border: '1px solid rgba(244,63,117,0.13)',
                     boxShadow: '0 2px 14px rgba(244,63,117,0.06)',
-                  } : {
-                    boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
-                  }}>
+                  } : { boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
                   {msg.text}
                 </div>
 
@@ -420,7 +336,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
             </div>
           ))}
 
-          {/* Thinking indicator */}
+          {/* Thinking dots */}
           {vs === 'thinking' && (
             <div className="flex gap-2 items-end" style={{ animation: 'ludia-msg 0.18s ease-out both' }}>
               <div className="w-7 h-7 rounded-xl flex-none flex items-center justify-center"
@@ -433,12 +349,9 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                   border: '1px solid rgba(244,63,117,0.13)',
                 }}>
                 <div className="flex items-center gap-1.5">
-                  {[0, 0.18, 0.36].map((delay, i) => (
+                  {[0, 0.18, 0.36].map((d, i) => (
                     <div key={i} className="w-2 h-2 rounded-full"
-                      style={{
-                        background: 'linear-gradient(135deg,#f43f75,#a855f7)',
-                        animation: `ludia-dot 0.8s ease-in-out ${delay}s infinite`,
-                      }} />
+                      style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)', animation: `ludia-dot 0.8s ease-in-out ${d}s infinite` }} />
                   ))}
                 </div>
               </div>
@@ -455,11 +368,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                 {EXAMPLES.map(ex => (
                   <button key={ex} onClick={() => processText(ex)}
                     className="text-xs px-3.5 py-1.5 rounded-full transition-all hover:scale-105 active:scale-95"
-                    style={{
-                      background: 'rgba(244,63,117,0.07)',
-                      border: '1px solid rgba(244,63,117,0.2)',
-                      color: '#c0395e',
-                    }}>
+                    style={{ background: 'rgba(244,63,117,0.07)', border: '1px solid rgba(244,63,117,0.2)', color: '#c0395e' }}>
                     {ex}
                   </button>
                 ))}
@@ -467,83 +376,73 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
             </div>
           )}
         </div>
-      </div>
 
-      {/* ─── Fixed input bar (above mobile nav) ───────────────────── */}
-      <div className="fixed bottom-above-nav inset-x-0 z-50 flex flex-col items-stretch px-3 pb-1 max-w-lg mx-auto left-0 right-0">
+        {/* ── Input bar — flex-none, always at the bottom of flex column ── */}
+        <div className="flex-none px-3 pt-1.5 pb-3 border-t border-rose-50">
 
-        {/* Interim / status label */}
-        {(interim || vs !== 'idle') && (
-          <div className="text-center mb-2 px-2">
-            {interim ? (
-              <p className="text-sm text-slate-500 italic">{interim}…</p>
-            ) : (
-              <p className="text-xs font-medium"
-                style={{ color: vs === 'thinking' ? '#a855f7' : vs === 'speaking' ? '#a855f7' : '#f43f75' }}>
-                {vs === 'listening' ? '듣고 있어요...' : vs === 'thinking' ? '분석 중이에요...' : '말하고 있어요...'}
-              </p>
-            )}
+          {/* Interim / status label */}
+          {(interim || vs !== 'idle') && (
+            <p className="text-[11px] text-center mb-1.5 font-medium"
+              style={{ color: vs === 'thinking' || vs === 'speaking' ? '#a855f7' : '#f43f75' }}>
+              {interim
+                ? `${interim}…`
+                : vs === 'listening' ? '듣고 있어요...'
+                : vs === 'thinking'  ? '분석 중이에요...'
+                : '말하고 있어요...'}
+            </p>
+          )}
+
+          {/* Row: textarea + action button */}
+          <div className="flex items-end gap-2 px-3 py-2 rounded-3xl"
+            style={{
+              background: 'rgba(255,255,255,0.97)',
+              border: '1px solid rgba(244,63,117,0.15)',
+              boxShadow: '0 2px 16px rgba(244,63,117,0.08), 0 1px 4px rgba(0,0,0,0.04)',
+            }}>
+
+            <textarea
+              ref={textareaRef}
+              value={inputText}
+              onChange={e => setInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={vs === 'listening' ? '말하고 있어요...' : '메시지를 입력하거나 🎤 로 말해보세요'}
+              rows={1}
+              disabled={isBusy || vs === 'listening'}
+              className="flex-1 resize-none bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none leading-relaxed py-1.5"
+              style={{ maxHeight: '96px', scrollbarWidth: 'none', minHeight: '24px' }}
+            />
+
+            <button
+              onClick={hasText ? handleTextSend : handleMic}
+              disabled={isBusy}
+              aria-label={hasText ? '전송' : vs === 'listening' ? '듣기 중지' : '음성 입력'}
+              className={cn(
+                'relative flex-none w-10 h-10 rounded-2xl flex items-center justify-center',
+                'transition-all duration-300 select-none',
+                vs === 'listening' && !hasText ? 'scale-110' : 'hover:scale-105 active:scale-95',
+                isBusy && 'opacity-60 cursor-not-allowed',
+              )}
+              style={{ background: btnBg, boxShadow: btnShadow }}>
+
+              {/* Pulse rings when listening */}
+              {vs === 'listening' && !hasText && [0, 0.7].map((delay, i) => (
+                <div key={i} className="absolute w-10 h-10 rounded-2xl pointer-events-none"
+                  style={{ background: 'rgba(244,63,117,0.25)', animation: `ludia-ring 1.8s ease-out ${delay}s infinite` }} />
+              ))}
+
+              {isBusy ? (
+                <Loader2 className="w-4 h-4 text-white/80 animate-spin" />
+              ) : hasText ? (
+                <Send className="w-4 h-4 text-white" />
+              ) : vs === 'listening' ? (
+                <MicOff className="w-4 h-4 text-white" />
+              ) : vs === 'speaking' ? (
+                <Volume2 className="w-4 h-4 text-white animate-pulse" />
+              ) : (
+                <Mic className="w-4 h-4 text-rose-300" />
+              )}
+            </button>
           </div>
-        )}
-
-        {/* Input bar */}
-        <div
-          className="flex items-end gap-2 px-3 py-2 rounded-3xl"
-          style={{
-            background: 'rgba(255,255,255,0.97)',
-            border: '1px solid rgba(244,63,117,0.15)',
-            boxShadow: '0 4px 24px rgba(244,63,117,0.1), 0 1px 8px rgba(0,0,0,0.06)',
-            backdropFilter: 'blur(16px)',
-          }}>
-
-          {/* Textarea */}
-          <textarea
-            ref={textareaRef}
-            value={inputText}
-            onChange={e => setInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={inputPlaceholder}
-            rows={1}
-            disabled={isBusy || vs === 'listening'}
-            className="flex-1 resize-none bg-transparent text-sm text-slate-700 placeholder-slate-400 outline-none leading-relaxed py-1.5"
-            style={{ maxHeight: '96px', scrollbarWidth: 'none', minHeight: '24px' }}
-          />
-
-          {/* Action button */}
-          <button
-            onClick={hasText ? handleTextSend : handleMic}
-            disabled={isBusy}
-            aria-label={hasText ? '전송' : vs === 'listening' ? '듣기 중지' : '음성 입력'}
-            className={cn(
-              'relative flex-none w-10 h-10 rounded-2xl flex items-center justify-center',
-              'transition-all duration-300 select-none',
-              vs === 'listening' ? 'scale-110' : 'hover:scale-105 active:scale-95',
-              isBusy && 'opacity-70 cursor-not-allowed',
-            )}
-            style={{ background: btnBg, boxShadow: btnShadow }}>
-
-            {/* Pulse rings when listening */}
-            {vs === 'listening' && !hasText && [0, 0.7].map((delay, i) => (
-              <div key={i} className="absolute w-10 h-10 rounded-2xl pointer-events-none"
-                style={{
-                  background: 'rgba(244,63,117,0.25)',
-                  animation: `ludia-ring 1.8s ease-out ${delay}s infinite`,
-                }} />
-            ))}
-
-            {/* Icon */}
-            {isBusy ? (
-              <Loader2 className="w-4 h-4 text-white/80 animate-spin" />
-            ) : hasText ? (
-              <Send className="w-4 h-4 text-white" />
-            ) : vs === 'listening' ? (
-              <MicOff className="w-4 h-4 text-white" />
-            ) : vs === 'speaking' ? (
-              <Volume2 className="w-4 h-4 text-white animate-pulse" />
-            ) : (
-              <Mic className="w-4 h-4 text-rose-300" />
-            )}
-          </button>
         </div>
       </div>
     </>
