@@ -19,6 +19,8 @@ export interface DailyLogFormData {
   bodyTemperature?: number
   heartRate?: number
   hrv?: number
+  bmi?: number
+  measuredAt?: string | null
   sleepHours?: number
   sleepQuality?: number
   weight?: number
@@ -64,6 +66,39 @@ export const SKIN_LABELS: Record<SkinCondition, string> = {
   breakout_mild: '여드름 (경미)',
   breakout_severe: '여드름 (심함)',
   sensitive: '민감함',
+}
+
+export interface ScheduleEvent {
+  id: string
+  date: string          // YYYY-MM-DD
+  startTime: string     // HH:mm
+  endTime: string       // HH:mm
+  title: string
+  category: 'work' | 'study' | 'exercise' | 'social' | 'rest' | 'medical' | 'other'
+  intensity: 'low' | 'medium' | 'high'
+  source: 'voice' | 'manual'
+  createdAt: string     // ISO timestamp
+  notes?: string
+}
+
+export const SCHEDULE_CATEGORY_LABELS: Record<ScheduleEvent['category'], string> = {
+  work:     '업무',
+  study:    '공부',
+  exercise: '운동',
+  social:   '약속',
+  rest:     '휴식',
+  medical:  '의료',
+  other:    '기타',
+}
+
+export const SCHEDULE_CATEGORY_COLORS: Record<ScheduleEvent['category'], string> = {
+  work:     '#3b82f6',
+  study:    '#8b5cf6',
+  exercise: '#10b981',
+  social:   '#f59e0b',
+  rest:     '#6366f1',
+  medical:  '#f43f75',
+  other:    '#94a3b8',
 }
 
 export const DISCHARGE_LABELS: Record<DischargeType, string> = {

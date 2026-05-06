@@ -327,8 +327,10 @@ export function DailyLogModal({ date, existingLog, cyclePhase, onSave, onClose }
                 { key: 'sleepHours', label: '수면 시간', unit: '시간', min: 0, max: 14, step: 0.5, icon: Moon },
                 { key: 'sleepQuality', label: '수면 질', unit: '/ 10', min: 1, max: 10, step: 1, icon: Moon },
                 { key: 'heartRate', label: '심박수', unit: 'bpm', min: 40, max: 160, step: 1, icon: Heart },
+                { key: 'hrv', label: 'HRV', unit: 'ms', min: 0, max: 200, step: 1, icon: Heart },
                 { key: 'bodyTemperature', label: '체온', unit: '°C', min: 35, max: 40, step: 0.1, icon: Activity },
                 { key: 'weight', label: '체중', unit: 'kg', min: 30, max: 120, step: 0.1, icon: Scale },
+                { key: 'bmi', label: 'BMI', unit: '', min: 10, max: 60, step: 0.1, icon: Scale },
               ].map(({ key, label, unit, min, max, step, icon: Icon }) => (
                 <div key={key} className="flex items-center gap-4 p-3 bg-slate-50 rounded-xl">
                   <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center flex-shrink-0">

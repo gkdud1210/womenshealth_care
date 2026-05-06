@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { CalendarHeart, Sparkles } from 'lucide-react'
+import { useCallback } from 'react'
+import { CalendarHeart, Sparkles, Trash2 } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
 import { useAuth } from '@/hooks/useAuth'
+import { usePersistedLogs } from '@/hooks/usePersistedLogs'
 import type { DailyLogFormData } from '@/types/health'
 
 const CYCLE_LENGTH  = 28
@@ -11,14 +12,14 @@ const PERIOD_LENGTH = 5
 
 export default function CalendarPage() {
   const { user } = useAuth()
-  const [logs, setLogs] = useState<Record<string, DailyLogFormData>>({})
+  const { logs, setLogs, clearLogs } = usePersistedLogs()
 
   const handleLogSave = useCallback((data: DailyLogFormData) => {
     setLogs(prev => ({ ...prev, [data.date]: data }))
-  }, [])
+  }, [setLogs])
 
   return (
-    <div className="min-h-screen p-4 sm:p-5 lg:p-6">
+    <div className="p-3 sm:p-5 lg:p-6">
 
       {/* ── Header ── */}
       <div className="flex items-center gap-2.5 mb-4">
@@ -49,6 +50,19 @@ export default function CalendarPage() {
         onLogSave={handleLogSave}
         userName={user?.name ?? '님'}
       />
+
+      {/* ── Dev-only: clear logs ── */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => { if (confirm('모든 로그를 초기화할까요?')) clearLogs() }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-slate-400 border border-slate-200 hover:border-rose-300 hover:text-rose-400 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            로그 초기화 (dev)
+          </button>
+        </div>
+      )}
     </div>
   )
 }

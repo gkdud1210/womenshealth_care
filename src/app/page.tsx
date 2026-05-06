@@ -22,7 +22,12 @@ export default function RootPage() {
     }
   }, [ready, hasSession, user, isOnboarded, router])
 
-  if (!ready || !hasSession || !user || !isOnboarded) return null
+  if (!ready || !hasSession || !user || !isOnboarded) return (
+    <div className="min-h-[100dvh] flex items-center justify-center"
+      style={{ background: 'linear-gradient(145deg, #fdf6f9 0%, #fce9f0 35%, #f8eeff 70%, #fdf0f8 100%)' }}>
+      <div className="w-8 h-8 rounded-full border-2 border-rose-300 border-t-rose-500 animate-spin" />
+    </div>
+  )
 
   return (
     <AppShell>

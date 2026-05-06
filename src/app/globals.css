@@ -91,6 +91,7 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     overflow-x: hidden;
+    height: 100%;
   }
 
   body {
@@ -100,6 +101,7 @@
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     max-width: 100vw;
+    height: 100%;
 
     /* Subtle pearl-rose-gold ambient background */
     background-color: hsl(var(--bg));
@@ -883,4 +885,9 @@
   0%   { opacity: 0.45; transform: scaleX(1);    transform-origin: left; }
   60%  { opacity: 0.2;  transform: scaleX(0.5);  transform-origin: left; }
   100% { opacity: 0;    transform: scaleX(0);    transform-origin: left; }
+}
+
+@keyframes ludia-msg {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

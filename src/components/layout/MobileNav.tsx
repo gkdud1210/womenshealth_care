@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, CalendarHeart, Microscope,
-  TrendingUp, MessageCircleHeart, ShoppingBag
+  TrendingUp, ShoppingBag
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,9 +12,8 @@ const NAV_ITEMS = [
   { href: '/',           icon: LayoutDashboard,   label: '홈' },
   { href: '/calendar',   icon: CalendarHeart,      label: '캘린더' },
   { href: '/diagnostic', icon: Microscope,         label: '진단' },
-  { href: '/program',    icon: TrendingUp,         label: '프로그램' },
-  { href: '/consultant', icon: MessageCircleHeart, label: 'AI상담' },
-  { href: '/shop',       icon: ShoppingBag,        label: '케어샵' },
+  { href: '/program',    icon: TrendingUp,  label: '프로그램' },
+  { href: '/shop',       icon: ShoppingBag, label: '케어샵' },
 ]
 
 export function MobileNav() {

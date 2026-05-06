@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Eye, Thermometer, Activity, CheckCircle2,
   Camera, CameraOff, ChevronRight, Scan, Zap,
-  ArrowRight, MessageCircleHeart, BarChart2, Upload,
+  ArrowRight, BarChart2, Upload,
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
@@ -990,11 +990,7 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
       </div>
 
       {/* CTAs */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <Link href="/consultant" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium text-white transition-all hover:opacity-90 active:scale-95"
-          style={{background:'linear-gradient(135deg,#f43f75,#e11d5a)',boxShadow:'0 4px 16px rgba(244,63,117,.35)'}}>
-          <MessageCircleHeart className="w-4 h-4"/> AI 상담 시작
-        </Link>
+      <div className="grid grid-cols-1 gap-3 pt-2">
         <Link href="/diagnostic" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all hover:opacity-90 active:scale-95"
           style={{background:'rgba(248,244,246,.9)',border:'1.5px solid rgba(244,63,117,.2)',color:'#e11d5a'}}>
           <BarChart2 className="w-4 h-4"/> 상세 결과 보기

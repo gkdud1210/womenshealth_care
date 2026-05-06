@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -9,8 +9,13 @@ import {
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { getCyclePhase, getPhaseColor, getPhaseCellBg, getPhaseLabel } from '@/lib/cycle-utils'
-import type { DailyLogFormData, CyclePhase } from '@/types/health'
+import type { DailyLogFormData, CyclePhase, FlowLevel, ScheduleEvent } from '@/types/health'
+import { SCHEDULE_CATEGORY_COLORS } from '@/types/health'
+import { useSchedule } from '@/hooks/useSchedule'
 import { DailyLogModal } from './DailyLogModal'
+import { DailyDetailModal } from './DailyDetailModal'
+import { VoiceInputButton } from './VoiceInputButton'
+import { VoiceConfirmModal } from './VoiceConfirmModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type CycleMode       = 'normal' | 'pregnancy' | 'menopause' | 'irregular'
@@ -208,9 +213,49 @@ export function HealthCalendar({
 }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-  const [showModal,    setShowModal]    = useState(false)
+  const [showModal,       setShowModal]       = useState(false)
+  const [showDetailModal, setShowDetailModal] = useState(false)
   const [modeData,     setModeData]     = useState<ModeData>({ mode: 'normal' })
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
+
+  // ── Voice schedule state ──
+  const { addEvents, getEventsByDate } = useSchedule()
+  const [voiceEvents,     setVoiceEvents]     = useState<ScheduleEvent[]>([])
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [showVoiceModal,  setShowVoiceModal]  = useState(false)
+  const [toastMsg,        setToastMsg]        = useState<string | null>(null)
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg)
+    setTimeout(() => setToastMsg(null), 3500)
+  }, [])
+
+  const handleVoiceEventsReady = useCallback((events: ScheduleEvent[], transcript: string) => {
+    setVoiceEvents(events)
+    setVoiceTranscript(transcript)
+    setShowVoiceModal(true)
+  }, [])
+
+  const handleVoiceConfirm = useCallback((events: ScheduleEvent[]) => {
+    addEvents(events)
+    setShowVoiceModal(false)
+    showToast(`📅 ${events.length}개 일정이 저장됐어요!`)
+    // Reset FAB state
+    const fab = document.getElementById('ludia-voice-fab') as any
+    if (fab?.__resetToIdle) fab.__resetToIdle()
+  }, [addEvents, showToast])
+
+  const handleVoiceRetry = useCallback(() => {
+    setShowVoiceModal(false)
+    const fab = document.getElementById('ludia-voice-fab') as any
+    if (fab?.__resetToIdle) fab.__resetToIdle()
+  }, [])
+
+  const handleVoiceClose = useCallback(() => {
+    setShowVoiceModal(false)
+    const fab = document.getElementById('ludia-voice-fab') as any
+    if (fab?.__resetToIdle) fab.__resetToIdle()
+  }, [])
   const [flipState, setFlipState] = useState<{
     outgoing: Date; incoming: Date; dir: 'next' | 'prev'
   } | null>(null)
@@ -337,6 +382,12 @@ export function HealthCalendar({
     [logs],
   )
 
+  const selectedCycleDay = useMemo(() => {
+    if (!selectedDate || !effectiveCycleStart) return 1
+    const diff = Math.floor((selectedDate.getTime() - effectiveCycleStart.getTime()) / 86400000)
+    return Math.max(1, (diff % cycleLength) + 1)
+  }, [selectedDate, effectiveCycleStart, cycleLength])
+
   // Irregular pattern detection (normal mode only)
   const irregularStatus = useMemo(() => {
     if (modeData.mode !== 'normal') return { type: 'none' as IrregularType, days: 0 }
@@ -405,12 +456,13 @@ export function HealthCalendar({
 
   function renderCalGrid(days: Date[], forMonth: Date) {
     return days.map((day, i) => {
-      const inMonth = isSameMonth(day, forMonth)
-      const isNow   = isToday(day)
-      const isSel   = selectedDate ? isSameDay(day, selectedDate) : false
-      const log     = inMonth ? logs[getKey(day)] : undefined
-      const phase   = modeData.mode === 'normal' ? getDayPhase(day) : undefined
-      const dow     = day.getDay()
+      const inMonth    = isSameMonth(day, forMonth)
+      const isNow      = isToday(day)
+      const isSel      = selectedDate ? isSameDay(day, selectedDate) : false
+      const log        = inMonth ? logs[getKey(day)] : undefined
+      const phase      = modeData.mode === 'normal' ? getDayPhase(day) : undefined
+      const dow        = day.getDay()
+      const dayEvents  = inMonth ? getEventsByDate(getKey(day)) : []
 
       const { bg: modeBg, label: modeLabel, isWarning, isDue } =
         (inMonth && modeData.mode !== 'normal')
@@ -437,8 +489,8 @@ export function HealthCalendar({
           onClick={() => { if (!inMonth) return; setSelectedDate(isSel ? null : day) }}
           disabled={!inMonth}
           className={cn(
-            'relative flex flex-col items-center py-1.5 gap-0.5 transition-all duration-150',
-            'min-h-[4.5rem] sm:min-h-[5.5rem] active:scale-95',
+            'relative flex flex-col items-center py-1 gap-0.5 transition-all duration-150',
+            'min-h-[3.5rem] sm:min-h-[5rem] active:scale-95',
             'border-r border-b border-slate-100',
             !inMonth && 'opacity-0 pointer-events-none',
           )}
@@ -453,9 +505,9 @@ export function HealthCalendar({
                   : undefined,
           }}>
           <span className={cn(
-            'text-sm font-semibold leading-none mt-0.5 z-10',
+            'text-xs sm:text-sm font-semibold leading-none mt-0.5 z-10',
             isNow
-              ? 'w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-bold'
+              ? 'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] sm:text-xs font-bold'
               : isDue  ? 'text-amber-600 font-bold'
                 : dow === 0 ? 'text-rose-700'
                   : dow === 6 ? 'text-blue-600'
@@ -472,23 +524,65 @@ export function HealthCalendar({
             </span>
           )}
           {log && (
-            <div className="flex items-center gap-0.5 z-10">
-              {log.isPeriod && (
-                <div className="w-4 h-4 rounded-full flex items-center justify-center"
-                  style={{ background: 'rgba(217,79,92,0.2)' }}>
-                  <Droplets className="w-2.5 h-2.5 text-rose-600" />
+            <>
+              <div className="flex items-center gap-0.5 z-10">
+                {log.isPeriod && (
+                  <span className="text-[10px] leading-none">
+                    {log.periodFlow === 'heavy' || log.periodFlow === 'very_heavy' ? '💧💧💧'
+                      : log.periodFlow === 'medium' ? '💧💧'
+                      : '💧'}
+                  </span>
+                )}
+                {log.mood && (
+                  <span className="text-[11px] leading-none">
+                    {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
+                  </span>
+                )}
+              </div>
+              {(log.hrv != null || log.bmi != null) && (
+                <div className="flex flex-col items-center gap-0.5 z-10 w-full">
+                  {log.hrv != null && (
+                    <span
+                      onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}
+                      className="leading-none px-1 rounded cursor-pointer"
+                      style={{ fontSize: '8px', color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
+                      ♥{log.hrv}ms
+                    </span>
+                  )}
+                  {log.bmi != null && (
+                    <span
+                      onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}
+                      className="leading-none px-1 rounded cursor-pointer"
+                      style={{ fontSize: '8px', color: '#10b981', background: 'rgba(16,185,129,0.1)' }}>
+                      ⚖{log.bmi.toFixed(1)}
+                    </span>
+                  )}
                 </div>
               )}
-              {log.mood && (
-                <span className="text-[11px] leading-none">
-                  {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
-                </span>
-              )}
-            </div>
+            </>
           )}
           {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
             <div className="w-1.5 h-1.5 rounded-full absolute bottom-1 right-1.5 z-10"
               style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
+          )}
+
+          {/* ── Schedule event dots ── */}
+          {dayEvents.length > 0 && (
+            <div className="flex items-center justify-center gap-0.5 mt-auto z-10">
+              {dayEvents.length <= 3
+                ? dayEvents.slice(0, 3).map(ev => (
+                    <div key={ev.id}
+                      className="w-1.5 h-1.5 rounded-full flex-none"
+                      style={{ background: SCHEDULE_CATEGORY_COLORS[ev.category] }} />
+                  ))
+                : (
+                  <span className="text-[8px] font-bold"
+                    style={{ color: SCHEDULE_CATEGORY_COLORS[dayEvents[0].category] }}>
+                    +{dayEvents.length}
+                  </span>
+                )
+              }
+            </div>
           )}
         </button>
       )
@@ -497,37 +591,37 @@ export function HealthCalendar({
 
   return (
     <>
-      <div className="glass-card p-4 sm:p-5">
+      <div className="glass-card p-3 sm:p-4 lg:p-5">
 
         {/* ── Month nav ── */}
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-display text-xl sm:text-2xl font-semibold text-slate-800">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="font-display text-lg sm:text-2xl font-semibold text-slate-800">
             {format(currentMonth, 'yyyy년 M월', { locale: ko })}
           </h2>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1">
             <button onClick={() => navigateMonth('prev')}
-              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
-              <ChevronLeft className="w-4 h-4 text-rose-500" />
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
+              <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
             </button>
             <button onClick={navigateToToday}
-              className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-500 transition-colors">
+              className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-500 transition-colors">
               오늘
             </button>
             <button onClick={() => navigateMonth('next')}
-              className="w-8 h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
-              <ChevronRight className="w-4 h-4 text-rose-500" />
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
+              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
             </button>
           </div>
         </div>
 
         {/* ── Mode strip ── */}
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="flex gap-1.5 mb-2 overflow-x-auto pb-0.5 scrollbar-none">
           {MODES.map(({ id, label, emoji, color }) => {
             const active = id === modeData.mode
             return (
               <button key={id}
                 onClick={() => { if (id !== modeData.mode) setPendingMode(id) }}
-                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap"
+                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap"
                 style={{
                   background: active ? color + '18' : 'rgba(248,248,250,0.9)',
                   border:     `1.5px solid ${active ? color + '55' : 'rgba(200,200,210,0.5)'}`,
@@ -555,7 +649,7 @@ export function HealthCalendar({
         {/* ── Weekday headers ── */}
         <div className="grid grid-cols-7 border-b border-slate-100">
           {WEEKDAYS.map((day, i) => (
-            <div key={day} className={cn('text-center text-xs font-semibold py-1.5',
+            <div key={day} className={cn('text-center text-[11px] sm:text-xs font-semibold py-1',
               i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : 'text-slate-400')}>
               {day}
             </div>
@@ -647,7 +741,7 @@ export function HealthCalendar({
 
         {/* ── Phase legend ── */}
         {modeData.mode === 'normal' && (
-          <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap gap-x-3 gap-y-1">
+          <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap gap-x-2 gap-y-1">
             {(['menstrual','follicular','ovulation','luteal'] as CyclePhase[]).map(p => (
               <div key={p} className="flex items-center gap-1.5">
                 <div className="w-3 h-3 rounded-sm border border-slate-200"
@@ -676,7 +770,7 @@ export function HealthCalendar({
           phase={selectedPhase}
           onSave={(data) => { onLogSave(data); setSelectedDate(null) }}
           onClose={() => setSelectedDate(null)}
-          onOpenFull={() => setShowModal(true)}
+          onOpenFull={() => { setShowDetailModal(true) }}
         />
       )}
 
@@ -691,6 +785,19 @@ export function HealthCalendar({
         />
       )}
 
+      {/* ── Detail / Analysis modal ── */}
+      {showDetailModal && selectedDate && (
+        <DailyDetailModal
+          date={selectedDate}
+          log={selectedLog}
+          phase={selectedPhase}
+          cycleDay={selectedCycleDay}
+          logs={logs}
+          onSave={(data) => { onLogSave(data); setShowDetailModal(false); setSelectedDate(null) }}
+          onClose={() => setShowDetailModal(false)}
+        />
+      )}
+
       {/* ── Mode switch dialog ── */}
       {pendingMode && (
         <ModeDialog
@@ -700,6 +807,38 @@ export function HealthCalendar({
           onConfirm={(data) => { saveMode(data); setPendingMode(null) }}
           onCancel={() => setPendingMode(null)}
         />
+      )}
+
+      {/* ── Voice input FAB ── */}
+      <VoiceInputButton
+        onEventsReady={handleVoiceEventsReady}
+        onError={showToast}
+      />
+
+      {/* ── Voice confirm modal ── */}
+      {showVoiceModal && (
+        <VoiceConfirmModal
+          events={voiceEvents}
+          transcript={voiceTranscript}
+          onConfirm={handleVoiceConfirm}
+          onRetry={handleVoiceRetry}
+          onClose={handleVoiceClose}
+        />
+      )}
+
+      {/* ── Toast ── */}
+      {toastMsg && (
+        <div
+          className="fixed bottom-above-nav inset-x-4 mx-auto max-w-sm z-[60] px-4 py-3 rounded-2xl text-sm font-medium text-center shadow-modal pointer-events-none"
+          style={{
+            background:     'rgba(255,255,255,0.97)',
+            border:         '1px solid rgba(244,63,117,0.2)',
+            color:          '#64748b',
+            backdropFilter: 'blur(16px)',
+            animation:      'ludia-msg 0.25s ease-out both',
+          }}>
+          {toastMsg}
+        </div>
       )}
     </>
   )
@@ -915,6 +1054,12 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
 }
 
 // ── QuickLogPopup ─────────────────────────────────────────────────────────────
+const FLOW_OPTIONS: { val: FlowLevel; label: string; dots: string }[] = [
+  { val: 'light',  label: '라이트', dots: '💧' },
+  { val: 'medium', label: '보통',   dots: '💧💧' },
+  { val: 'heavy',  label: '많음',   dots: '💧💧💧' },
+]
+
 function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
   date: Date
   log?: DailyLogFormData
@@ -924,8 +1069,11 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
   onOpenFull: () => void
 }) {
   const [period, setPeriod] = useState(log?.isPeriod ?? false)
+  const [flow,   setFlow]   = useState<FlowLevel | ''>(log?.periodFlow ?? '')
   const [mood,   setMood]   = useState(log?.mood ?? '')
   const [pain,   setPain]   = useState(log?.painIntensity ?? 0)
+  const [hrv,    setHrv]    = useState(log?.hrv   != null ? String(log.hrv)   : '')
+  const [bmi,    setBmi]    = useState(log?.bmi   != null ? String(log.bmi)   : '')
 
   const phaseColor = phase ? getPhaseColor(phase) : '#f43f75'
 
@@ -934,9 +1082,12 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
       ...(log ?? {}),
       date:          format(date, 'yyyy-MM-dd'),
       isPeriod:      period,
+      periodFlow:    period && flow ? flow as FlowLevel : undefined,
       mood:          mood || undefined,
       painIntensity: pain,
       cyclePhase:    phase,
+      hrv:           hrv ? Number(hrv) : undefined,
+      bmi:           bmi ? Number(bmi) : undefined,
     } as DailyLogFormData)
   }
 
@@ -946,6 +1097,7 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
       <div className="fixed z-50 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-sm rounded-3xl shadow-2xl overflow-hidden"
         style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.9)' }}>
 
+        {/* Header */}
         <div className="px-5 pt-5 pb-3.5 flex items-start justify-between"
           style={{ borderBottom: `1.5px solid ${phaseColor}20` }}>
           <div>
@@ -966,9 +1118,11 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
         </div>
 
         <div className="px-5 py-4 space-y-4">
+
+          {/* ── Period ── */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-2">생리 중인가요?</p>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mb-2.5">
               {[{ v: true, label: '🩸 네, 생리 중' }, { v: false, label: '✓ 아니요' }].map(({ v, label }) => (
                 <button key={String(v)} onClick={() => setPeriod(v)}
                   className={cn('flex-1 py-2.5 rounded-2xl text-sm font-medium transition-all border',
@@ -979,8 +1133,23 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
                 </button>
               ))}
             </div>
+            {period && (
+              <div className="flex gap-1.5">
+                {FLOW_OPTIONS.map(({ val, label, dots }) => (
+                  <button key={val} onClick={() => setFlow(flow === val ? '' : val)}
+                    className={cn('flex-1 flex flex-col items-center py-2 rounded-2xl transition-all border',
+                      flow === val ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-100 hover:border-rose-200')}>
+                    <span className="text-[13px] leading-none mb-0.5">{dots}</span>
+                    <span className={cn('text-[10px]', flow === val ? 'text-rose-500 font-semibold' : 'text-slate-400')}>
+                      {label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* ── Mood ── */}
           <div>
             <p className="text-xs font-semibold text-slate-500 mb-2">오늘 기분은?</p>
             <div className="flex gap-1.5">
@@ -995,6 +1164,7 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </div>
           </div>
 
+          {/* ── Pain ── */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-slate-500">통증 강도</p>
@@ -1014,6 +1184,36 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
             </div>
           </div>
 
+          {/* ── HRV / BMI ── */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1.5">HRV</p>
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 border border-blue-100">
+                <input
+                  type="number" inputMode="decimal" min="0" max="200" step="1"
+                  value={hrv}
+                  onChange={e => setHrv(e.target.value)}
+                  placeholder="기기 입력"
+                  className="flex-1 w-0 min-w-0 text-sm font-semibold text-blue-700 bg-transparent outline-none placeholder-blue-300"
+                />
+                <span className="text-[10px] text-blue-400 flex-shrink-0">ms</span>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1.5">BMI</p>
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-100">
+                <input
+                  type="number" inputMode="decimal" min="10" max="60" step="0.1"
+                  value={bmi}
+                  onChange={e => setBmi(e.target.value)}
+                  placeholder="22.1"
+                  className="flex-1 w-0 min-w-0 text-sm font-semibold text-emerald-700 bg-transparent outline-none placeholder-emerald-300"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Buttons ── */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-2xl text-sm text-slate-400 border border-slate-100 hover:border-slate-200 transition-colors">
@@ -1028,7 +1228,7 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
 
           <button onClick={onOpenFull}
             className="w-full text-center text-[11px] text-slate-300 hover:text-rose-400 transition-colors pb-1">
-            더 자세히 기록하기 →
+            정밀 분석 보기 →
           </button>
         </div>
       </div>
