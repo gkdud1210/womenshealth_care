@@ -614,27 +614,6 @@ export function HealthCalendar({
           </div>
         </div>
 
-        {/* ── Mode strip ── */}
-        <div className="flex gap-1.5 mb-2 overflow-x-auto pb-0.5 scrollbar-none">
-          {MODES.map(({ id, label, emoji, color }) => {
-            const active = id === modeData.mode
-            return (
-              <button key={id}
-                onClick={() => { if (id !== modeData.mode) setPendingMode(id) }}
-                className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold transition-all whitespace-nowrap"
-                style={{
-                  background: active ? color + '18' : 'rgba(248,248,250,0.9)',
-                  border:     `1.5px solid ${active ? color + '55' : 'rgba(200,200,210,0.5)'}`,
-                  color:      active ? color : '#94a3b8',
-                  boxShadow:  active ? `0 2px 8px ${color}22` : undefined,
-                }}>
-                <span>{emoji}</span>
-                <span>{label}</span>
-              </button>
-            )
-          })}
-        </div>
-
         {/* ── Mode info banner ── */}
         <ModeBanner
           modeData={modeData}
