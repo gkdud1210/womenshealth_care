@@ -1,3 +1,5 @@
+export type CycleMode = 'normal' | 'pregnancy' | 'menopause' | 'amenorrhea'
+
 export type FlowLevel = 'spotting' | 'light' | 'medium' | 'heavy' | 'very_heavy'
 export type MoodType = 'happy' | 'calm' | 'tired' | 'anxious' | 'irritable' | 'sad' | 'energetic' | 'sensitive'
 export type SkinCondition = 'clear' | 'slightly_oily' | 'oily' | 'dry' | 'breakout_mild' | 'breakout_severe' | 'sensitive'

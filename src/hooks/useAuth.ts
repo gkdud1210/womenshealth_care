@@ -6,6 +6,7 @@ export interface UserProfile {
   name: string
   birthdate: string
   careTypes: string[]
+  cycleMode?: string
 }
 
 const PROFILE_KEY = 'ludia_user_v1'

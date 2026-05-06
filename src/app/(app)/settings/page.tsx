@@ -4,17 +4,23 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { CARE_CASES } from '@/data/careCases'
-import { LogOut, Calendar, Shield, ChevronRight, X, Check, LayoutGrid } from 'lucide-react'
+import { CYCLE_MODES, CYCLE_MODE_MAP } from '@/data/cycleModes'
+import { LogOut, Calendar, Shield, ChevronRight, X, Check, LayoutGrid, Repeat2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
+import type { CycleMode } from '@/types/health'
 
 export default function SettingsPage() {
   const router = useRouter()
   const { user, saveUser, logout } = useAuth()
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [showCareSheet, setShowCareSheet] = useState(false)
+  const [showModeSheet, setShowModeSheet] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set(user?.careTypes ?? []))
+
+  const currentModeId = (user?.cycleMode ?? 'normal') as CycleMode
+  const currentMode = CYCLE_MODE_MAP[currentModeId]
 
   function handleLogout() {
     logout()
@@ -87,6 +93,26 @@ export default function SettingsPage() {
           <p className="text-xs text-slate-400 mt-0.5">
             {user?.careTypes?.length ? `${user.careTypes.length}개 선택됨` : '아직 선택하지 않았어요'}
           </p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-slate-300" />
+      </button>
+
+      {/* 사이클 모드 선택 */}
+      <button
+        onClick={() => setShowModeSheet(true)}
+        className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl mb-4 transition-all active:scale-95"
+        style={{
+          background: currentMode.bg,
+          border: `1.5px solid ${currentMode.border}`,
+        }}
+      >
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+          style={{ background: currentMode.gradient, boxShadow: `0 2px 10px ${currentMode.glow}` }}>
+          <Repeat2 className="w-4 h-4 text-white" />
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-slate-700">사이클 모드</p>
+          <p className="text-xs text-slate-400 mt-0.5">{currentMode.label} · {currentMode.desc.split('·')[0].trim()}</p>
         </div>
         <ChevronRight className="w-4 h-4 text-slate-300" />
       </button>
@@ -238,6 +264,64 @@ export default function SettingsPage() {
                   }}>
                   {selected.size > 0 ? `${selected.size}개 선택 완료 · 저장하기` : '하나 이상 선택해주세요'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+      {/* 사이클 모드 바텀 시트 */}
+      {showModeSheet && (
+        <>
+          <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]"
+            onClick={() => setShowModeSheet(false)} />
+          <div className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl overflow-hidden"
+            style={{ background: 'rgba(255,248,250,0.98)', backdropFilter: 'blur(24px)', border: '1px solid rgba(244,63,117,0.12)' }}>
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between px-5 pt-5 pb-3">
+                <div>
+                  <h2 className="font-bold text-slate-800 text-base">사이클 모드 선택</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">현재 나의 상태에 맞는 모드를 선택하세요</p>
+                </div>
+                <button onClick={() => setShowModeSheet(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+
+              <div className="px-4 pb-6 space-y-2">
+                {CYCLE_MODES.map(({ id, label, desc, icon: Icon, gradient, glow, bg, border }) => {
+                  const active = id === currentModeId
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => {
+                        saveUser({ ...user!, cycleMode: id })
+                        setShowModeSheet(false)
+                      }}
+                      className="w-full flex items-center gap-3.5 px-4 py-3.5 rounded-2xl transition-all active:scale-[0.98]"
+                      style={{
+                        background: active ? bg : 'rgba(255,255,255,0.82)',
+                        border: `1.5px solid ${active ? border : 'rgba(220,220,230,0.6)'}`,
+                        boxShadow: active ? `0 4px 16px ${glow}` : '0 1px 6px rgba(0,0,0,0.04)',
+                      }}
+                    >
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: gradient, boxShadow: `0 3px 12px ${glow}` }}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="text-sm font-semibold text-slate-800">{label}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{desc}</p>
+                      </div>
+                      {active && (
+                        <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ background: gradient, boxShadow: `0 2px 8px ${glow}` }}>
+                          <Check className="w-3 h-3 text-white" />
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
