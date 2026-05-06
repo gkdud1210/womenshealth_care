@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -14,8 +14,6 @@ import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '@/types/heal
 import { useSchedule } from '@/hooks/useSchedule'
 import { DailyLogModal } from './DailyLogModal'
 import { DailyDetailModal } from './DailyDetailModal'
-import { VoiceInputButton } from './VoiceInputButton'
-import { VoiceConfirmModal } from './VoiceConfirmModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type CycleMode       = 'normal' | 'pregnancy' | 'menopause' | 'irregular'
@@ -221,42 +219,7 @@ export function HealthCalendar({
   // ── Voice schedule state ──
   const { addEvents, getEventsByDate, deleteEvent } = useSchedule()
   const [scheduleSheetDate, setScheduleSheetDate] = useState<Date | null>(null)
-  const [voiceEvents,     setVoiceEvents]     = useState<ScheduleEvent[]>([])
-  const [voiceTranscript, setVoiceTranscript] = useState('')
-  const [showVoiceModal,  setShowVoiceModal]  = useState(false)
-  const [toastMsg,        setToastMsg]        = useState<string | null>(null)
-
-  const showToast = useCallback((msg: string) => {
-    setToastMsg(msg)
-    setTimeout(() => setToastMsg(null), 3500)
-  }, [])
-
-  const handleVoiceEventsReady = useCallback((events: ScheduleEvent[], transcript: string) => {
-    setVoiceEvents(events)
-    setVoiceTranscript(transcript)
-    setShowVoiceModal(true)
-  }, [])
-
-  const handleVoiceConfirm = useCallback((events: ScheduleEvent[]) => {
-    addEvents(events)
-    setShowVoiceModal(false)
-    showToast(`📅 ${events.length}개 일정이 저장됐어요!`)
-    // Reset FAB state
-    const fab = document.getElementById('ludia-voice-fab') as any
-    if (fab?.__resetToIdle) fab.__resetToIdle()
-  }, [addEvents, showToast])
-
-  const handleVoiceRetry = useCallback(() => {
-    setShowVoiceModal(false)
-    const fab = document.getElementById('ludia-voice-fab') as any
-    if (fab?.__resetToIdle) fab.__resetToIdle()
-  }, [])
-
-  const handleVoiceClose = useCallback(() => {
-    setShowVoiceModal(false)
-    const fab = document.getElementById('ludia-voice-fab') as any
-    if (fab?.__resetToIdle) fab.__resetToIdle()
-  }, [])
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [flipState, setFlipState] = useState<{
     outgoing: Date; incoming: Date; dir: 'next' | 'prev'
   } | null>(null)
@@ -791,23 +754,6 @@ export function HealthCalendar({
           currentModeData={modeData}
           onConfirm={(data) => { saveMode(data); setPendingMode(null) }}
           onCancel={() => setPendingMode(null)}
-        />
-      )}
-
-      {/* ── Voice input FAB ── */}
-      <VoiceInputButton
-        onEventsReady={handleVoiceEventsReady}
-        onError={showToast}
-      />
-
-      {/* ── Voice confirm modal ── */}
-      {showVoiceModal && (
-        <VoiceConfirmModal
-          events={voiceEvents}
-          transcript={voiceTranscript}
-          onConfirm={handleVoiceConfirm}
-          onRetry={handleVoiceRetry}
-          onClose={handleVoiceClose}
         />
       )}
 
