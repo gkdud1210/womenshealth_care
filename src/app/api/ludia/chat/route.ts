@@ -68,10 +68,12 @@ export async function POST(req: Request) {
 3. 일정/약속이 감지되면 event 필드에 정확히 추출하세요
 
 반드시 아래 JSON 형식만 출력하세요 (코드블록·설명 없이):
-{"reply":"응답 텍스트","event":{"hasEvent":false,"title":null,"date":null,"time":null}}
+{"reply":"응답 텍스트","event":{"hasEvent":false,"title":null,"date":null,"startTime":null,"endTime":null,"category":null}}
 
-일정 감지 기준: 발표·회의·미팅·약속·병원·검진·파티·수업·시험·모임 등
-시간 변환: 오전 N시→"0N:00", 오후 N시→"(N+12):00" (오후 12시→"12:00")
+일정 감지 기준: 발표·회의·미팅·약속·병원·검진·파티·수업·시험·모임·과외·레슨·강습·강의·운동·헬스·요가·필라테스·미용실·헤어·네일·데이트·여행·출장 등
+시간 변환: 오전 N시→"0N:00", 오후 N시→"(N+12):00" (오후 12시→"12:00"), 시간 없으면→null
+종료시간: 명시된 경우 변환, 없으면 startTime +1시간, startTime이 null이면 null
+category 분류: work=업무/회의/발표/출장, study=수업/과외/시험/강의/레슨/강습, exercise=운동/헬스/요가/필라테스, medical=병원/검진, social=약속/파티/모임/데이트, rest=휴식, other=기타/미용실/여행
 날짜 변환: 오늘→"${context.today}", 내일→"${tomorrow}", 언급 없으면→"${context.today}"`,
     })
 

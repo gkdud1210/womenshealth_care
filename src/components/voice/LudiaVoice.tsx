@@ -6,9 +6,10 @@ import { cn } from '@/lib/utils'
 import { askLudia } from '@/lib/ludia-engine'
 import { useOnboardingProfile } from '@/lib/onboarding-profile'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
+import { useSchedule } from '@/hooks/useSchedule'
 import { getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
-import type { CyclePhase, DailyLogFormData } from '@/types/health'
+import type { CyclePhase, ScheduleEvent } from '@/types/health'
 
 /* ─── Keyframes ───────────────────────────────────────────────────────── */
 const ANIMATION_CSS = `
@@ -33,13 +34,15 @@ interface Message {
   id: string
   role: 'user' | 'ludia'
   text: string
-  event?: { title: string; date: string; time: string | null }
+  event?: { title: string; date: string; startTime: string | null }
 }
 interface ParsedEvent {
   hasEvent: boolean
   title: string | null
   date: string | null
-  time: string | null
+  startTime: string | null
+  endTime: string | null
+  category: string | null
 }
 interface Props {
   data: MultimodalData
@@ -109,8 +112,9 @@ const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
 
 /* ─── Component ───────────────────────────────────────────────────────── */
 export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
-  const profile     = useOnboardingProfile()
-  const { setLogs } = usePersistedLogs()
+  const profile          = useOnboardingProfile()
+  const { setLogs }      = usePersistedLogs()
+  const { addEvents }    = useSchedule()
   const phaseColor  = getPhaseColor(phase)
   const accent      = PHASE_ACCENT[phase]
 
@@ -144,16 +148,32 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
   }, [])
 
-  /* save calendar event */
+  /* save calendar event as proper ScheduleEvent */
   const saveEvent = useCallback((ev: ParsedEvent) => {
     if (!ev.hasEvent || !ev.title) return
-    const key = ev.date ?? todayStr()
-    setLogs(prev => {
-      const ex: Partial<DailyLogFormData> = prev[key] ?? {}
-      const note = `📅 ${ev.title}${ev.time ? ` ${fmtTime(ev.time)}` : ''}`
-      return { ...prev, [key]: { ...ex, date: key, notes: ex.notes ? `${ex.notes}\n${note}` : note } as DailyLogFormData }
-    })
-  }, [setLogs])
+    const date = ev.date ?? todayStr()
+    const startTime = ev.startTime ?? '09:00'
+    let endTime = ev.endTime
+    if (!endTime) {
+      const [h, m] = startTime.split(':').map(Number)
+      endTime = `${String(Math.min(h + 1, 23)).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+    }
+    const validCategories: ScheduleEvent['category'][] = ['work','study','exercise','social','rest','medical','other']
+    const category: ScheduleEvent['category'] = validCategories.includes(ev.category as ScheduleEvent['category'])
+      ? (ev.category as ScheduleEvent['category'])
+      : 'other'
+    addEvents([{
+      id: `ludia-${Date.now()}`,
+      date,
+      startTime,
+      endTime,
+      title: ev.title,
+      category,
+      intensity: 'medium',
+      source: 'voice',
+      createdAt: new Date().toISOString(),
+    }])
+  }, [addEvents])
 
   /* build history */
   const buildHistory = useCallback(() =>
@@ -168,7 +188,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     setVsSync('thinking')
 
     let reply = ''
-    let ev: ParsedEvent = { hasEvent: false, title: null, date: null, time: null }
+    let ev: ParsedEvent = { hasEvent: false, title: null, date: null, startTime: null, endTime: null, category: null }
 
     try {
       const res = await fetch('/api/ludia/chat/', {
@@ -184,7 +204,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
           },
         }),
       })
-      if (res.ok) { const j = await res.json(); reply = j.reply ?? ''; ev = j.event ?? ev }
+      if (res.ok) { const j = await res.json(); reply = j.reply ?? ''; ev = { ...ev, ...(j.event ?? {}) } }
       else reply = askLudia(text, data, phase, cycleDay, profile).text
     } catch {
       reply = askLudia(text, data, phase, cycleDay, profile).text
@@ -194,7 +214,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
 
     setMessages(prev => [...prev, {
       id: `l-${Date.now()}`, role: 'ludia', text: reply,
-      event: ev.hasEvent && ev.title ? { title: ev.title, date: ev.date ?? todayStr(), time: ev.time } : undefined,
+      event: ev.hasEvent && ev.title ? { title: ev.title, date: ev.date ?? todayStr(), startTime: ev.startTime } : undefined,
     }])
     setVsSync('speaking')
     speak(reply, () => setVsSync('idle'))
@@ -328,7 +348,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                     style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.22)' }}>
                     <CalendarCheck className="w-3 h-3 flex-none" style={{ color: '#a855f7' }} />
                     <span className="font-semibold" style={{ color: '#7c3aed' }}>
-                      {msg.event.title}{msg.event.time ? ` · ${fmtTime(msg.event.time)}` : ''} 저장됨
+                      {msg.event.title}{msg.event.startTime ? ` · ${fmtTime(msg.event.startTime)}` : ''} 캘린더에 저장됨
                     </span>
                   </div>
                 )}
