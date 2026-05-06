@@ -63,9 +63,8 @@ export async function POST(req: Request) {
 - 오늘: ${context.today} | 내일: ${tomorrow}
 
 응답 원칙:
-1. 따뜻하고 공감적인 한국어로 2~4문장 응답하세요
-2. 현재 주기 단계와 생체 데이터를 활용한 맞춤 인사이트를 제공하세요
-3. 일정/약속이 감지되면 event 필드에 정확히 추출하세요
+1. 일정/약속이 감지되면: reply는 "📅 [날짜] [시간]에 [제목] 일정이 맞나요?" 형식으로만 짧게 답하세요. 건강 조언 없이 확인만 요청하세요.
+2. 일정이 없으면: 따뜻하고 공감적인 한국어로 2~4문장 건강 인사이트를 제공하세요.
 
 반드시 아래 JSON 형식만 출력하세요 (코드블록·설명 없이):
 {"reply":"응답 텍스트","event":{"hasEvent":false,"title":null,"date":null,"startTime":null,"endTime":null,"category":null}}

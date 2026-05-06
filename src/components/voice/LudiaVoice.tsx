@@ -34,7 +34,8 @@ interface Message {
   id: string
   role: 'user' | 'ludia'
   text: string
-  event?: { title: string; date: string; startTime: string | null }
+  pendingEvent?: ParsedEvent          // waiting for user confirmation
+  event?: { title: string; date: string; startTime: string | null }  // confirmed & saved
 }
 interface ParsedEvent {
   hasEvent: boolean
@@ -61,6 +62,22 @@ function fmtTime(t: string | null) {
   return `오후 ${h-12}:${String(m).padStart(2,'0')}`
 }
 const todayStr = () => new Date().toISOString().split('T')[0]
+
+function fmtDateKo(dateStr: string): string {
+  const today = todayStr()
+  if (dateStr === today) return '오늘'
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1)
+  if (dateStr === tomorrow.toISOString().split('T')[0]) return '내일'
+  const d = new Date(dateStr)
+  const days = ['일','월','화','수','목','금','토']
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${days[d.getDay()]})`
+}
+
+function makeConfirmReply(ev: ParsedEvent): string {
+  const datePart = fmtDateKo(ev.date ?? todayStr())
+  const timePart = ev.startTime ? ` ${fmtTime(ev.startTime)}` : ''
+  return `📅 ${datePart}${timePart}에 ${ev.title} 일정이 맞나요?`
+}
 
 function addDaysToStr(base: string, n: number): string {
   const d = new Date(base); d.setDate(d.getDate() + n)
@@ -239,6 +256,19 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     }])
   }, [addEvents])
 
+  const confirmEvent = useCallback((msgId: string, ev: ParsedEvent) => {
+    saveEvent(ev)
+    setMessages(prev => prev.map(m => m.id !== msgId ? m : {
+      ...m,
+      pendingEvent: undefined,
+      event: { title: ev.title!, date: ev.date ?? todayStr(), startTime: ev.startTime },
+    }))
+  }, [saveEvent])
+
+  const dismissEvent = useCallback((msgId: string) => {
+    setMessages(prev => prev.map(m => m.id !== msgId ? m : { ...m, pendingEvent: undefined }))
+  }, [])
+
   /* build history */
   const buildHistory = useCallback(() =>
     messages.filter(m => m.id !== 'welcome').slice(-10).map(m => ({
@@ -269,16 +299,14 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         }),
       })
       if (res.ok) { const j = await res.json(); reply = j.reply ?? ''; ev = { ...ev, ...(j.event ?? {}) } }
-      else { reply = askLudia(text, data, phase, cycleDay, profile).text; ev = parseEventLocally(text) }
+      else { ev = parseEventLocally(text); reply = ev.hasEvent ? makeConfirmReply(ev) : askLudia(text, data, phase, cycleDay, profile).text }
     } catch {
-      reply = askLudia(text, data, phase, cycleDay, profile).text; ev = parseEventLocally(text)
+      ev = parseEventLocally(text); reply = ev.hasEvent ? makeConfirmReply(ev) : askLudia(text, data, phase, cycleDay, profile).text
     }
-
-    if (ev.hasEvent && ev.title) saveEvent(ev)
 
     setMessages(prev => [...prev, {
       id: `l-${Date.now()}`, role: 'ludia', text: reply,
-      event: ev.hasEvent && ev.title ? { title: ev.title, date: ev.date ?? todayStr(), startTime: ev.startTime } : undefined,
+      pendingEvent: ev.hasEvent && ev.title ? ev : undefined,
     }])
     setVsSync('speaking')
     speak(reply, () => setVsSync('idle'))
@@ -407,12 +435,47 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                   {msg.text}
                 </div>
 
+                {/* Pending confirmation card */}
+                {msg.pendingEvent && (
+                  <div className="rounded-2xl overflow-hidden"
+                    style={{ border: '1px solid rgba(168,85,247,0.22)', background: 'rgba(168,85,247,0.05)' }}>
+                    <div className="flex items-center gap-3 px-3.5 py-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}>
+                        <CalendarCheck className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800">{msg.pendingEvent.title}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {fmtDateKo(msg.pendingEvent.date ?? todayStr())}
+                          {msg.pendingEvent.startTime ? ` · ${fmtTime(msg.pendingEvent.startTime)}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex" style={{ borderTop: '1px solid rgba(168,85,247,0.15)' }}>
+                      <button
+                        onClick={() => dismissEvent(msg.id)}
+                        className="flex-1 py-2.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-50 active:bg-slate-100">
+                        아니요
+                      </button>
+                      <div style={{ width: 1, background: 'rgba(168,85,247,0.15)' }} />
+                      <button
+                        onClick={() => confirmEvent(msg.id, msg.pendingEvent!)}
+                        className="flex-1 py-2.5 text-xs font-bold transition-colors hover:bg-purple-50 active:bg-purple-100"
+                        style={{ color: '#7c3aed' }}>
+                        맞아요 ✓
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Confirmed & saved badge */}
                 {msg.event && (
                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px]"
                     style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.22)' }}>
                     <CalendarCheck className="w-3 h-3 flex-none" style={{ color: '#a855f7' }} />
                     <span className="font-semibold" style={{ color: '#7c3aed' }}>
-                      {msg.event.title}{msg.event.startTime ? ` · ${fmtTime(msg.event.startTime)}` : ''} 캘린더에 저장됨
+                      {msg.event.title}{msg.event.startTime ? ` · ${fmtTime(msg.event.startTime)}` : ''} 캘린더에 저장됨 ✓
                     </span>
                   </div>
                 )}
