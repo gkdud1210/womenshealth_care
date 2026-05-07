@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import Image from 'next/image'
 import {
   Star, X, ShoppingBag, Trash2, PenLine, ImagePlus, Sparkles,
   Droplets, Shield, Leaf, Wind, Heart, Zap, Search,
@@ -13,6 +12,8 @@ import {
 } from '@/data/shopProducts'
 import { CARE_CASES } from '@/data/careCases'
 import { useAuth } from '@/hooks/useAuth'
+
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
 // ── Icon map for placeholder products ─────────────────────────────────────
 
@@ -144,9 +145,14 @@ function ProductImage({
   className?: string
 }) {
   if (product.image) {
-    return fill
-      ? <Image src={product.image} alt={product.name} fill className={`object-contain ${className}`} />
-      : <Image src={product.image} alt={product.name} width={160} height={160} className={`object-contain ${className}`} />
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`${BASE}${product.image}`}
+        alt={product.name}
+        className={`w-full h-full object-contain ${className}`}
+      />
+    )
   }
   if (product.placeholderGradient && product.placeholderIcon) {
     return (
@@ -789,7 +795,7 @@ export default function ShopPage() {
   return (
     <div className="min-h-screen p-4 sm:p-6">
       <div className="mb-4">
-        <h1 className="font-display text-2xl font-semibold text-slate-800">맞춤 케어샵</h1>
+        <h1 className="font-display text-2xl font-semibold text-slate-800">루디아샵</h1>
         <p className="text-sm text-slate-400 mt-0.5">진단 결과 기반으로 큐레이션된 제품</p>
       </div>
 
