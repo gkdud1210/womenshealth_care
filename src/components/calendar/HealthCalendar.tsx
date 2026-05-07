@@ -213,6 +213,7 @@ export function HealthCalendar({
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showModal,       setShowModal]       = useState(false)
   const [showDetailModal, setShowDetailModal] = useState(false)
+  const [dayMode, setDayMode] = useState<'action' | 'health' | 'schedule' | null>(null)
   const [modeData,     setModeData]     = useState<ModeData>({ mode: 'normal' })
   const [pendingMode,  setPendingMode]  = useState<CycleMode | null>(null)
 
@@ -450,7 +451,11 @@ export function HealthCalendar({
 
       return (
         <button key={i}
-          onClick={() => { if (!inMonth) return; setSelectedDate(isSel ? null : day) }}
+          onClick={() => {
+            if (!inMonth) return
+            if (isSel) { setSelectedDate(null); setDayMode(null) }
+            else { setSelectedDate(day); setDayMode('action') }
+          }}
           disabled={!inMonth}
           className={cn(
             'relative flex flex-col items-center py-1 gap-0.5 transition-all duration-150',
@@ -710,15 +715,35 @@ export function HealthCalendar({
         <PregnancyInfoCard lmpDate={modeData.pregnancyLMP} userName={userName} />
       )}
 
-      {/* ── Quick log popup ── */}
-      {selectedDate && !showModal && (
+      {/* ── Day action sheet ── */}
+      {selectedDate && dayMode === 'action' && (
+        <DayActionSheet
+          date={selectedDate}
+          onHealthLog={() => setDayMode('health')}
+          onAddSchedule={() => setDayMode('schedule')}
+          onClose={() => { setSelectedDate(null); setDayMode(null) }}
+        />
+      )}
+
+      {/* ── Quick health log popup ── */}
+      {selectedDate && dayMode === 'health' && !showModal && (
         <QuickLogPopup
           date={selectedDate}
           log={selectedLog}
           phase={selectedPhase}
-          onSave={(data) => { onLogSave(data); setSelectedDate(null) }}
-          onClose={() => setSelectedDate(null)}
-          onOpenFull={() => { setShowDetailModal(true) }}
+          onSave={(data) => { onLogSave(data); setSelectedDate(null); setDayMode(null) }}
+          onClose={() => setDayMode('action')}
+          onOpenFull={() => { setShowDetailModal(true); setDayMode(null) }}
+        />
+      )}
+
+      {/* ── Add schedule sheet ── */}
+      {selectedDate && dayMode === 'schedule' && (
+        <AddScheduleSheet
+          date={selectedDate}
+          onSave={(ev) => { addEvents([ev]); setSelectedDate(null); setDayMode(null) }}
+          onBack={() => setDayMode('action')}
+          onClose={() => { setSelectedDate(null); setDayMode(null) }}
         />
       )}
 
@@ -1276,6 +1301,188 @@ function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: s
 
       </div>
     </div>
+  )
+}
+
+// ── DayActionSheet ────────────────────────────────────────────────────────────
+function DayActionSheet({
+  date, onHealthLog, onAddSchedule, onClose,
+}: {
+  date: Date
+  onHealthLog: () => void
+  onAddSchedule: () => void
+  onClose: () => void
+}) {
+  const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl"
+        style={{ background: 'rgba(255,248,252,0.98)', backdropFilter: 'blur(24px)', border: '1px solid rgba(244,63,117,0.1)' }}>
+        <div className="px-5 pt-5 pb-6">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-base font-bold text-slate-800">{dateLabel}</p>
+              <p className="text-xs text-slate-400 mt-0.5">무엇을 하시겠어요?</p>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            <button onClick={onHealthLog}
+              className="flex flex-col items-center gap-2.5 py-5 rounded-2xl transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, rgba(244,63,117,0.08), rgba(225,29,90,0.06))', border: '1.5px solid rgba(244,63,117,0.2)' }}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)', boxShadow: '0 4px 14px rgba(244,63,117,0.35)' }}>
+                <span className="text-xl">🩸</span>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-800">생리 체크하기</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">몸 상태 기록</p>
+              </div>
+            </button>
+
+            <button onClick={onAddSchedule}
+              className="flex flex-col items-center gap-2.5 py-5 rounded-2xl transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(124,58,237,0.06))', border: '1.5px solid rgba(168,85,247,0.2)' }}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 4px 14px rgba(168,85,247,0.35)' }}>
+                <span className="text-xl">📅</span>
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-bold text-slate-800">일정 추가하기</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">스케줄 등록</p>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── AddScheduleSheet ──────────────────────────────────────────────────────────
+function AddScheduleSheet({
+  date, onSave, onBack, onClose,
+}: {
+  date: Date
+  onSave: (ev: ScheduleEvent) => void
+  onBack: () => void
+  onClose: () => void
+}) {
+  const dateStr   = format(date, 'yyyy-MM-dd')
+  const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
+  const [title, setTitle]         = useState('')
+  const [startTime, setStartTime] = useState('09:00')
+  const [endTime, setEndTime]     = useState('10:00')
+  const [category, setCategory]   = useState<ScheduleEvent['category']>('other')
+
+  function handleSave() {
+    if (!title.trim()) return
+    onSave({
+      id: `manual-${Date.now()}`,
+      date: dateStr,
+      startTime,
+      endTime,
+      title: title.trim(),
+      category,
+      intensity: 'medium',
+      source: 'manual',
+      createdAt: new Date().toISOString(),
+    })
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl"
+        style={{ background: 'rgba(255,248,255,0.98)', backdropFilter: 'blur(24px)', border: '1px solid rgba(168,85,247,0.14)' }}>
+        <div className="px-5 pt-5 pb-6 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <button onClick={onBack}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                <ChevronLeft className="w-4 h-4 text-slate-500" />
+              </button>
+              <div>
+                <p className="text-sm font-bold text-slate-800">일정 추가</p>
+                <p className="text-xs text-slate-400">{dateLabel}</p>
+              </div>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+              <X className="w-4 h-4 text-slate-500" />
+            </button>
+          </div>
+
+          {/* Title */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-1.5">일정 이름</p>
+            <input
+              autoFocus
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="예: 병원 예약, 운동, 회의..."
+              className="w-full text-sm text-slate-800 bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-purple-400 transition-colors placeholder-slate-300"
+            />
+          </div>
+
+          {/* Time */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1.5">시작 시간</p>
+              <input type="time" value={startTime}
+                onChange={e => setStartTime(e.target.value)}
+                className="w-full text-sm text-slate-700 bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-purple-400 transition-colors" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-slate-500 mb-1.5">종료 시간</p>
+              <input type="time" value={endTime}
+                onChange={e => setEndTime(e.target.value)}
+                className="w-full text-sm text-slate-700 bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-purple-400 transition-colors" />
+            </div>
+          </div>
+
+          {/* Category */}
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-2">카테고리</p>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_OPTIONS.map(o => {
+                const c = SCHEDULE_CATEGORY_COLORS[o.value]
+                const active = category === o.value
+                return (
+                  <button key={o.value} onClick={() => setCategory(o.value)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
+                    style={{
+                      background: active ? c + '18' : 'rgba(248,248,250,0.9)',
+                      border: `1.5px solid ${active ? c + '55' : 'rgba(200,200,210,0.5)'}`,
+                      color: active ? c : '#94a3b8',
+                      boxShadow: active ? `0 2px 8px ${c}22` : undefined,
+                    }}>
+                    {o.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Save */}
+          <button
+            onClick={handleSave}
+            disabled={!title.trim()}
+            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-40"
+            style={{ background: `linear-gradient(135deg, #a855f7, #7c3aed)`, boxShadow: title.trim() ? '0 4px 16px rgba(168,85,247,0.4)' : 'none' }}>
+            일정 저장하기 ✓
+          </button>
+        </div>
+      </div>
+    </>
   )
 }
 
