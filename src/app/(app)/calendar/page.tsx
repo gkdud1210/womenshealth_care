@@ -50,20 +50,6 @@ export default function CalendarPage() {
     })
   }, [setLogs])
 
-  const handlePeriodEnd = useCallback((fromDate: string) => {
-    setLogs(prev => {
-      const next: Record<string, DailyLogFormData> = { ...prev }
-      // Clear isPeriod from fromDate onwards (up to periodLength days)
-      for (let i = 0; i < PERIOD_LENGTH; i++) {
-        const k = dateKey(fromDate, i)
-        if (next[k]?.isPeriod) {
-          next[k] = { ...next[k], isPeriod: false, periodFlow: undefined } as DailyLogFormData
-        }
-      }
-      return next
-    })
-  }, [setLogs])
-
   function selectMode(id: CycleMode) {
     if (id === currentModeId) { setDropdownOpen(false); return }
     setPendingMode(id)
@@ -178,7 +164,6 @@ export default function CalendarPage() {
         cycleLength={CYCLE_LENGTH}
         periodLength={PERIOD_LENGTH}
         onLogSave={handleLogSave}
-        onPeriodEnd={handlePeriodEnd}
         userName={user?.name ?? '님'}
         cycleMode={user?.cycleMode}
       />

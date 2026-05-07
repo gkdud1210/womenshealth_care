@@ -9,6 +9,7 @@ export type CyclePhase = 'menstrual' | 'follicular' | 'ovulation' | 'luteal'
 export interface DailyLogFormData {
   date: string
   isPeriod: boolean
+  isPeriodEnd?: boolean
   periodFlow?: FlowLevel
   painIntensity?: number
   painLocations?: string[]

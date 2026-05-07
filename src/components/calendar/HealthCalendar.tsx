@@ -102,7 +102,6 @@ interface Props {
   cycleLength?: number
   periodLength?: number
   onLogSave: (data: DailyLogFormData) => void
-  onPeriodEnd?: (fromDate: string) => void
   userName?: string
   cycleMode?: string
 }
@@ -209,7 +208,7 @@ const N_STRIPS = 6
 
 // ── HealthCalendar ────────────────────────────────────────────────────────────
 export function HealthCalendar({
-  logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, onPeriodEnd, userName = '님', cycleMode,
+  logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님', cycleMode,
 }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -737,10 +736,6 @@ export function HealthCalendar({
           log={selectedLog}
           onHealthLog={() => setDayMode('health')}
           onAddSchedule={() => setDayMode('schedule')}
-          onPeriodEnd={onPeriodEnd ? () => {
-            onPeriodEnd(format(selectedDate, 'yyyy-MM-dd'))
-            setSelectedDate(null); setDayMode(null)
-          } : undefined}
           onClose={() => { setSelectedDate(null); setDayMode(null) }}
         />
       )}
@@ -750,6 +745,7 @@ export function HealthCalendar({
         <QuickLogPopup
           date={selectedDate}
           log={selectedLog}
+          logs={logs}
           phase={selectedPhase}
           onSave={(data) => { onLogSave(data); setSelectedDate(null); setDayMode(null) }}
           onClose={() => setDayMode('action')}
@@ -1047,28 +1043,57 @@ const FLOW_OPTIONS: { val: FlowLevel; label: string; dots: string }[] = [
   { val: 'heavy',  label: '많음',   dots: '💧💧💧' },
 ]
 
-function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
+function calcAvgPeriodLength(logs: Record<string, DailyLogFormData>): number | null {
+  const periodKeys = Object.keys(logs).filter(k => logs[k]?.isPeriod).sort()
+  if (periodKeys.length === 0) return null
+
+  // Find all period runs (consecutive days)
+  const runs: number[] = []
+  let runStart: string | null = null
+  let runLen = 0
+
+  for (const key of periodKeys) {
+    const prev = format(new Date(new Date(key).getTime() - 86400000), 'yyyy-MM-dd')
+    if (logs[prev]?.isPeriod) {
+      runLen++
+    } else {
+      if (runStart !== null) runs.push(runLen)
+      runStart = key
+      runLen = 1
+    }
+  }
+  if (runStart !== null) runs.push(runLen)
+
+  if (runs.length === 0) return null
+  return Math.round(runs.reduce((a, b) => a + b, 0) / runs.length)
+}
+
+function QuickLogPopup({ date, log, logs, phase, onSave, onClose, onOpenFull }: {
   date: Date
   log?: DailyLogFormData
+  logs: Record<string, DailyLogFormData>
   phase?: CyclePhase
   onSave: (data: DailyLogFormData) => void
   onClose: () => void
   onOpenFull: () => void
 }) {
-  const [period, setPeriod] = useState(log?.isPeriod ?? false)
-  const [flow,   setFlow]   = useState<FlowLevel | ''>(log?.periodFlow ?? '')
-  const [mood,   setMood]   = useState(log?.mood ?? '')
-  const [pain,   setPain]   = useState(log?.painIntensity ?? 0)
-  const [hrv,    setHrv]    = useState(log?.hrv   != null ? String(log.hrv)   : '')
-  const [bmi,    setBmi]    = useState(log?.bmi   != null ? String(log.bmi)   : '')
+  const [period,      setPeriod]      = useState(log?.isPeriod    ?? false)
+  const [isPeriodEnd, setIsPeriodEnd] = useState(log?.isPeriodEnd ?? false)
+  const [flow,        setFlow]        = useState<FlowLevel | ''>(log?.periodFlow ?? '')
+  const [mood,        setMood]        = useState(log?.mood ?? '')
+  const [pain,        setPain]        = useState(log?.painIntensity ?? 0)
+  const [hrv,         setHrv]         = useState(log?.hrv != null ? String(log.hrv) : '')
+  const [bmi,         setBmi]         = useState(log?.bmi != null ? String(log.bmi) : '')
 
   const phaseColor = phase ? getPhaseColor(phase) : '#f43f75'
+  const avgPeriodLen = calcAvgPeriodLength(logs)
 
   function handleSave() {
     onSave({
       ...(log ?? {}),
       date:          format(date, 'yyyy-MM-dd'),
       isPeriod:      period,
+      isPeriodEnd:   period ? isPeriodEnd : false,
       periodFlow:    period && flow ? flow as FlowLevel : undefined,
       mood:          mood || undefined,
       painIntensity: pain,
@@ -1121,18 +1146,49 @@ function QuickLogPopup({ date, log, phase, onSave, onClose, onOpenFull }: {
               ))}
             </div>
             {period && (
-              <div className="flex gap-1.5">
-                {FLOW_OPTIONS.map(({ val, label, dots }) => (
-                  <button key={val} onClick={() => setFlow(flow === val ? '' : val)}
-                    className={cn('flex-1 flex flex-col items-center py-2 rounded-2xl transition-all border',
-                      flow === val ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-100 hover:border-rose-200')}>
-                    <span className="text-[13px] leading-none mb-0.5">{dots}</span>
-                    <span className={cn('text-[10px]', flow === val ? 'text-rose-500 font-semibold' : 'text-slate-400')}>
-                      {label}
+              <>
+                <div className="flex gap-1.5 mb-2.5">
+                  {FLOW_OPTIONS.map(({ val, label, dots }) => (
+                    <button key={val} onClick={() => setFlow(flow === val ? '' : val)}
+                      className={cn('flex-1 flex flex-col items-center py-2 rounded-2xl transition-all border',
+                        flow === val ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-100 hover:border-rose-200')}>
+                      <span className="text-[13px] leading-none mb-0.5">{dots}</span>
+                      <span className={cn('text-[10px]', flow === val ? 'text-rose-500 font-semibold' : 'text-slate-400')}>
+                        {label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Period end toggle */}
+                <button
+                  onClick={() => setIsPeriodEnd(v => !v)}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl transition-all border text-sm',
+                    isPeriodEnd
+                      ? 'bg-rose-50 border-rose-300'
+                      : 'bg-white border-slate-100 hover:border-rose-200',
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🔴</span>
+                    <span className={cn('font-medium', isPeriodEnd ? 'text-rose-600' : 'text-slate-600')}>
+                      이 날이 생리 마지막 날이에요
                     </span>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                  <div className={cn(
+                    'w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all',
+                    isPeriodEnd ? 'bg-rose-500' : 'border-2 border-slate-200',
+                  )}>
+                    {isPeriodEnd && <Check className="w-3 h-3 text-white" />}
+                  </div>
+                </button>
+                {avgPeriodLen !== null && (
+                  <p className="text-[11px] text-slate-400 text-right mt-1 pr-1">
+                    평균 생리 기간: <span className="font-semibold text-rose-400">{avgPeriodLen}일</span>
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -1326,13 +1382,12 @@ function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: s
 
 // ── DayActionSheet ────────────────────────────────────────────────────────────
 function DayActionSheet({
-  date, log, onHealthLog, onAddSchedule, onPeriodEnd, onClose,
+  date, log, onHealthLog, onAddSchedule, onClose,
 }: {
   date: Date
   log?: DailyLogFormData
   onHealthLog: () => void
   onAddSchedule: () => void
-  onPeriodEnd?: () => void
   onClose: () => void
 }) {
   const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
@@ -1389,21 +1444,6 @@ function DayActionSheet({
             </button>
           </div>
 
-          {/* Period end button — only shown on active period days */}
-          {isPeriodDay && onPeriodEnd && (
-            <button
-              onClick={onPeriodEnd}
-              className="w-full mt-3 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-2"
-              style={{
-                background: 'rgba(239,68,68,0.06)',
-                border: '1.5px solid rgba(239,68,68,0.2)',
-                color: '#dc2626',
-              }}
-            >
-              <span>🔴</span>
-              오늘부터 생리 종료
-            </button>
-          )}
         </div>
       </div>
     </>
