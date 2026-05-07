@@ -103,6 +103,7 @@ interface Props {
   periodLength?: number
   onLogSave: (data: DailyLogFormData) => void
   userName?: string
+  cycleMode?: string
 }
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
@@ -207,7 +208,7 @@ const N_STRIPS = 6
 
 // ── HealthCalendar ────────────────────────────────────────────────────────────
 export function HealthCalendar({
-  logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님'
+  logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님', cycleMode,
 }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -268,6 +269,13 @@ export function HealthCalendar({
       if (saved) setModeData(JSON.parse(saved))
     } catch {}
   }, [])
+
+  // Sync mode from parent (user profile) — takes precedence over localStorage
+  useEffect(() => {
+    if (cycleMode) {
+      setModeData(prev => ({ ...prev, mode: cycleMode as CycleMode }))
+    }
+  }, [cycleMode])
 
   // RAF-driven paper curl animation — full 0°→170° with front/back face switching
   useEffect(() => {
@@ -375,9 +383,15 @@ export function HealthCalendar({
 
   function getDayPhase(date: Date): CyclePhase | undefined {
     if (!effectiveCycleStart) return undefined
-    const diff = Math.floor((date.getTime() - effectiveCycleStart.getTime()) / 86400000)
-    if (diff < 0) return undefined
-    return getCyclePhase((diff % cycleLength) + 1, cycleLength, periodLength)
+    // Use local-midnight comparison to avoid timezone drift
+    const startMidnight = new Date(effectiveCycleStart)
+    startMidnight.setHours(0, 0, 0, 0)
+    const dayMidnight = new Date(date)
+    dayMidnight.setHours(0, 0, 0, 0)
+    const diff = Math.round((dayMidnight.getTime() - startMidnight.getTime()) / 86400000)
+    // Wrap negative diffs so previous cycles also show phases
+    const dayInCycle = ((diff % cycleLength) + cycleLength) % cycleLength
+    return getCyclePhase(dayInCycle + 1, cycleLength, periodLength)
   }
 
   function getKey(date: Date) { return format(date, 'yyyy-MM-dd') }

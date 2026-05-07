@@ -141,6 +141,7 @@ export default function CalendarPage() {
         periodLength={PERIOD_LENGTH}
         onLogSave={handleLogSave}
         userName={user?.name ?? '님'}
+        cycleMode={user?.cycleMode}
       />
 
       {/* ── Mode change confirm dialog ── */}
