@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useState, useRef, useEffect } from 'react'
-import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check } from 'lucide-react'
+import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
@@ -16,6 +16,7 @@ export default function CalendarPage() {
   const { user, saveUser } = useAuth()
   const { logs, setLogs, clearLogs } = usePersistedLogs()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [pendingMode, setPendingMode] = useState<CycleMode | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const currentModeId = (user?.cycleMode ?? 'normal') as CycleMode
@@ -26,8 +27,15 @@ export default function CalendarPage() {
   }, [setLogs])
 
   function selectMode(id: CycleMode) {
-    saveUser({ ...user!, cycleMode: id })
+    if (id === currentModeId) { setDropdownOpen(false); return }
+    setPendingMode(id)
     setDropdownOpen(false)
+  }
+
+  function confirmMode() {
+    if (!pendingMode) return
+    saveUser({ ...user!, cycleMode: pendingMode })
+    setPendingMode(null)
   }
 
   // Close dropdown on outside click
@@ -134,6 +142,47 @@ export default function CalendarPage() {
         onLogSave={handleLogSave}
         userName={user?.name ?? '님'}
       />
+
+      {/* ── Mode change confirm dialog ── */}
+      {pendingMode && (() => {
+        const m = CYCLE_MODE_MAP[pendingMode]
+        return (
+          <>
+            <div className="fixed inset-0 z-50 bg-black/25 backdrop-blur-[2px]"
+              onClick={() => setPendingMode(null)} />
+            <div className="fixed z-[60] left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-2rem)] max-w-xs rounded-3xl shadow-2xl overflow-hidden"
+              style={{ background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(24px)', border: '1px solid rgba(168,85,247,0.15)' }}>
+              <div className="px-5 pt-5 pb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
+                    style={{ background: m.gradient, boxShadow: `0 4px 14px ${m.glow}` }}>
+                    <m.icon className="w-5 h-5 text-white" />
+                  </div>
+                  <button onClick={() => setPendingMode(null)}
+                    className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+                    <X className="w-3.5 h-3.5 text-slate-500" />
+                  </button>
+                </div>
+                <h2 className="font-bold text-slate-800 text-[15px] mb-1">
+                  {m.label}으로 변경할까요?
+                </h2>
+                <p className="text-[13px] text-slate-500 leading-relaxed">{m.desc}</p>
+              </div>
+              <div className="px-5 pb-5 flex gap-2">
+                <button onClick={() => setPendingMode(null)}
+                  className="flex-1 py-2.5 rounded-2xl text-sm text-slate-400 border border-slate-100 hover:border-slate-200 transition-colors">
+                  아니요
+                </button>
+                <button onClick={confirmMode}
+                  className="flex-1 py-2.5 rounded-2xl text-sm font-bold text-white transition-all active:scale-95"
+                  style={{ background: m.gradient, boxShadow: `0 4px 14px ${m.glow}` }}>
+                  네, 변경할게요
+                </button>
+              </div>
+            </div>
+          </>
+        )
+      })()}
 
       {/* ── Dev-only: clear logs ── */}
       {process.env.NODE_ENV === 'development' && (
