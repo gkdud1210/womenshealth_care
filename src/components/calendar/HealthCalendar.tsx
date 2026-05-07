@@ -102,6 +102,7 @@ interface Props {
   cycleLength?: number
   periodLength?: number
   onLogSave: (data: DailyLogFormData) => void
+  onPeriodEnd?: (fromDate: string) => void
   userName?: string
   cycleMode?: string
 }
@@ -208,7 +209,7 @@ const N_STRIPS = 6
 
 // ── HealthCalendar ────────────────────────────────────────────────────────────
 export function HealthCalendar({
-  logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, userName = '님', cycleMode,
+  logs, lastPeriodStart, cycleLength = 28, periodLength = 5, onLogSave, onPeriodEnd, userName = '님', cycleMode,
 }: Props) {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -733,8 +734,13 @@ export function HealthCalendar({
       {selectedDate && dayMode === 'action' && (
         <DayActionSheet
           date={selectedDate}
+          log={selectedLog}
           onHealthLog={() => setDayMode('health')}
           onAddSchedule={() => setDayMode('schedule')}
+          onPeriodEnd={onPeriodEnd ? () => {
+            onPeriodEnd(format(selectedDate, 'yyyy-MM-dd'))
+            setSelectedDate(null); setDayMode(null)
+          } : undefined}
           onClose={() => { setSelectedDate(null); setDayMode(null) }}
         />
       )}
@@ -1320,14 +1326,18 @@ function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: s
 
 // ── DayActionSheet ────────────────────────────────────────────────────────────
 function DayActionSheet({
-  date, onHealthLog, onAddSchedule, onClose,
+  date, log, onHealthLog, onAddSchedule, onPeriodEnd, onClose,
 }: {
   date: Date
+  log?: DailyLogFormData
   onHealthLog: () => void
   onAddSchedule: () => void
+  onPeriodEnd?: () => void
   onClose: () => void
 }) {
   const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
+  const isPeriodDay = !!log?.isPeriod
+
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
@@ -1338,7 +1348,9 @@ function DayActionSheet({
           <div className="flex items-center justify-between mb-5">
             <div>
               <p className="text-base font-bold text-slate-800">{dateLabel}</p>
-              <p className="text-xs text-slate-400 mt-0.5">무엇을 하시겠어요?</p>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {isPeriodDay ? '🩸 생리 중인 날이에요' : '무엇을 하시겠어요?'}
+              </p>
             </div>
             <button onClick={onClose}
               className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
@@ -1356,7 +1368,9 @@ function DayActionSheet({
                 <span className="text-xl">🩸</span>
               </div>
               <div className="text-center">
-                <p className="text-sm font-bold text-slate-800">생리 체크하기</p>
+                <p className="text-sm font-bold text-slate-800">
+                  {isPeriodDay ? '생리 기록 수정' : '생리 체크하기'}
+                </p>
                 <p className="text-[10px] text-slate-400 mt-0.5">몸 상태 기록</p>
               </div>
             </button>
@@ -1374,6 +1388,22 @@ function DayActionSheet({
               </div>
             </button>
           </div>
+
+          {/* Period end button — only shown on active period days */}
+          {isPeriodDay && onPeriodEnd && (
+            <button
+              onClick={onPeriodEnd}
+              className="w-full mt-3 py-3 rounded-2xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-2"
+              style={{
+                background: 'rgba(239,68,68,0.06)',
+                border: '1.5px solid rgba(239,68,68,0.2)',
+                color: '#dc2626',
+              }}
+            >
+              <span>🔴</span>
+              오늘부터 생리 종료
+            </button>
+          )}
         </div>
       </div>
     </>

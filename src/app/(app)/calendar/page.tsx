@@ -22,8 +22,46 @@ export default function CalendarPage() {
   const currentModeId = (user?.cycleMode ?? 'normal') as CycleMode
   const currentMode = CYCLE_MODE_MAP[currentModeId]
 
+  function dateKey(base: string, offsetDays: number) {
+    const d = new Date(base + 'T00:00:00')
+    d.setDate(d.getDate() + offsetDays)
+    return d.toISOString().split('T')[0]
+  }
+
   const handleLogSave = useCallback((data: DailyLogFormData) => {
-    setLogs(prev => ({ ...prev, [data.date]: data }))
+    setLogs(prev => {
+      const next: Record<string, DailyLogFormData> = { ...prev, [data.date]: data }
+
+      // Auto-fill the following days as period days when marking period start
+      if (data.isPeriod) {
+        const prevKey = dateKey(data.date, -1)
+        const isPeriodStart = !prev[prevKey]?.isPeriod
+        if (isPeriodStart) {
+          for (let i = 1; i < PERIOD_LENGTH; i++) {
+            const k = dateKey(data.date, i)
+            if (!next[k]?.isPeriod) {
+              next[k] = { ...(next[k] ?? {}), date: k, isPeriod: true } as DailyLogFormData
+            }
+          }
+        }
+      }
+
+      return next
+    })
+  }, [setLogs])
+
+  const handlePeriodEnd = useCallback((fromDate: string) => {
+    setLogs(prev => {
+      const next: Record<string, DailyLogFormData> = { ...prev }
+      // Clear isPeriod from fromDate onwards (up to periodLength days)
+      for (let i = 0; i < PERIOD_LENGTH; i++) {
+        const k = dateKey(fromDate, i)
+        if (next[k]?.isPeriod) {
+          next[k] = { ...next[k], isPeriod: false, periodFlow: undefined } as DailyLogFormData
+        }
+      }
+      return next
+    })
   }, [setLogs])
 
   function selectMode(id: CycleMode) {
@@ -140,6 +178,7 @@ export default function CalendarPage() {
         cycleLength={CYCLE_LENGTH}
         periodLength={PERIOD_LENGTH}
         onLogSave={handleLogSave}
+        onPeriodEnd={handlePeriodEnd}
         userName={user?.name ?? '님'}
         cycleMode={user?.cycleMode}
       />
