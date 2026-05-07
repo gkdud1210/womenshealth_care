@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { LudiaLogo } from '@/components/LudiaLogo'
+import type { UserProfile } from '@/hooks/useAuth'
 
 const inputStyle = {
   background: 'rgba(253,248,246,0.9)',
@@ -18,6 +19,11 @@ export default function LoginPage() {
   const [userId,   setUserId]   = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState('')
+  const [savedUser, setSavedUser] = useState<UserProfile | null>(null)
+
+  useEffect(() => {
+    setSavedUser(storedUser())
+  }, [storedUser])
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,6 +62,31 @@ export default function LoginPage() {
       </div>
 
       <div className="w-full max-w-sm">
+
+        {savedUser && (
+          <button
+            onClick={() => { startSession(); router.push('/') }}
+            className="w-full mb-4 py-4 rounded-3xl flex items-center gap-3 px-5 transition-all active:scale-[0.98]"
+            style={{
+              background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
+              boxShadow: '0 8px 28px rgba(244,63,117,0.38)',
+            }}>
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ background: 'rgba(255,255,255,0.22)' }}>
+              <span className="text-white text-lg font-bold">
+                {savedUser.nickname.charAt(0)}
+              </span>
+            </div>
+            <div className="text-left">
+              <p className="text-white text-[13px] font-semibold leading-snug">
+                {savedUser.nickname}님으로 계속하기
+              </p>
+              <p className="text-white/70 text-[11px]">자동 로그인</p>
+            </div>
+            <span className="ml-auto text-white/80 text-lg">→</span>
+          </button>
+        )}
+
         <div className="rounded-3xl p-7 sm:p-8"
           style={{
             background: 'rgba(255,255,255,0.85)',
