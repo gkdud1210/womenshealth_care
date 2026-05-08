@@ -4,17 +4,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, CalendarHeart, Microscope,
-  ShoppingBag, Settings
+  ShoppingBag, Settings, Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LudiaLogo } from '@/components/LudiaLogo'
 
 const navItems = [
-  { href: '/dashboard',  icon: LayoutDashboard,   label: '대시보드' },
-  { href: '/calendar',   icon: CalendarHeart,      label: '건강 캘린더' },
-  { href: '/diagnostic', icon: Microscope,         label: '진단 분석' },
-  { href: '/shop',       icon: ShoppingBag, label: '루디아샵' },
-  { href: '/settings',   icon: Settings,    label: '설정' },
+  { href: '/dashboard',  icon: LayoutDashboard, label: '대시보드' },
+  { href: '/cycle',      icon: Activity,        label: '호르몬 사이클' },
+  { href: '/calendar',   icon: CalendarHeart,   label: '건강 캘린더' },
+  { href: '/diagnostic', icon: Microscope,      label: '진단 분석' },
+  { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
+  { href: '/settings',   icon: Settings,        label: '설정' },
 ]
 
 export function Sidebar() {

@@ -4,16 +4,17 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, CalendarHeart, Microscope,
-  Settings, ShoppingBag
+  Settings, ShoppingBag, Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { href: '/',           icon: LayoutDashboard,   label: '홈' },
-  { href: '/calendar',   icon: CalendarHeart,      label: '캘린더' },
-  { href: '/diagnostic', icon: Microscope,         label: '진단' },
-  { href: '/shop',       icon: ShoppingBag, label: '루디아샵' },
-  { href: '/settings',   icon: Settings,    label: '설정' },
+  { href: '/',           icon: LayoutDashboard, label: '홈' },
+  { href: '/cycle',      icon: Activity,        label: '사이클' },
+  { href: '/calendar',   icon: CalendarHeart,   label: '캘린더' },
+  { href: '/diagnostic', icon: Microscope,      label: '진단' },
+  { href: '/shop',       icon: ShoppingBag,     label: '샵' },
+  { href: '/settings',   icon: Settings,        label: '설정' },
 ]
 
 export function MobileNav() {
@@ -28,12 +29,12 @@ export function MobileNav() {
         borderTop: '1px solid rgba(244,63,117,0.1)',
         boxShadow: '0 -4px 24px rgba(244,63,117,0.07)',
       }}>
-      <div className="flex items-center justify-around px-1 py-1.5">
+      <div className="flex items-center justify-around px-0.5 py-1">
         {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
           return (
             <Link key={href} href={href}
-              className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl min-w-0 flex-1 transition-all duration-200">
+              className="flex flex-col items-center gap-0.5 px-1 py-1 rounded-xl min-w-0 flex-1 transition-all duration-200">
               <div className={cn(
                 'w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200',
                 isActive

@@ -30,12 +30,28 @@ const ANIMATION_CSS = `
 /* ─── Types ───────────────────────────────────────────────────────────── */
 type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking'
 
+interface RecurringPending {
+  weekday: number                        // 0=일, 1=월, ..., 6=토
+  title: string
+  category: ScheduleEvent['category']
+  startTime: string | null
+  endTime: string | null
+}
+
 interface Message {
   id: string
   role: 'user' | 'ludia'
   text: string
-  pendingEvent?: ParsedEvent          // waiting for user confirmation
-  event?: { title: string; date: string; startTime: string | null }  // confirmed & saved
+  pendingEvent?: ParsedEvent
+  event?: { title: string; date: string; startTime: string | null }
+  pendingRecurring?: {
+    events: ScheduleEvent[]
+    weekday: number
+    startMonth: number
+    endMonth: number
+    title: string
+  }
+  savedRecurring?: { count: number; title: string; weekday: number }
 }
 interface ParsedEvent {
   hasEvent: boolean
@@ -53,6 +69,94 @@ interface Props {
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
+const WEEKDAY_NAMES = ['일', '월', '화', '수', '목', '금', '토']
+
+const RECURRING_KEYWORDS: { pattern: RegExp; category: ScheduleEvent['category'] }[] = [
+  { pattern: /과외|수업|강의|레슨|강습|공부/, category: 'study' },
+  { pattern: /회의|미팅|업무|발표|출장|면접/, category: 'work' },
+  { pattern: /운동|헬스|요가|필라테스|수영|달리기/, category: 'exercise' },
+  { pattern: /병원|검진|진료|치과/, category: 'medical' },
+  { pattern: /약속|모임|파티|데이트|만남/, category: 'social' },
+]
+
+function parseRecurringPattern(text: string) {
+  const none = { isRecurring: false, weekday: null as number | null, title: '일정', category: 'other' as ScheduleEvent['category'], startTime: null as string | null, endTime: null as string | null, startMonth: null as number | null, endMonth: null as number | null }
+  if (!/매주|주마다|마다/.test(text)) return none
+
+  const WEEKDAY_MAP: Record<string, number> = { 월: 1, 화: 2, 수: 3, 목: 4, 금: 5, 토: 6, 일: 0 }
+  let weekday: number | null = null
+  for (const [k, v] of Object.entries(WEEKDAY_MAP)) {
+    if (new RegExp(k + '요일?').test(text)) { weekday = v; break }
+  }
+  if (weekday === null) return none
+
+  const matched = RECURRING_KEYWORDS.find(k => k.pattern.test(text))
+  const titleMatch = text.match(matched?.pattern ?? /일정/)
+  const title = titleMatch?.[0] ?? '일정'
+  const category = matched?.category ?? 'other'
+
+  let startTime: string | null = null
+  const pmMatch = text.match(/오후\s*(\d+)시(?:\s*(\d+)분)?/)
+  const amMatch = text.match(/오전\s*(\d+)시(?:\s*(\d+)분)?/)
+  if (pmMatch) {
+    const h = parseInt(pmMatch[1]) + (parseInt(pmMatch[1]) < 12 ? 12 : 0)
+    startTime = `${String(h).padStart(2,'0')}:${String(parseInt(pmMatch[2] ?? '0')).padStart(2,'0')}`
+  } else if (amMatch) {
+    startTime = `${String(parseInt(amMatch[1])).padStart(2,'0')}:${String(parseInt(amMatch[2] ?? '0')).padStart(2,'0')}`
+  }
+  const endTime = startTime
+    ? (() => { const [h,m] = startTime!.split(':').map(Number); return `${String(Math.min(h+1,23)).padStart(2,'0')}:${String(m).padStart(2,'0')}` })()
+    : null
+
+  let startMonth: number | null = null
+  let endMonth: number | null = null
+  const rangeMatch = text.match(/(\d{1,2})월(?:부터|에서|-|~)?\s*(\d{1,2})월/)
+  if (rangeMatch) { startMonth = parseInt(rangeMatch[1]); endMonth = parseInt(rangeMatch[2]) }
+
+  return { isRecurring: true, weekday, title, category, startTime, endTime, startMonth, endMonth }
+}
+
+function parseDateRange(text: string): { startMonth: number; endMonth: number } | null {
+  const m = text.match(/(\d{1,2})월(?:부터|에서|-|~)?\s*(\d{1,2})월/)
+    ?? text.match(/(\d{1,2})월.*?(\d{1,2})월/)
+  if (m) {
+    const s = parseInt(m[1]); const e = parseInt(m[2])
+    if (s >= 1 && s <= 12 && e >= 1 && e <= 12) return { startMonth: s, endMonth: e }
+  }
+  const single = text.match(/(\d{1,2})월까지/)
+  if (single) {
+    const end = parseInt(single[1])
+    if (end >= 1 && end <= 12) return { startMonth: new Date().getMonth() + 1, endMonth: end }
+  }
+  return null
+}
+
+function generateWeeklyEvents(
+  weekday: number, startMonth: number, endMonth: number,
+  title: string, category: ScheduleEvent['category'],
+  startTime: string | null, endTime: string | null,
+): ScheduleEvent[] {
+  const year = new Date().getFullYear()
+  const st = startTime ?? '09:00'
+  const et = endTime ?? (() => { const [h,m] = st.split(':').map(Number); return `${String(Math.min(h+1,23)).padStart(2,'0')}:${String(m).padStart(2,'0')}` })()
+  const cur = new Date(year, startMonth - 1, 1)
+  const endDate = new Date(year, endMonth, 0)
+  while (cur.getDay() !== weekday) cur.setDate(cur.getDate() + 1)
+  const events: ScheduleEvent[] = []
+  while (cur <= endDate) {
+    const dateStr = `${cur.getFullYear()}-${String(cur.getMonth()+1).padStart(2,'0')}-${String(cur.getDate()).padStart(2,'0')}`
+    events.push({
+      id: `ludia-recur-${Date.now()}-${events.length}-${Math.random().toString(36).slice(2,5)}`,
+      date: dateStr,
+      startTime: st, endTime: et,
+      title, category,
+      intensity: 'medium', source: 'voice', createdAt: new Date().toISOString(),
+    })
+    cur.setDate(cur.getDate() + 7)
+  }
+  return events
+}
+
 function fmtTime(t: string | null) {
   if (!t) return ''
   const [h, m] = t.split(':').map(Number)
@@ -199,10 +303,11 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   const phaseColor  = getPhaseColor(phase)
   const accent      = PHASE_ACCENT[phase]
 
-  const [vs, setVs]               = useState<VoiceState>('idle')
-  const [messages, setMessages]   = useState<Message[]>(() => [makeWelcome(userName, cycleDay, phase)])
-  const [interim, setInterim]     = useState('')
-  const [inputText, setInputText] = useState('')
+  const [vs, setVs]                           = useState<VoiceState>('idle')
+  const [messages, setMessages]               = useState<Message[]>(() => [makeWelcome(userName, cycleDay, phase)])
+  const [interim, setInterim]                 = useState('')
+  const [inputText, setInputText]             = useState('')
+  const [recurringPending, setRecurringPending] = useState<RecurringPending | null>(null)
 
   const vsRef       = useRef<VoiceState>('idle')
   const recogRef    = useRef<any>(null)
@@ -269,6 +374,18 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     setMessages(prev => prev.map(m => m.id !== msgId ? m : { ...m, pendingEvent: undefined }))
   }, [])
 
+  const confirmRecurring = useCallback((msgId: string, events: ScheduleEvent[], weekday: number, title: string) => {
+    addEvents(events)
+    setMessages(prev => prev.map(m => m.id !== msgId ? m : {
+      ...m, pendingRecurring: undefined,
+      savedRecurring: { count: events.length, title, weekday },
+    }))
+  }, [addEvents])
+
+  const dismissRecurring = useCallback((msgId: string) => {
+    setMessages(prev => prev.map(m => m.id !== msgId ? m : { ...m, pendingRecurring: undefined }))
+  }, [])
+
   /* build history */
   const buildHistory = useCallback(() =>
     messages.filter(m => m.id !== 'welcome').slice(-10).map(m => ({
@@ -279,6 +396,67 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   /* core: send to API */
   const processText = useCallback(async (text: string) => {
     setMessages(prev => [...prev, { id: `u-${Date.now()}`, role: 'user', text }])
+
+    // ── 정기 스케줄: 날짜 범위 대기 중 ──────────────────────────────
+    if (recurringPending) {
+      const range = parseDateRange(text)
+      if (range) {
+        const { startMonth, endMonth } = range
+        const events = generateWeeklyEvents(
+          recurringPending.weekday, startMonth, endMonth,
+          recurringPending.title, recurringPending.category,
+          recurringPending.startTime, recurringPending.endTime,
+        )
+        const dayName = WEEKDAY_NAMES[recurringPending.weekday]
+        const reply = `📅 매주 ${dayName}요일 ${recurringPending.title}을(를) ${startMonth}월부터 ${endMonth}월까지, 총 ${events.length}회 캘린더에 등록할까요?`
+        setRecurringPending(null)
+        setMessages(prev => [...prev, {
+          id: `l-${Date.now()}`, role: 'ludia', text: reply,
+          pendingRecurring: { events, weekday: recurringPending.weekday, startMonth, endMonth, title: recurringPending.title },
+        }])
+        setVsSync('speaking'); speak(reply, () => setVsSync('idle'))
+      } else {
+        const reply = '날짜 범위를 다시 알려주세요. 예: "1월부터 5월까지"'
+        setMessages(prev => [...prev, { id: `l-${Date.now()}`, role: 'ludia', text: reply }])
+        setVsSync('speaking'); speak(reply, () => setVsSync('idle'))
+      }
+      return
+    }
+
+    // ── 정기 스케줄: 새 메시지에서 감지 ─────────────────────────────
+    const recurring = parseRecurringPattern(text)
+    if (recurring.isRecurring && recurring.weekday !== null) {
+      const dayName = WEEKDAY_NAMES[recurring.weekday]
+      let reply: string
+      let pendingRec: Message['pendingRecurring']
+
+      if (recurring.startMonth !== null && recurring.endMonth !== null) {
+        const events = generateWeeklyEvents(
+          recurring.weekday, recurring.startMonth, recurring.endMonth,
+          recurring.title, recurring.category,
+          recurring.startTime, recurring.endTime,
+        )
+        reply = `📅 매주 ${dayName}요일 ${recurring.title}을(를) ${recurring.startMonth}월부터 ${recurring.endMonth}월까지, 총 ${events.length}회 캘린더에 등록할까요?`
+        pendingRec = { events, weekday: recurring.weekday, startMonth: recurring.startMonth, endMonth: recurring.endMonth, title: recurring.title }
+      } else {
+        reply = `📅 매주 ${dayName}요일 ${recurring.title}이군요! 몇 월부터 몇 월까지 있나요?`
+        setRecurringPending({
+          weekday: recurring.weekday,
+          title: recurring.title,
+          category: recurring.category,
+          startTime: recurring.startTime,
+          endTime: recurring.endTime,
+        })
+      }
+
+      setMessages(prev => [...prev, {
+        id: `l-${Date.now()}`, role: 'ludia', text: reply,
+        ...(pendingRec ? { pendingRecurring: pendingRec } : {}),
+      }])
+      setVsSync('speaking'); speak(reply, () => setVsSync('idle'))
+      return
+    }
+
     setVsSync('thinking')
 
     let reply = ''
@@ -310,7 +488,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     }])
     setVsSync('speaking')
     speak(reply, () => setVsSync('idle'))
-  }, [data, phase, cycleDay, userName, profile, buildHistory, saveEvent, setVsSync])
+  }, [data, phase, cycleDay, userName, profile, buildHistory, saveEvent, setVsSync, recurringPending])
 
   /* text send */
   const handleTextSend = useCallback(() => {
@@ -476,6 +654,51 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
                     <CalendarCheck className="w-3 h-3 flex-none" style={{ color: '#a855f7' }} />
                     <span className="font-semibold" style={{ color: '#7c3aed' }}>
                       {msg.event.title}{msg.event.startTime ? ` · ${fmtTime(msg.event.startTime)}` : ''} 캘린더에 저장됨 ✓
+                    </span>
+                  </div>
+                )}
+
+                {/* 정기 일정 확인 카드 */}
+                {msg.pendingRecurring && (
+                  <div className="rounded-2xl overflow-hidden"
+                    style={{ border: '1px solid rgba(168,85,247,0.22)', background: 'rgba(168,85,247,0.05)' }}>
+                    <div className="flex items-center gap-3 px-3.5 py-3">
+                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 2px 8px rgba(168,85,247,0.3)' }}>
+                        <CalendarCheck className="w-4 h-4 text-white" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800">
+                          매주 {WEEKDAY_NAMES[msg.pendingRecurring.weekday]}요일 {msg.pendingRecurring.title}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {msg.pendingRecurring.startMonth}월 ~ {msg.pendingRecurring.endMonth}월 · 총 {msg.pendingRecurring.events.length}회
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex" style={{ borderTop: '1px solid rgba(168,85,247,0.15)' }}>
+                      <button onClick={() => dismissRecurring(msg.id)}
+                        className="flex-1 py-2.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-50 active:bg-slate-100">
+                        아니요
+                      </button>
+                      <div style={{ width: 1, background: 'rgba(168,85,247,0.15)' }} />
+                      <button
+                        onClick={() => confirmRecurring(msg.id, msg.pendingRecurring!.events, msg.pendingRecurring!.weekday, msg.pendingRecurring!.title)}
+                        className="flex-1 py-2.5 text-xs font-bold transition-colors hover:bg-purple-50 active:bg-purple-100"
+                        style={{ color: '#7c3aed' }}>
+                        저장하기 ✓
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 정기 일정 저장 완료 배지 */}
+                {msg.savedRecurring && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px]"
+                    style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.22)' }}>
+                    <CalendarCheck className="w-3 h-3 flex-none" style={{ color: '#a855f7' }} />
+                    <span className="font-semibold" style={{ color: '#7c3aed' }}>
+                      매주 {WEEKDAY_NAMES[msg.savedRecurring.weekday]}요일 {msg.savedRecurring.title} · {msg.savedRecurring.count}회 저장됨 ✓
                     </span>
                   </div>
                 )}

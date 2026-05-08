@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { getQuestionsForCards, type Question } from '@/data/onboardingQuestions'
+import { computeDiscomfortScore, TIER_CONFIG, SCORE_KEY, type DiscomfortResult } from '@/lib/discomfortScore'
 import { Bluetooth, CheckCircle2 } from 'lucide-react'
 
 const ANSWERS_KEY = 'ludia_answers_v1'
@@ -33,6 +34,7 @@ export default function QuestionsPage() {
   const [current, setCurrent]           = useState<Answer | null>(null)
   const [step, setStep]                 = useState<'questions' | 'done' | 'device' | 'bluetooth'>('questions')
   const [animating, setAnimating]       = useState(false)
+  const [scoreResult, setScoreResult]   = useState<DiscomfortResult | null>(null)
 
   useEffect(() => {
     if (!ready) return
@@ -51,7 +53,12 @@ export default function QuestionsPage() {
       setAnswers(newAnswers)
       setCurrent(null)
       if (idx + 1 >= questions.length) {
-        try { localStorage.setItem(ANSWERS_KEY, JSON.stringify(newAnswers)) } catch {}
+        const result = computeDiscomfortScore(newAnswers)
+        try {
+          localStorage.setItem(ANSWERS_KEY, JSON.stringify(newAnswers))
+          localStorage.setItem(SCORE_KEY, JSON.stringify(result))
+        } catch {}
+        setScoreResult(result)
         setStep('done')
       } else {
         setIdx(i => i + 1)
@@ -63,7 +70,7 @@ export default function QuestionsPage() {
   if (!ready || (step === 'questions' && questions.length === 0)) return null
 
   if (step === 'done') {
-    return <CompletionScreen userName={user!.name} onFinish={() => setStep('device')} />
+    return <CompletionScreen userName={user!.name} scoreResult={scoreResult} onFinish={() => setStep('device')} />
   }
 
   if (step === 'device') {
@@ -95,10 +102,8 @@ export default function QuestionsPage() {
         <div className="mb-5 px-4 py-3.5 rounded-2xl text-sm text-slate-600 leading-relaxed"
           style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(168,85,247,0.15)' }}>
           <p className="font-semibold text-purple-600 mb-1">반가워요, {user!.name}님!</p>
-          선택하신 카드들을 보니 평소에 어떤 부분을 소중히 관리하고 싶으신지 루디아가 잘 알 것 같아요.
-          더 정확한 <span className="font-semibold text-purple-600">'호르몬 지도'</span>를 그려드리기 위해,
-          루디아에게만 살짝 들려주실 이야기가 있나요?
-          <span className="block text-[11px] text-slate-400 mt-1">아는 만큼만 편하게 답해주세요 💜</span>
+          <span className="font-semibold text-purple-600"></span> 더 정확한 <span className="font-semibold text-purple-600">'호르몬 지도'</span>를 그려드리기 위해,
+          <span className="font-semibold text-purple-600">몇 가지 질문</span>을 드릴게요.
         </div>
       )}
 
@@ -272,12 +277,69 @@ function MultiSelectInput({ options, value, onChange }: {
 }
 
 /* ── 완료 화면 ──────────────────────────────────────────────── */
-function CompletionScreen({ userName, onFinish }: { userName: string; onFinish: () => void }) {
+function CompletionScreen({ userName, scoreResult, onFinish }: {
+  userName: string
+  scoreResult: DiscomfortResult | null
+  onFinish: () => void
+}) {
+  const [showWarning, setShowWarning] = useState(false)
+
+  useEffect(() => {
+    if (scoreResult?.tier === 'warning') {
+      const t = setTimeout(() => setShowWarning(true), 700)
+      return () => clearTimeout(t)
+    }
+  }, [scoreResult])
+
+  const tier = scoreResult ? TIER_CONFIG[scoreResult.tier] : null
+
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 text-center"
       style={{ background: 'linear-gradient(145deg, #fdf6f9, #fce9f0, #f8eeff)' }}>
-      <div className="space-y-6 max-w-sm">
+
+      {/* ── Warning 팝업 ── */}
+      {showWarning && scoreResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6"
+          style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(6px)' }}>
+          <div className="w-full max-w-sm rounded-3xl p-7 text-center space-y-5"
+            style={{ background: 'white', boxShadow: '0 20px 60px rgba(239,68,68,0.25)' }}>
+            <div className="text-5xl">⚠️</div>
+            <div>
+              <h3 className="text-xl font-bold mb-2" style={{ color: '#ef4444' }}>주의가 필요해요</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">{TIER_CONFIG.warning.message}</p>
+            </div>
+            <div className="px-4 py-3 rounded-2xl text-sm font-medium"
+              style={{
+                background: 'rgba(239,68,68,0.08)',
+                border: '1.5px solid rgba(239,68,68,0.2)',
+                color: '#ef4444',
+              }}>
+              불편 지수 <span className="text-lg font-bold">{scoreResult.total}점</span> / 100점
+            </div>
+            <button onClick={() => setShowWarning(false)}
+              className="w-full py-3.5 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
+              style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 4px 16px rgba(239,68,68,0.35)' }}>
+              확인했어요
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-6 max-w-sm w-full">
         <div className="text-6xl animate-bounce">🌸</div>
+
+        {/* ── 티어 배지 ── */}
+        {tier && scoreResult && (
+          <div className="px-5 py-4 rounded-2xl space-y-1.5 text-left"
+            style={{ background: tier.bg, border: `1.5px solid ${tier.color}40` }}>
+            <div className="text-sm font-bold" style={{ color: tier.color }}>{tier.label}</div>
+            <div className="text-xs text-slate-500">{tier.description}</div>
+            <div className="text-xs font-semibold text-slate-600 pt-0.5">
+              불편 지수 <span style={{ color: tier.color }}>{scoreResult.total}점</span> / 100점
+            </div>
+          </div>
+        )}
+
         <div>
           <h2 className="text-2xl font-semibold text-slate-800 mb-3">
             좋아요, {userName}님!
