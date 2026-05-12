@@ -1,22 +1,18 @@
 'use client'
 
 import { useMemo } from 'react'
-import { getCyclePhase, getPhaseColor } from '@/lib/cycle-utils'
+import { getPhaseColor } from '@/lib/cycle-utils'
 import { useOnboardingProfile, isHighConcern } from '@/lib/onboarding-profile'
 import { useAuth } from '@/hooks/useAuth'
+import { useCycleData } from '@/hooks/useCycleData'
 import type { CyclePhase } from '@/types/health'
-
-/* ── Cycle constants (must match dashboard) ───────────────────── */
-const MOCK_LAST_PERIOD = new Date(2026, 3, 8)
-const CYCLE_LENGTH = 28
-const PERIOD_LENGTH = 5
 
 /* ── 28-day normalized (0–100) hormone curves ─────────────────── */
 const E2 = [10,10,11,13,11,18,26,37,51,66,79,89,97,100,76,48,42,50,53,51,47,43,38,32,26,20,16,12]
 const P4 = [2,2,2,2,3,3,3,4,4,5,5,5,6,6,8,16,30,46,63,76,86,91,89,78,60,41,24,10]
 
-/* ── SVG helpers (viewBox 0 0 280 96) ─────────────────────────── */
-const CHART_H = 86   // data area bottom y
+/* ── SVG helpers (viewBox 0 0 270 92) ─────────────────────────── */
+const CHART_H = 86
 function yv(v: number) { return 4 + (100 - v) * 0.82 }
 
 function linePath(data: number[]) {
@@ -40,7 +36,7 @@ function areaPath(data: number[]) {
   return d
 }
 
-/* ── Phase bands (x-range in the 280-wide chart) ─────────────── */
+/* ── Phase bands ──────────────────────────────────────────────── */
 const BANDS = [
   { id: 'menstrual',  x: 0,   w: 50,  fill: 'rgba(217,79,92,0.13)',   label: '생리기' },
   { id: 'follicular', x: 50,  w: 70,  fill: 'rgba(61,139,86,0.10)',   label: '난포기' },
@@ -83,7 +79,7 @@ const META: Record<CyclePhase, {
   },
 }
 
-/* ── Personalized LUDIA advice ────────────────────────────────── */
+/* ── Personalized advice ──────────────────────────────────────── */
 type Answers = Record<string, string | string[] | number>
 
 function getAdvice(phase: CyclePhase, answers: Answers, careTypes: string[]) {
@@ -112,7 +108,6 @@ function getAdvice(phase: CyclePhase, answers: Answers, careTypes: string[]) {
   cautions.push(...base[phase].c)
   tips.push(...base[phase].t)
 
-  // personalize by care type & answers
   if ((careTypes.includes('period_pain') || careTypes.includes('healthy_cycle')) && phase === 'menstrual') {
     if (isHighConcern(answers['period_pain_level'])) {
       cautions.push('생리통이 심할 경우 진통제는 식후 복용을 권장해요')
@@ -143,17 +138,18 @@ function getAdvice(phase: CyclePhase, answers: Answers, careTypes: string[]) {
   return { cautions, tips }
 }
 
+/* ── Today date label ─────────────────────────────────────────── */
+function formatDate(d: Date) {
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`
+}
+
 /* ── Page component ───────────────────────────────────────────── */
 export default function CyclePage() {
   const { user } = useAuth()
   const profile = useOnboardingProfile()
+  const cycle = useCycleData(28, 5)
 
-  const today = useMemo(() => new Date(), [])
-  const cycleDay = useMemo(() => {
-    const diff = Math.floor((today.getTime() - MOCK_LAST_PERIOD.getTime()) / 86400000)
-    return (diff % CYCLE_LENGTH) + 1
-  }, [today])
-  const phase = useMemo(() => getCyclePhase(cycleDay, CYCLE_LENGTH, PERIOD_LENGTH), [cycleDay])
+  const { cycleDay, phase, daysUntilNextPeriod, daysUntilOvulation, hasRealData, lastPeriodStart } = cycle
   const meta = META[phase]
 
   // SVG chart values
@@ -161,6 +157,10 @@ export default function CyclePage() {
   const todayX  = dayIdx * 10
   const todayE2 = yv(E2[dayIdx])
   const todayP4 = yv(P4[dayIdx])
+
+  // Current E2/P4 percentages for the mini gauge
+  const e2Pct = E2[dayIdx]
+  const p4Pct = P4[dayIdx]
 
   const e2Line = useMemo(() => linePath(E2), [])
   const e2Area = useMemo(() => areaPath(E2), [])
@@ -171,6 +171,11 @@ export default function CyclePage() {
     () => getAdvice(phase, profile.answers, profile.careTypes),
     [phase, profile],
   )
+
+  const today = new Date()
+  const nextPeriodDate = lastPeriodStart
+    ? new Date(lastPeriodStart.getTime() + 28 * 86400000)
+    : null
 
   return (
     <div className="min-h-screen pb-28 px-4 pt-5 max-w-lg mx-auto"
@@ -185,15 +190,73 @@ export default function CyclePage() {
             {meta.emoji} D+{cycleDay}
           </span>
         </div>
-        <p className="text-xs text-slate-400">28일 주기 기준 · {user?.name ?? ''}님의 오늘</p>
+        <p className="text-xs text-slate-400">
+          {hasRealData
+            ? `마지막 생리 시작일 기준 · ${user?.name ?? ''}님의 오늘`
+            : `캘린더에 생리를 기록하면 정확한 주기가 표시돼요`}
+        </p>
+      </div>
+
+      {/* ── No data nudge ── */}
+      {!hasRealData && (
+        <div className="rounded-2xl px-4 py-3 mb-4 flex items-center gap-3"
+          style={{ background: 'rgba(244,63,117,0.07)', border: '1.5px dashed rgba(244,63,117,0.3)' }}>
+          <span className="text-xl">🩸</span>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            아직 생리 기록이 없어요. <b>캘린더</b>에서 생리 시작일을 기록하면
+            오늘의 호르몬 상태를 정확하게 알 수 있어요.
+          </p>
+        </div>
+      )}
+
+      {/* ── Countdown pills ── */}
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+          style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(244,63,117,0.18)', boxShadow: '0 2px 12px rgba(244,63,117,0.07)' }}>
+          <p className="text-[9px] font-bold text-rose-400 uppercase tracking-wide mb-1">다음 생리까지</p>
+          <p className="text-xl font-black text-slate-800 leading-none">{daysUntilNextPeriod}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">일 남음</p>
+          {nextPeriodDate && (
+            <p className="text-[9px] text-rose-400 font-semibold mt-1">{formatDate(nextPeriodDate)} 예정</p>
+          )}
+        </div>
+
+        {daysUntilOvulation !== null ? (
+          <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+            style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(112,72,192,0.18)', boxShadow: '0 2px 12px rgba(112,72,192,0.07)' }}>
+            <p className="text-[9px] font-bold text-purple-400 uppercase tracking-wide mb-1">배란일까지</p>
+            <p className="text-xl font-black text-slate-800 leading-none">{daysUntilOvulation}</p>
+            <p className="text-[9px] text-slate-400 mt-0.5">일 남음</p>
+            {lastPeriodStart && (
+              <p className="text-[9px] text-purple-400 font-semibold mt-1">
+                {formatDate(new Date(lastPeriodStart.getTime() + (28 - 14) * 86400000))} 예정
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+            style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(184,135,11,0.18)', boxShadow: '0 2px 12px rgba(184,135,11,0.07)' }}>
+            <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mb-1">현재 주기 위치</p>
+            <p className="text-xl font-black text-slate-800 leading-none">{cycleDay}</p>
+            <p className="text-[9px] text-slate-400 mt-0.5">/ 28일차</p>
+            <p className="text-[9px] text-amber-500 font-semibold mt-1">{meta.title}</p>
+          </div>
+        )}
+
+        <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+          style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(61,139,86,0.18)', boxShadow: '0 2px 12px rgba(61,139,86,0.07)' }}>
+          <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wide mb-1">오늘 날짜</p>
+          <p className="text-sm font-black text-slate-800 leading-none">{today.getMonth() + 1}/{today.getDate()}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">D+{cycleDay}</p>
+          <p className="text-[9px] text-emerald-500 font-semibold mt-1">{meta.emoji} {meta.title}</p>
+        </div>
       </div>
 
       {/* ── Hormone Chart ── */}
       <div className="rounded-3xl p-4 mb-4"
         style={{ background: 'rgba(255,255,255,0.92)', boxShadow: '0 6px 32px rgba(158,18,57,0.08)', border: '1px solid rgba(255,255,255,0.95)' }}>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">호르몬 변화 곡선 (28일)</p>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">호르몬 변화 곡선 (28일 주기)</p>
 
-        {/* Responsive SVG wrapper */}
         <div className="relative w-full" style={{ paddingBottom: '34%' }}>
           <svg
             viewBox="0 0 270 92"
@@ -226,10 +289,13 @@ export default function CyclePage() {
 
             {/* Today vertical marker */}
             <line x1={todayX} y1={0} x2={todayX} y2={CHART_H}
-              stroke="rgba(30,16,53,0.55)" strokeWidth="1" strokeDasharray="3,2" />
+              stroke={meta.color} strokeWidth="1.2" strokeDasharray="3,2" opacity="0.7" />
 
-            {/* Today dots */}
+            {/* Today dots with glow */}
+            <circle cx={todayX} cy={todayE2} r="4.5" fill={meta.color} opacity="0.15" />
             <circle cx={todayX} cy={todayE2} r="3.5" fill="#f43f75" stroke="white" strokeWidth="1.2" />
+
+            <circle cx={todayX} cy={todayP4} r="4.5" fill="#a855f7" opacity="0.15" />
             <circle cx={todayX} cy={todayP4} r="3.5" fill="#a855f7" stroke="white" strokeWidth="1.2" />
 
             {/* Day tick labels */}
@@ -238,32 +304,63 @@ export default function CyclePage() {
                 fontSize="5.5" fill="rgba(100,100,120,0.7)">{d}</text>
             ))}
 
-            {/* "오늘" label */}
-            {todayX > 10 && todayX < 260 && (
-              <text x={todayX} y={CHART_H + 6} textAnchor="middle"
-                fontSize="5.5" fill={meta.color} fontWeight="bold">오늘</text>
+            {/* "오늘" label above marker */}
+            {todayX > 10 && todayX < 255 && (
+              <>
+                <rect
+                  x={todayX - 8} y={0} width={16} height={8}
+                  rx="2" fill={meta.color} opacity="0.9"
+                />
+                <text x={todayX} y={6.5} textAnchor="middle"
+                  fontSize="4.5" fill="white" fontWeight="bold">오늘</text>
+              </>
             )}
           </svg>
         </div>
 
-        {/* Legend */}
-        <div className="flex items-center justify-center gap-5 mt-2">
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-            <span className="inline-block w-5 h-0.5 rounded" style={{ background: '#f43f75' }} />
-            에스트로겐 E2
-          </span>
-          <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
-            <span className="inline-block w-5 h-0.5 rounded" style={{ background: '#a855f7' }} />
-            프로게스테론 P4
-          </span>
+        {/* Live hormone level bars */}
+        <div className="mt-3 space-y-2">
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <span className="inline-block w-3 h-0.5 rounded" style={{ background: '#f43f75' }} />
+                에스트로겐 E2
+              </span>
+              <span className="text-[10px] font-bold text-rose-400">{meta.e2}</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(244,63,117,0.12)' }}>
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${e2Pct}%`, background: 'linear-gradient(90deg,#f43f75,#ff8fab)' }} />
+            </div>
+          </div>
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                <span className="inline-block w-3 h-0.5 rounded" style={{ background: '#a855f7' }} />
+                프로게스테론 P4
+              </span>
+              <span className="text-[10px] font-bold text-purple-400">{meta.p4}</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(168,85,247,0.12)' }}>
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${p4Pct}%`, background: 'linear-gradient(90deg,#a855f7,#c084fc)' }} />
+            </div>
+          </div>
         </div>
 
         {/* Phase label bar */}
         <div className="flex mt-3 rounded-xl overflow-hidden text-center">
           {BANDS.map(b => (
             <div key={b.id}
-              style={{ flex: b.w, background: b.fill, padding: '4px 0', color: getPhaseColor(b.id as CyclePhase) }}
-              className="text-[9px] font-bold leading-none">
+              style={{
+                flex: b.w,
+                background: b.id === phase ? (META[b.id as CyclePhase].color + '33') : b.fill,
+                padding: '4px 0',
+                color: getPhaseColor(b.id as CyclePhase),
+                fontWeight: b.id === phase ? '900' : '700',
+                borderBottom: b.id === phase ? `2px solid ${META[b.id as CyclePhase].color}` : '2px solid transparent',
+              }}
+              className="text-[9px] leading-none">
               {b.label}
             </div>
           ))}
@@ -277,7 +374,7 @@ export default function CyclePage() {
           <span className="text-3xl">{meta.emoji}</span>
           <div className="flex-1">
             <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: meta.color }}>
-              오늘 D+{cycleDay}일
+              오늘 D+{cycleDay}일 · {today.getMonth() + 1}월 {today.getDate()}일
             </p>
             <h2 className="text-base font-bold text-slate-800 mb-0.5">{meta.title}</h2>
             <p className="text-xs font-semibold mb-2" style={{ color: meta.color }}>{meta.subtitle}</p>
@@ -304,7 +401,6 @@ export default function CyclePage() {
       <div className="rounded-3xl p-5 mb-4"
         style={{ background: 'rgba(255,255,255,0.92)', boxShadow: '0 6px 32px rgba(158,18,57,0.08)', border: '1px solid rgba(255,255,255,0.95)' }}>
 
-        {/* Header */}
         <div className="flex items-center gap-2.5 mb-4">
           <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-none"
             style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)', boxShadow: '0 3px 12px rgba(244,63,117,0.3)' }}>
@@ -316,7 +412,6 @@ export default function CyclePage() {
           </div>
         </div>
 
-        {/* Cautions */}
         {cautions.length > 0 && (
           <div className="mb-4">
             <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-2">⚠ 오늘 조심하세요</p>
@@ -332,7 +427,6 @@ export default function CyclePage() {
           </div>
         )}
 
-        {/* Tips */}
         {tips.length > 0 && (
           <div>
             <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-2">✦ 루디아 추천</p>
