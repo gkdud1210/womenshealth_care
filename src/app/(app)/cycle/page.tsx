@@ -167,12 +167,22 @@ export default function CyclePage() {
   const p4Line = useMemo(() => linePath(P4), [])
   const p4Area = useMemo(() => areaPath(P4), [])
 
+  const tickLabels = useMemo(() => {
+    const TICK_DAYS = [1, 7, 14, 21, 28]
+    if (!lastPeriodStart) return TICK_DAYS.map(d => `D${d}`)
+    return TICK_DAYS.map(d => {
+      const date = new Date(lastPeriodStart.getTime() + (d - 1) * 86400000)
+      return `${date.getMonth() + 1}/${date.getDate()}`
+    })
+  }, [lastPeriodStart])
+
   const { cautions, tips } = useMemo(
     () => getAdvice(phase, profile.answers, profile.careTypes),
     [phase, profile],
   )
 
   const today = new Date()
+  const todayLabel = `${today.getMonth() + 1}/${today.getDate()}`
   const nextPeriodDate = lastPeriodStart
     ? new Date(lastPeriodStart.getTime() + 28 * 86400000)
     : null
@@ -287,34 +297,45 @@ export default function CyclePage() {
             <line x1={0} y1={CHART_H} x2={270} y2={CHART_H}
               stroke="rgba(200,200,220,0.5)" strokeWidth="0.5" />
 
-            {/* Today vertical marker */}
-            <line x1={todayX} y1={0} x2={todayX} y2={CHART_H}
-              stroke={meta.color} strokeWidth="1.2" strokeDasharray="3,2" opacity="0.7" />
+            {/* ── TODAY MARKER ── */}
+            {/* Column glow */}
+            <rect x={todayX - 6} y={0} width={12} height={CHART_H}
+              fill={meta.color} opacity="0.08" rx="1" />
 
-            {/* Today dots with glow */}
-            <circle cx={todayX} cy={todayE2} r="4.5" fill={meta.color} opacity="0.15" />
-            <circle cx={todayX} cy={todayE2} r="3.5" fill="#f43f75" stroke="white" strokeWidth="1.2" />
+            {/* Solid vertical line */}
+            <line x1={todayX} y1={9} x2={todayX} y2={CHART_H}
+              stroke={meta.color} strokeWidth="2" opacity="0.9" />
 
-            <circle cx={todayX} cy={todayP4} r="4.5" fill="#a855f7" opacity="0.15" />
-            <circle cx={todayX} cy={todayP4} r="3.5" fill="#a855f7" stroke="white" strokeWidth="1.2" />
+            {/* E2 dot — pulsing ring */}
+            <circle cx={todayX} cy={todayE2} r="3.5" fill="#f43f75" opacity="0.5">
+              <animate attributeName="r" values="3.5;10;3.5" dur="2s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.45;0;0.45" dur="2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx={todayX} cy={todayE2} r="4" fill="#f43f75" stroke="white" strokeWidth="1.6" />
+
+            {/* P4 dot — pulsing ring (offset) */}
+            <circle cx={todayX} cy={todayP4} r="3.5" fill="#a855f7" opacity="0.5">
+              <animate attributeName="r" values="3.5;10;3.5" dur="2s" begin="0.6s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.45;0;0.45" dur="2s" begin="0.6s" repeatCount="indefinite" />
+            </circle>
+            <circle cx={todayX} cy={todayP4} r="4" fill="#a855f7" stroke="white" strokeWidth="1.6" />
 
             {/* Day tick labels */}
-            {[1, 7, 14, 21, 28].map(d => (
+            {[1, 7, 14, 21, 28].map((d, i) => (
               <text key={d} x={(d-1)*10} y={CHART_H + 6} textAnchor="middle"
-                fontSize="5.5" fill="rgba(100,100,120,0.7)">{d}</text>
+                fontSize="5.5" fill="rgba(100,100,120,0.7)">{tickLabels[i]}</text>
             ))}
 
-            {/* "오늘" label above marker */}
-            {todayX > 10 && todayX < 255 && (
-              <>
-                <rect
-                  x={todayX - 8} y={0} width={16} height={8}
-                  rx="2" fill={meta.color} opacity="0.9"
-                />
-                <text x={todayX} y={6.5} textAnchor="middle"
-                  fontSize="4.5" fill="white" fontWeight="bold">오늘</text>
-              </>
-            )}
+            {/* Date label bubble */}
+            <rect
+              x={Math.min(Math.max(todayX - 13, 0), 244)} y={0}
+              width={26} height={10} rx="3"
+              fill={meta.color} opacity="1"
+            />
+            <text
+              x={Math.min(Math.max(todayX, 13), 257)} y={7.5}
+              textAnchor="middle" fontSize="5.2" fill="white" fontWeight="bold"
+            >{todayLabel}</text>
           </svg>
         </div>
 
