@@ -488,14 +488,17 @@ export function HealthCalendar({
                   : undefined,
           }}>
           <span className={cn(
-            'text-xs sm:text-sm font-semibold leading-none mt-0.5 z-10',
+            'text-xs sm:text-sm font-bold leading-none mt-0.5 z-10',
             isNow
-              ? 'w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px] sm:text-xs font-bold'
+              ? 'w-6 h-6 sm:w-7 sm:h-7 rounded-full text-white flex items-center justify-center text-[11px] sm:text-xs font-black'
               : isDue  ? 'text-amber-600 font-bold'
-                : dow === 0 ? 'text-rose-700'
-                  : dow === 6 ? 'text-blue-600'
-                    : 'text-slate-700'
-          )}>
+                : dow === 0 ? 'text-rose-600'
+                  : dow === 6 ? 'text-blue-500'
+                    : isSel ? 'text-slate-800 font-black'
+                      : 'text-slate-700'
+          )}
+          style={isNow ? { background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 2px 8px rgba(244,63,117,0.45)' } : undefined}
+          >
             {format(day, 'd')}
           </span>
           {isPredictedStart && <span className="text-[7px] font-semibold text-rose-400 leading-none">예상시작</span>}
@@ -508,39 +511,28 @@ export function HealthCalendar({
           )}
           {log && (
             <>
-              <div className="flex items-center gap-0.5 z-10">
-                {log.isPeriod && (
-                  <span className="text-[10px] leading-none">
-                    {log.periodFlow === 'heavy' || log.periodFlow === 'very_heavy' ? '💧💧💧'
-                      : log.periodFlow === 'medium' ? '💧💧'
-                      : '💧'}
-                  </span>
-                )}
-                {log.mood && (
-                  <span className="text-[11px] leading-none">
-                    {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
-                  </span>
-                )}
-              </div>
-              {(log.hrv != null || log.bmi != null) && (
-                <div className="flex flex-col items-center gap-0.5 z-10 w-full">
-                  {log.hrv != null && (
-                    <span
-                      onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}
-                      className="leading-none px-1 rounded cursor-pointer"
-                      style={{ fontSize: '8px', color: '#3b82f6', background: 'rgba(59,130,246,0.1)' }}>
-                      ♥{log.hrv}ms
-                    </span>
-                  )}
-                  {log.bmi != null && (
-                    <span
-                      onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}
-                      className="leading-none px-1 rounded cursor-pointer"
-                      style={{ fontSize: '8px', color: '#10b981', background: 'rgba(16,185,129,0.1)' }}>
-                      ⚖{log.bmi.toFixed(1)}
-                    </span>
-                  )}
-                </div>
+              {/* 기분 이모지 */}
+              {log.mood && (
+                <span className="text-[13px] leading-none z-10">
+                  {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
+                </span>
+              )}
+              {/* 생리 물방울 — 기분 없을 때만 */}
+              {log.isPeriod && !log.mood && (
+                <span className="text-[10px] leading-none z-10">
+                  {log.periodFlow === 'heavy' || log.periodFlow === 'very_heavy' ? '💧💧'
+                    : log.periodFlow === 'medium' ? '💧💧'
+                    : '💧'}
+                </span>
+              )}
+              {/* HRV 작은 뱃지 */}
+              {log.hrv != null && (
+                <span
+                  onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}
+                  className="leading-none px-1 py-0.5 rounded-md cursor-pointer z-10"
+                  style={{ fontSize: '7px', color: '#3b82f6', background: 'rgba(59,130,246,0.12)' }}>
+                  ♥{log.hrv}
+                </span>
               )}
             </>
           )}
@@ -582,22 +574,30 @@ export function HealthCalendar({
       <div className="glass-card p-3 sm:p-4 lg:p-5">
 
         {/* ── Month nav ── */}
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="font-display text-lg sm:text-2xl font-semibold text-slate-800">
-            {format(currentMonth, 'yyyy년 M월', { locale: ko })}
-          </h2>
-          <div className="flex gap-1">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">
+              {format(currentMonth, 'M월', { locale: ko })}
+              <span className="text-slate-400 font-medium text-base sm:text-lg ml-1.5">
+                {format(currentMonth, 'yyyy', { locale: ko })}
+              </span>
+            </h2>
+          </div>
+          <div className="flex items-center gap-1.5">
             <button onClick={() => navigateMonth('prev')}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
-              <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
+              className="w-8 h-8 rounded-2xl flex items-center justify-center transition-all active:scale-90"
+              style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.15)' }}>
+              <ChevronLeft className="w-4 h-4 text-rose-500" />
             </button>
             <button onClick={navigateToToday}
-              className="px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-xs font-medium text-rose-500 transition-colors">
+              className="px-3 py-1.5 rounded-2xl text-xs font-bold transition-all active:scale-95"
+              style={{ background: 'rgba(244,63,117,0.08)', color: '#f43f75', border: '1px solid rgba(244,63,117,0.15)' }}>
               오늘
             </button>
             <button onClick={() => navigateMonth('next')}
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-50 hover:bg-rose-100 flex items-center justify-center transition-colors">
-              <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
+              className="w-8 h-8 rounded-2xl flex items-center justify-center transition-all active:scale-90"
+              style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.15)' }}>
+              <ChevronRight className="w-4 h-4 text-rose-500" />
             </button>
           </div>
         </div>
@@ -708,17 +708,22 @@ export function HealthCalendar({
 
         {/* ── Phase legend ── */}
         {modeData.mode === 'normal' && (
-          <div className="mt-2 pt-2 border-t border-slate-100 flex flex-wrap gap-x-2 gap-y-1">
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap gap-1.5 items-center">
             {(['menstrual','follicular','ovulation','luteal'] as CyclePhase[]).map(p => (
-              <div key={p} className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm border border-slate-200"
-                  style={{ background: getPhaseCellBg(p) }} />
-                <span className="text-[10px] text-slate-400">{getPhaseLabel(p)}</span>
+              <div key={p}
+                className="flex items-center gap-1 px-2 py-1 rounded-full"
+                style={{ background: getPhaseCellBg(p), border: `1px solid ${getPhaseColor(p)}22` }}>
+                <div className="w-1.5 h-1.5 rounded-full flex-none"
+                  style={{ background: getPhaseColor(p) }} />
+                <span className="text-[10px] font-medium" style={{ color: getPhaseColor(p) }}>
+                  {getPhaseLabel(p)}
+                </span>
               </div>
             ))}
-            <div className="flex items-center gap-1 ml-auto">
-              <Droplets className="w-2.5 h-2.5 text-rose-300" />
-              <span className="text-[10px] text-slate-400">생리일</span>
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full ml-auto"
+              style={{ background: 'rgba(244,63,117,0.06)', border: '1px solid rgba(244,63,117,0.15)' }}>
+              <Droplets className="w-2.5 h-2.5 text-rose-400" />
+              <span className="text-[10px] font-medium text-rose-400">생리일</span>
             </div>
           </div>
         )}

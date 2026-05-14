@@ -1,16 +1,22 @@
 'use client'
 
-import { useCallback, useState, useRef, useEffect } from 'react'
+import { useCallback, useState, useRef, useEffect, useMemo } from 'react'
 import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
 import { CYCLE_MODES, CYCLE_MODE_MAP } from '@/data/cycleModes'
+import { getCyclePhase, getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
 import type { DailyLogFormData, CycleMode } from '@/types/health'
 import { cn } from '@/lib/utils'
 
-const CYCLE_LENGTH  = 28
-const PERIOD_LENGTH = 5
+const CYCLE_LENGTH    = 28
+const PERIOD_LENGTH   = 5
+const MOCK_LAST_PERIOD = new Date(2026, 3, 8)
+
+function computeCycleDay(from: Date, to: Date, len: number) {
+  return (Math.floor((to.getTime() - from.getTime()) / 86400000) % len) + 1
+}
 
 export default function CalendarPage() {
   const { user, saveUser } = useAuth()
@@ -18,6 +24,19 @@ export default function CalendarPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [pendingMode, setPendingMode] = useState<CycleMode | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
+
+  const today    = useMemo(() => new Date(), [])
+  const cycleDay = useMemo(() => computeCycleDay(MOCK_LAST_PERIOD, today, CYCLE_LENGTH), [today])
+  const phase    = useMemo(() => getCyclePhase(cycleDay, CYCLE_LENGTH, PERIOD_LENGTH), [cycleDay])
+  const daysLeft = CYCLE_LENGTH - cycleDay
+  const phaseColor = getPhaseColor(phase)
+
+  const PHASE_INFO: Record<string, { emoji: string; desc: string }> = {
+    menstrual:  { emoji: '🩸', desc: '따뜻하게 쉬는 날' },
+    follicular: { emoji: '🌱', desc: '에너지가 올라오는 시기' },
+    ovulation:  { emoji: '✨', desc: '활력이 넘치는 시기' },
+    luteal:     { emoji: '🌙', desc: 'PMS 관리가 중요한 시기' },
+  }
 
   const currentModeId = (user?.cycleMode ?? 'normal') as CycleMode
   const currentMode = CYCLE_MODE_MAP[currentModeId]
@@ -157,6 +176,60 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+
+      {/* ── Cycle summary card ── */}
+      {(user?.cycleMode ?? 'normal') === 'normal' && (
+        <div className="mb-4 rounded-3xl overflow-hidden"
+          style={{
+            background: 'rgba(255,255,255,0.92)',
+            border: `1px solid ${phaseColor}22`,
+            boxShadow: `0 4px 20px ${phaseColor}10`,
+          }}>
+          <div className="px-4 py-3 flex items-center gap-3"
+            style={{ background: `linear-gradient(135deg, ${phaseColor}10, ${phaseColor}05)` }}>
+
+            {/* Phase emoji + label */}
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-none text-2xl"
+              style={{ background: `${phaseColor}18`, border: `1.5px solid ${phaseColor}28` }}>
+              {PHASE_INFO[phase]?.emoji}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="text-sm font-bold text-slate-800">{getPhaseLabel(phase)}</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                  style={{ background: phaseColor }}>
+                  D+{cycleDay}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">{PHASE_INFO[phase]?.desc}</p>
+            </div>
+
+            {/* Days until next period */}
+            <div className="flex-none text-center px-3 py-2 rounded-2xl"
+              style={{ background: `${phaseColor}10`, border: `1px solid ${phaseColor}20` }}>
+              <p className="text-xl font-black leading-none" style={{ color: phaseColor }}>{daysLeft}</p>
+              <p className="text-[9px] text-slate-400 mt-0.5 whitespace-nowrap">다음 생리까지</p>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="px-4 py-2">
+            <div className="flex justify-between text-[9px] text-slate-400 mb-1">
+              <span>생리 시작</span>
+              <span>D+{cycleDay} / {CYCLE_LENGTH}일</span>
+              <span>다음 생리</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(200,200,220,0.3)' }}>
+              <div className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${(cycleDay / CYCLE_LENGTH) * 100}%`,
+                  background: `linear-gradient(90deg, #f43f75, ${phaseColor})`,
+                }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Calendar ── */}
       <HealthCalendar
