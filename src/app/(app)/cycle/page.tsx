@@ -231,20 +231,8 @@ export default function CyclePage() {
   const { cycleDay, phase, daysUntilNextPeriod, daysUntilOvulation, hasRealData, lastPeriodStart } = cycle
   const meta = META[phase]
 
-  if (isPregnancy) {
-    return <PregnancyCyclePage gestWeek={gestWeek} pregnancyLMP={pregnancyLMP} userName={user?.name ?? '님'} />
-  }
-
-  // SVG chart values
+  // All hooks must be called before any early return
   const dayIdx  = Math.min(cycleDay - 1, 27)
-  const todayX  = dayIdx * 10
-  const todayE2 = yv(E2[dayIdx])
-  const todayP4 = yv(P4[dayIdx])
-
-  // Current E2/P4 percentages for the mini gauge
-  const e2Pct = E2[dayIdx]
-  const p4Pct = P4[dayIdx]
-
   const e2Line = useMemo(() => linePath(E2), [])
   const e2Area = useMemo(() => areaPath(E2), [])
   const p4Line = useMemo(() => linePath(P4), [])
@@ -263,6 +251,17 @@ export default function CyclePage() {
     () => getAdvice(phase, profile.answers, profile.careTypes),
     [phase, profile],
   )
+
+  if (isPregnancy) {
+    return <PregnancyCyclePage gestWeek={gestWeek} pregnancyLMP={pregnancyLMP} userName={user?.name ?? '님'} />
+  }
+
+  // SVG chart values (normal mode only)
+  const todayX  = dayIdx * 10
+  const todayE2 = yv(E2[dayIdx])
+  const todayP4 = yv(P4[dayIdx])
+  const e2Pct = E2[dayIdx]
+  const p4Pct = P4[dayIdx]
 
   const today = new Date()
   const todayLabel = `${today.getMonth() + 1}/${today.getDate()}`
