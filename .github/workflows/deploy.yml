@@ -32,10 +32,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
-        env:
-          npm_config_platform: linux
-          npm_config_arch: x64
+        run: |
+          rm -f package-lock.json
+          npm install
 
       - name: Build (static export)
         run: npm run build
