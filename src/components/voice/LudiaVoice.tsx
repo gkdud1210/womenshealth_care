@@ -309,11 +309,11 @@ const SUGGESTION_BANK = [
   '호르몬이 불균형한 것 같아', '배란일은 언제야?', '에스트로겐이 뭐야?',
 ]
 
-function pickSuggestions(exclude: Set<string>): string[] {
+function pickSuggestions(exclude: Set<string>, count: number): string[] {
   let pool = SUGGESTION_BANK.filter(s => !exclude.has(s))
-  if (pool.length < 3) pool = [...SUGGESTION_BANK]
+  if (pool.length < count) pool = [...SUGGESTION_BANK]
   const shuffled = pool.slice().sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, 3)
+  return shuffled.slice(0, count)
 }
 
 const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
@@ -336,7 +336,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   const [interim, setInterim]                 = useState('')
   const [inputText, setInputText]             = useState('')
   const [recurringPending, setRecurringPending] = useState<RecurringPending | null>(null)
-  const [suggestions, setSuggestions]         = useState<string[]>(() => pickSuggestions(new Set()))
+  const [suggestions, setSuggestions]         = useState<string[]>(() => pickSuggestions(new Set(), 10))
 
   const vsRef          = useRef<VoiceState>('idle')
   const recogRef       = useRef<any>(null)
@@ -368,7 +368,9 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   useEffect(() => {
     const last = messages[messages.length - 1]
     if (!last || last.role !== 'ludia') return
-    const next = pickSuggestions(usedSugRef.current)
+    const isFirst = messages.filter(m => m.role === 'ludia').length <= 1
+    const count = isFirst ? 10 : 6
+    const next = pickSuggestions(usedSugRef.current, count)
     next.forEach(s => usedSugRef.current.add(s))
     if (usedSugRef.current.size > SUGGESTION_BANK.length * 0.7) usedSugRef.current.clear()
     setSuggestions(next)
@@ -775,7 +777,10 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
 
           {/* ── 제안 칩 — 항상 표시, LUDIA 답변 후 자동 교체 ── */}
           {vs !== 'thinking' && vs !== 'listening' && (
-            <div className="flex gap-2 overflow-x-auto mb-2 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+            <div
+              className={suggestions.length >= 8 ? 'flex flex-wrap gap-1.5 mb-2' : 'flex gap-2 overflow-x-auto mb-2 pb-0.5'}
+              style={{ scrollbarWidth: 'none' }}
+            >
               {suggestions.map(s => (
                 <button
                   key={s}
