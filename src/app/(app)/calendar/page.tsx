@@ -23,6 +23,9 @@ export default function CalendarPage() {
   const { logs, setLogs, clearLogs } = usePersistedLogs()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [pendingMode, setPendingMode] = useState<CycleMode | null>(null)
+  const [lmpDate,       setLmpDate]       = useState('')
+  const [eddDate,       setEddDate]       = useState('')
+  const [dateInputMode, setDateInputMode] = useState<'lmp' | 'edd'>('lmp')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const today    = useMemo(() => new Date(), [])
@@ -71,13 +74,45 @@ export default function CalendarPage() {
 
   function selectMode(id: CycleMode) {
     if (id === currentModeId) { setDropdownOpen(false); return }
+    setLmpDate(''); setEddDate(''); setDateInputMode('lmp')
     setPendingMode(id)
     setDropdownOpen(false)
+  }
+
+  function handleLmpChange(val: string) {
+    setLmpDate(val)
+    if (val) {
+      const edd = new Date(val + 'T00:00:00')
+      edd.setDate(edd.getDate() + 280)
+      setEddDate(edd.toISOString().split('T')[0])
+    } else { setEddDate('') }
+  }
+
+  function handleEddChange(val: string) {
+    setEddDate(val)
+    if (val) {
+      const lmp = new Date(val + 'T00:00:00')
+      lmp.setDate(lmp.getDate() - 280)
+      setLmpDate(lmp.toISOString().split('T')[0])
+    } else { setLmpDate('') }
   }
 
   function confirmMode() {
     if (!pendingMode) return
     saveUser({ ...user!, cycleMode: pendingMode })
+    // Sync pregnancy dates into HealthCalendar's localStorage slot
+    if (pendingMode === 'pregnancy') {
+      try {
+        const stored = localStorage.getItem('ludia_cycle_mode_v1')
+        const prev = stored ? JSON.parse(stored) : {}
+        localStorage.setItem('ludia_cycle_mode_v1', JSON.stringify({
+          ...prev,
+          mode: 'pregnancy',
+          pregnancyLMP: lmpDate || undefined,
+          pregnancyEDD: eddDate || undefined,
+        }))
+      } catch {}
+    }
     setPendingMode(null)
   }
 
@@ -265,6 +300,53 @@ export default function CalendarPage() {
                   {m.label}으로 변경할까요?
                 </h2>
                 <p className="text-[13px] text-slate-500 leading-relaxed">{m.desc}</p>
+
+                {/* ── Pregnancy date inputs ── */}
+                {pendingMode === 'pregnancy' && (
+                  <div className="mt-4 space-y-2.5">
+                    {/* Tab toggle */}
+                    <div className="flex rounded-xl overflow-hidden" style={{ border: '1.5px solid rgba(16,185,129,0.3)' }}>
+                      {(['lmp', 'edd'] as const).map(tab => (
+                        <button key={tab}
+                          onClick={() => setDateInputMode(tab)}
+                          className="flex-1 py-2 text-xs font-semibold transition-all"
+                          style={dateInputMode === tab
+                            ? { background: '#10b981', color: '#fff' }
+                            : { background: 'rgba(16,185,129,0.06)', color: '#64748b' }
+                          }>
+                          {tab === 'lmp' ? '마지막 생리일' : '출산 예정일'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {dateInputMode === 'lmp' ? (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1.5">마지막 생리 시작일</label>
+                        <input type="date" value={lmpDate} onChange={e => handleLmpChange(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none"
+                          style={{ background: 'rgba(16,185,129,0.06)', border: '1.5px solid rgba(16,185,129,0.3)' }} />
+                        {eddDate && (
+                          <p className="text-[11px] mt-1.5 font-semibold text-emerald-600">
+                            출산 예정일: {new Date(eddDate + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 mb-1.5">출산 예정일</label>
+                        <input type="date" value={eddDate} onChange={e => handleEddChange(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none"
+                          style={{ background: 'rgba(16,185,129,0.06)', border: '1.5px solid rgba(16,185,129,0.3)' }} />
+                        {lmpDate && (
+                          <p className="text-[11px] mt-1.5 font-semibold text-emerald-600">
+                            마지막 생리일: {new Date(lmpDate + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-slate-400">※ 입력하지 않아도 나중에 설정할 수 있어요</p>
+                  </div>
+                )}
               </div>
               <div className="px-5 pb-5 flex gap-2">
                 <button onClick={() => setPendingMode(null)}
