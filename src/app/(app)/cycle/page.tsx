@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { getPhaseColor } from '@/lib/cycle-utils'
 import { useOnboardingProfile, isHighConcern } from '@/lib/onboarding-profile'
 import { useAuth } from '@/hooks/useAuth'
@@ -10,6 +10,66 @@ import type { CyclePhase } from '@/types/health'
 /* ── 28-day normalized (0–100) hormone curves ─────────────────── */
 const E2 = [10,10,11,13,11,18,26,37,51,66,79,89,97,100,76,48,42,50,53,51,47,43,38,32,26,20,16,12]
 const P4 = [2,2,2,2,3,3,3,4,4,5,5,5,6,6,8,16,30,46,63,76,86,91,89,78,60,41,24,10]
+
+/* ── 40-week pregnancy hormone curves (normalized 0–100) ────────
+   P_HCG : hCG (인간 융모성 생식선 자극 호르몬) — peaks ~week 8, then drops
+   P_E2  : Estrogens (에스트로겐) — gradually rises through week 40
+   P_P4  : Progesterone (프로게스테론) — rises and plateaus ~week 36
+   ─────────────────────────────────────────────────────────────── */
+const P_HCG = [0,2,8,20,45,72,90,100,98,85,65,45,28,18,14,12,11,11,11,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,10]
+const P_E2  = [0,1,2,3,4,5,6,7,8,9,10,11,13,15,17,19,22,26,30,35,40,46,52,58,64,70,75,80,84,87,90,92,94,96,97,98,99,100,100,100,100]
+const P_P4  = [0,2,5,9,13,17,21,26,30,34,38,42,46,49,53,57,61,65,68,71,74,77,80,82,84,86,88,90,91,93,94,96,97,98,99,100,99,96,90,84,78]
+
+/* ── Pregnancy SVG helpers (41 points, width=270) ─────────────── */
+const PREG_W = 270
+function pregX(i: number) { return (i / 40) * PREG_W }
+
+function pregLinePath(data: number[]) {
+  let d = `M ${pregX(0)},${yv(data[0])}`
+  for (let i = 1; i < data.length; i++) {
+    const cpx = (pregX(i - 1) + pregX(i)) / 2
+    d += ` C ${cpx},${yv(data[i-1])} ${cpx},${yv(data[i])} ${pregX(i)},${yv(data[i])}`
+  }
+  return d
+}
+function pregAreaPath(data: number[]) {
+  let d = `M ${pregX(0)},${CHART_H} L ${pregX(0)},${yv(data[0])}`
+  for (let i = 1; i < data.length; i++) {
+    const cpx = (pregX(i - 1) + pregX(i)) / 2
+    d += ` C ${cpx},${yv(data[i-1])} ${cpx},${yv(data[i])} ${pregX(i)},${yv(data[i])}`
+  }
+  d += ` L ${pregX(40)},${CHART_H} Z`
+  return d
+}
+
+/* ── Pregnancy trimester reference data ──────────────────────── */
+interface TrimesterRef {
+  label: string; emoji: string; weeks: string
+  hcg: string; e2: string; p4: string
+  color: string; bg: string; border: string
+}
+const TRIMESTER_REF: TrimesterRef[] = [
+  {
+    label: '1삼분기', emoji: '🌱', weeks: '1–12주',
+    hcg: '1,000–200,000 mIU/mL', e2: '500–7,000 pg/mL', p4: '11–44 ng/mL',
+    color: '#10b981', bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.25)',
+  },
+  {
+    label: '2삼분기', emoji: '🌿', weeks: '13–27주',
+    hcg: '6,000–70,000 mIU/mL', e2: '2,000–12,000 pg/mL', p4: '25–90 ng/mL',
+    color: '#34d399', bg: 'rgba(52,211,153,0.08)', border: 'rgba(52,211,153,0.25)',
+  },
+  {
+    label: '3삼분기', emoji: '🍃', weeks: '28–40주',
+    hcg: '3,000–15,000 mIU/mL', e2: '6,000–30,000 pg/mL', p4: '65–290 ng/mL',
+    color: '#059669', bg: 'rgba(5,150,105,0.08)', border: 'rgba(5,150,105,0.25)',
+  },
+]
+function getTrimester(w: number): TrimesterRef {
+  if (w <= 12) return TRIMESTER_REF[0]
+  if (w <= 27) return TRIMESTER_REF[1]
+  return TRIMESTER_REF[2]
+}
 
 /* ── SVG helpers (viewBox 0 0 270 92) ─────────────────────────── */
 const CHART_H = 86
@@ -149,8 +209,31 @@ export default function CyclePage() {
   const profile = useOnboardingProfile()
   const cycle = useCycleData(28, 5)
 
+  // Pregnancy mode detection
+  const isPregnancy = (user?.cycleMode ?? 'normal') === 'pregnancy'
+  const [pregnancyLMP, setPregnancyLMP] = useState<string | null>(null)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ludia_cycle_mode_v1')
+      if (saved) {
+        const p = JSON.parse(saved)
+        if (p.mode === 'pregnancy' && p.pregnancyLMP) setPregnancyLMP(p.pregnancyLMP)
+      }
+    } catch {}
+  }, [isPregnancy])
+
+  const gestWeek = useMemo(() => {
+    if (!pregnancyLMP) return 0
+    const diff = Math.floor((Date.now() - new Date(pregnancyLMP + 'T00:00:00').getTime()) / 86400000)
+    return Math.max(0, Math.min(40, Math.floor(diff / 7)))
+  }, [pregnancyLMP])
+
   const { cycleDay, phase, daysUntilNextPeriod, daysUntilOvulation, hasRealData, lastPeriodStart } = cycle
   const meta = META[phase]
+
+  if (isPregnancy) {
+    return <PregnancyCyclePage gestWeek={gestWeek} pregnancyLMP={pregnancyLMP} userName={user?.name ?? '님'} />
+  }
 
   // SVG chart values
   const dayIdx  = Math.min(cycleDay - 1, 27)
@@ -497,6 +580,309 @@ export default function CyclePage() {
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
           수치는 일반적인 28일 주기 평균값이며 개인차가 있습니다.<br />
+          정확한 호르몬 수치는 혈액 검사로만 확인 가능해요.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   임신 호르몬 사이클 페이지
+   ══════════════════════════════════════════════════════════════════ */
+function PregnancyCyclePage({
+  gestWeek, pregnancyLMP, userName,
+}: { gestWeek: number; pregnancyLMP: string | null; userName: string }) {
+  const trimester = getTrimester(gestWeek)
+  const dueDate = pregnancyLMP
+    ? new Date(new Date(pregnancyLMP + 'T00:00:00').getTime() + 280 * 86400000)
+    : null
+  const daysLeft = dueDate
+    ? Math.max(0, Math.ceil((dueDate.getTime() - Date.now()) / 86400000))
+    : null
+
+  // SVG x position of current week
+  const todayX = pregX(Math.min(gestWeek, 40))
+
+  const hcgLine  = useMemo(() => pregLinePath(P_HCG), [])
+  const e2Line   = useMemo(() => pregLinePath(P_E2), [])
+  const p4Line   = useMemo(() => pregLinePath(P_P4), [])
+  const hcgArea  = useMemo(() => pregAreaPath(P_HCG), [])
+  const e2Area   = useMemo(() => pregAreaPath(P_E2), [])
+  const p4Area   = useMemo(() => pregAreaPath(P_P4), [])
+
+  const todayHCG = yv(P_HCG[Math.min(gestWeek, 40)])
+  const todayE2  = yv(P_E2 [Math.min(gestWeek, 40)])
+  const todayP4  = yv(P_P4 [Math.min(gestWeek, 40)])
+
+  const TICK_WEEKS = [0, 4, 8, 12, 16, 20, 24, 28, 32, 36, 40]
+
+  return (
+    <div className="min-h-screen pb-28 px-4 pt-5 max-w-lg mx-auto"
+      style={{ background: 'linear-gradient(160deg,#f0fdf4 0%,#dcfce7 45%,#d1fae5 100%)' }}>
+
+      {/* ── Header ── */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-0.5">
+          <h1 className="text-xl font-bold text-slate-800">임신 호르몬 변화</h1>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+            style={{ background: trimester.bg, color: trimester.color, border: `1px solid ${trimester.border}` }}>
+            {trimester.emoji} {gestWeek}주차
+          </span>
+        </div>
+        <p className="text-xs text-slate-400">
+          {pregnancyLMP ? `마지막 생리일 기준 · ${userName}님의 임신 {gestWeek}주` : '캘린더에서 마지막 생리일을 입력하면 정확한 주수가 표시돼요'}
+        </p>
+      </div>
+
+      {/* ── No LMP nudge ── */}
+      {!pregnancyLMP && (
+        <div className="rounded-2xl px-4 py-3 mb-4 flex items-center gap-3"
+          style={{ background: 'rgba(16,185,129,0.08)', border: '1.5px dashed rgba(16,185,129,0.4)' }}>
+          <span className="text-xl">🌿</span>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            <b>캘린더</b>에서 임신/출산 모드로 변경 후 마지막 생리일이나 출산 예정일을 입력하면
+            현재 주수와 정확한 호르몬 변화를 확인할 수 있어요.
+          </p>
+        </div>
+      )}
+
+      {/* ── Countdown pills ── */}
+      <div className="flex gap-2 mb-4">
+        <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+          style={{ background: 'rgba(255,255,255,0.92)', border: `1px solid ${trimester.border}`, boxShadow: '0 2px 12px rgba(16,185,129,0.1)' }}>
+          <p className="text-[9px] font-bold uppercase tracking-wide mb-1" style={{ color: trimester.color }}>현재 주수</p>
+          <p className="text-xl font-black text-slate-800 leading-none">{gestWeek}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">주차</p>
+          <p className="text-[9px] font-semibold mt-1" style={{ color: trimester.color }}>{trimester.label}</p>
+        </div>
+
+        <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+          style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(16,185,129,0.2)', boxShadow: '0 2px 12px rgba(16,185,129,0.07)' }}>
+          <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-wide mb-1">삼분기</p>
+          <p className="text-lg font-black text-slate-800 leading-none">{trimester.emoji}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">{trimester.weeks}</p>
+          <p className="text-[9px] font-semibold text-emerald-500 mt-1">{trimester.label}</p>
+        </div>
+
+        <div className="flex-1 rounded-2xl px-3 py-3 text-center"
+          style={{ background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(245,158,11,0.25)', boxShadow: '0 2px 12px rgba(245,158,11,0.07)' }}>
+          <p className="text-[9px] font-bold text-amber-500 uppercase tracking-wide mb-1">출산까지</p>
+          <p className="text-xl font-black text-slate-800 leading-none">{daysLeft ?? '—'}</p>
+          <p className="text-[9px] text-slate-400 mt-0.5">일 남음</p>
+          {dueDate && (
+            <p className="text-[9px] text-amber-500 font-semibold mt-1">
+              {dueDate.getMonth()+1}/{dueDate.getDate()} 예정
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* ── Pregnancy Hormone Chart ── */}
+      <div className="rounded-3xl p-4 mb-4"
+        style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 6px 32px rgba(16,185,129,0.10)', border: '1px solid rgba(16,185,129,0.15)' }}>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">임신 호르몬 변화 곡선 (0–40주)</p>
+
+        <div className="relative w-full" style={{ paddingBottom: '34%' }}>
+          <svg viewBox="0 0 270 92" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+
+            {/* Trimester bands */}
+            <rect x={0}   y={0} width={pregX(12)} height={CHART_H} fill="rgba(16,185,129,0.07)" />
+            <rect x={pregX(12)} y={0} width={pregX(27)-pregX(12)} height={CHART_H} fill="rgba(52,211,153,0.07)" />
+            <rect x={pregX(27)} y={0} width={pregX(40)-pregX(27)} height={CHART_H} fill="rgba(5,150,105,0.07)" />
+            {[12, 27].map(w => (
+              <line key={w} x1={pregX(w)} y1={0} x2={pregX(w)} y2={CHART_H}
+                stroke="rgba(16,185,129,0.3)" strokeWidth="0.7" strokeDasharray="2,2" />
+            ))}
+
+            {/* hCG area + line (olive green) */}
+            <path d={hcgArea} fill="rgba(101,163,13,0.10)" />
+            <path d={hcgLine} fill="none" stroke="#65a30d" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Estrogens area + line (orange) */}
+            <path d={e2Area} fill="rgba(249,115,22,0.10)" />
+            <path d={e2Line} fill="none" stroke="#f97316" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* Progesterone line — dashed blue */}
+            <path d={p4Area} fill="rgba(59,130,246,0.06)" />
+            <path d={p4Line} fill="none" stroke="#3b82f6" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5,3" />
+
+            {/* X axis */}
+            <line x1={0} y1={CHART_H} x2={PREG_W} y2={CHART_H}
+              stroke="rgba(200,200,220,0.5)" strokeWidth="0.5" />
+
+            {/* TODAY marker — only if LMP set */}
+            {pregnancyLMP && (
+              <>
+                <rect x={todayX - 5} y={0} width={10} height={CHART_H}
+                  fill="#10b981" opacity="0.07" rx="1" />
+                <line x1={todayX} y1={9} x2={todayX} y2={CHART_H}
+                  stroke="#10b981" strokeWidth="2" opacity="0.9" />
+
+                {/* hCG dot */}
+                <circle cx={todayX} cy={todayHCG} r="3.5" fill="#65a30d" opacity="0.4">
+                  <animate attributeName="r" values="3.5;9;3.5" dur="2.2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.4;0;0.4" dur="2.2s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={todayX} cy={todayHCG} r="3.5" fill="#65a30d" stroke="white" strokeWidth="1.4" />
+
+                {/* E2 dot */}
+                <circle cx={todayX} cy={todayE2} r="3.5" fill="#f97316" opacity="0.4">
+                  <animate attributeName="r" values="3.5;9;3.5" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.4;0;0.4" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={todayX} cy={todayE2} r="3.5" fill="#f97316" stroke="white" strokeWidth="1.4" />
+
+                {/* P4 dot */}
+                <circle cx={todayX} cy={todayP4} r="3.5" fill="#3b82f6" opacity="0.4">
+                  <animate attributeName="r" values="3.5;9;3.5" dur="2.2s" begin="1s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.4;0;0.4" dur="2.2s" begin="1s" repeatCount="indefinite" />
+                </circle>
+                <circle cx={todayX} cy={todayP4} r="3.5" fill="#3b82f6" stroke="white" strokeWidth="1.4" />
+
+                {/* Week label bubble */}
+                <rect x={Math.min(Math.max(todayX - 12, 0), 246)} y={0} width={24} height={10} rx="3"
+                  fill="#10b981" opacity="1" />
+                <text x={Math.min(Math.max(todayX, 12), 258)} y={7.5}
+                  textAnchor="middle" fontSize="5.2" fill="white" fontWeight="bold">
+                  {gestWeek}주
+                </text>
+              </>
+            )}
+
+            {/* Tick labels */}
+            {TICK_WEEKS.map(w => (
+              <text key={w} x={pregX(w)} y={CHART_H + 7} textAnchor="middle"
+                fontSize="5" fill="rgba(100,100,120,0.7)">{w}</text>
+            ))}
+            <text x={135} y={CHART_H + 13} textAnchor="middle" fontSize="4.5" fill="rgba(140,140,160,0.8)">weeks of pregnancy</text>
+          </svg>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px]">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-5 h-0.5 rounded" style={{ background: '#65a30d' }} />
+            <span className="text-slate-500">hCG (융모성 생식선자극호르몬)</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-5 h-0.5 rounded" style={{ background: '#f97316' }} />
+            <span className="text-slate-500">에스트로겐</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-5 border-t-2 border-dashed border-blue-400" style={{ borderColor: '#3b82f6' }} />
+            <span className="text-slate-500">프로게스테론</span>
+          </span>
+        </div>
+
+        {/* Live bars */}
+        {pregnancyLMP && (
+          <div className="mt-3 space-y-2">
+            {[
+              { label: 'hCG', val: P_HCG[Math.min(gestWeek,40)], color: '#65a30d', range: trimester.hcg },
+              { label: '에스트로겐', val: P_E2[Math.min(gestWeek,40)], color: '#f97316', range: trimester.e2 },
+              { label: '프로게스테론', val: P_P4[Math.min(gestWeek,40)], color: '#3b82f6', range: trimester.p4 },
+            ].map(({ label, val, color, range }) => (
+              <div key={label}>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="inline-block w-3 h-0.5 rounded" style={{ background: color }} />
+                    {label}
+                  </span>
+                  <span className="text-[10px] font-bold" style={{ color }}>{range}</span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: `${color}18` }}>
+                  <div className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${val}%`, background: color }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Trimester label bar */}
+        <div className="flex mt-3 rounded-xl overflow-hidden text-center text-[9px]">
+          {TRIMESTER_REF.map((t, i) => (
+            <div key={i}
+              style={{
+                flex: i === 0 ? 12 : i === 1 ? 15 : 13,
+                background: t.color === trimester.color ? t.color + '33' : t.bg,
+                padding: '4px 0', color: t.color, fontWeight: t.color === trimester.color ? '900' : '700',
+                borderBottom: t.color === trimester.color ? `2px solid ${t.color}` : '2px solid transparent',
+              }}>
+              {t.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Current stage card ── */}
+      <div className="rounded-3xl p-5 mb-4"
+        style={{ background: trimester.bg, border: `1.5px solid ${trimester.border}`, boxShadow: '0 4px 20px rgba(16,185,129,0.08)' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-3xl">{trimester.emoji}</span>
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: trimester.color }}>
+              현재 {gestWeek}주차 · {trimester.label}
+            </p>
+            <h2 className="text-base font-bold text-slate-800">{trimester.weeks}</h2>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { label: 'hCG', range: trimester.hcg, color: '#65a30d' },
+            { label: '에스트로겐', range: trimester.e2, color: '#f97316' },
+            { label: '프로게스테론', range: trimester.p4, color: '#3b82f6' },
+          ].map(({ label, range, color }) => (
+            <div key={label} className="rounded-2xl px-2 py-2.5 text-center"
+              style={{ background: 'rgba(255,255,255,0.7)', border: `1px solid ${color}25` }}>
+              <p className="text-[8px] font-bold uppercase tracking-wide mb-0.5" style={{ color }}>
+                {label}
+              </p>
+              <p className="text-[10px] font-bold text-slate-700 leading-tight">{range}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Trimester reference table ── */}
+      <div className="rounded-3xl p-5"
+        style={{ background: 'rgba(255,255,255,0.92)', boxShadow: '0 6px 32px rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.12)' }}>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">삼분기별 호르몬 정상 범위</p>
+        <div className="space-y-2">
+          {TRIMESTER_REF.map((t) => {
+            const active = t.color === trimester.color
+            return (
+              <div key={t.label}
+                className="flex items-center gap-3 px-3 py-3 rounded-2xl transition-all"
+                style={{
+                  background: active ? t.bg : 'rgba(248,248,252,0.7)',
+                  border: `1.5px solid ${active ? t.border : 'rgba(230,230,240,0.6)'}`,
+                }}>
+                <span className="text-xl flex-none">{t.emoji}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <p className="text-xs font-bold text-slate-800">{t.label}</p>
+                    <span className="text-[9px] text-slate-400">{t.weeks}</span>
+                    {active && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                        style={{ background: t.color, color: 'white' }}>지금</span>
+                    )}
+                  </div>
+                  <p className="text-[9px] text-slate-400 leading-relaxed">
+                    hCG {t.hcg}<br />
+                    E2 {t.e2} · P4 {t.p4}
+                  </p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+        <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
+          수치는 일반적인 참고 범위이며 개인차가 있습니다.<br />
           정확한 호르몬 수치는 혈액 검사로만 확인 가능해요.
         </p>
       </div>
