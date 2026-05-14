@@ -1,9 +1,10 @@
 'use client'
 
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useGarden } from '@/contexts/GardenContext'
-import { ORGANS } from '@/lib/tkm-scoring'
+import { ORGANS, TEMPERAMENTS } from '@/lib/tkm-scoring'
 import { GROWTH_CONFIG, SOIL_STYLE } from '@/lib/bio-digital-twin'
 import type { OrganKey } from '@/lib/tkm-scoring'
 import type { GrowthStage, AnimationMode } from '@/lib/bio-digital-twin'
@@ -205,9 +206,201 @@ function StressParticles() {
   )
 }
 
+/* ── Temperament info bottom sheet ───────────────────────────── */
+function CharacterInfoSheet({ organ, onClose }: { organ: OrganKey; onClose: () => void }) {
+  const [visible, setVisible] = useState(false)
+  const temp   = TEMPERAMENTS[organ]
+  const info   = ORGANS[organ]
+  const accent = ORGAN_ACCENT[organ]
+  const bg     = `${ORGAN_BASE_BG[organ]}`
+
+  useEffect(() => { requestAnimationFrame(() => setVisible(true)) }, [])
+
+  function handleClose() {
+    setVisible(false)
+    setTimeout(onClose, 300)
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center transition-all duration-300"
+      style={{ background: visible ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0)', backdropFilter: visible ? 'blur(6px)' : 'none' }}
+      onClick={handleClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-t-[2rem] overflow-hidden transition-transform duration-300"
+        style={{
+          background: 'linear-gradient(180deg,#fafffe 0%,#f8f6ff 100%)',
+          transform: visible ? 'translateY(0)' : 'translateY(100%)',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 sticky top-0 z-10" style={{ background: 'inherit' }}>
+          <div className="w-10 h-1 rounded-full bg-slate-200" />
+        </div>
+
+        {/* Hero */}
+        <div className="px-5 pt-2 pb-5 text-center"
+          style={{ background: `linear-gradient(160deg, ${accent}14, ${accent}06)` }}>
+          <div className="relative inline-block mb-3">
+            <div className="w-24 h-24 rounded-3xl overflow-hidden mx-auto"
+              style={{ background: bg, border: `2px solid ${accent}28` }}>
+              <img
+                src={`${BASE}/garden/${VEGGIE_FILE_MAP[organ]}.png`}
+                alt={info.vegetable}
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center text-lg"
+              style={{ background: accent, boxShadow: `0 2px 8px ${accent}66` }}>
+              {temp.emoji}
+            </div>
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: accent }}>
+            {info.name} · {info.element} 기질
+          </p>
+          <h2 className="text-xl font-black text-slate-800 mb-1">{temp.title}</h2>
+          <p className="text-[11px] text-slate-500">{temp.subtitle}</p>
+        </div>
+
+        <div className="px-5 pb-8 space-y-4 mt-1">
+          <InfoSection color={accent} icon="✨" title="나의 본성">
+            <p className="text-sm text-slate-700 leading-relaxed">{temp.nature}</p>
+          </InfoSection>
+
+          <InfoSection color={accent} icon="🌟" title="기질 특성">
+            <div className="grid grid-cols-2 gap-2">
+              {temp.traits.map(t => (
+                <div key={t} className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: accent }} />
+                  <span className="text-xs text-slate-700">{t}</span>
+                </div>
+              ))}
+            </div>
+          </InfoSection>
+
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-2xl p-3.5" style={{ background: 'rgba(240,253,244,0.9)', border: '1px solid rgba(22,163,74,0.2)' }}>
+              <p className="text-[10px] font-bold text-emerald-600 mb-2">💪 강한 부분</p>
+              <div className="space-y-1.5">
+                {temp.strongPoints.map(s => (
+                  <div key={s} className="flex items-start gap-1.5">
+                    <span className="text-emerald-500 text-[10px] flex-none mt-0.5">✓</span>
+                    <span className="text-[11px] text-slate-700 leading-tight">{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl p-3.5" style={{ background: 'rgba(254,242,242,0.9)', border: '1px solid rgba(239,68,68,0.15)' }}>
+              <p className="text-[10px] font-bold text-red-500 mb-2">⚠️ 취약한 장부</p>
+              <div className="space-y-1.5">
+                {temp.weakOrgans.map(w => (
+                  <div key={w} className="flex items-start gap-1.5">
+                    <span className="text-red-400 text-[10px] flex-none mt-0.5">!</span>
+                    <span className="text-[11px] text-slate-700 leading-tight">{w}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <InfoSection color="#dc2626" bg="rgba(254,242,242,0.8)" borderColor="rgba(239,68,68,0.18)" icon="🚫" title="피해야 할 음식">
+            <div className="space-y-1.5">
+              {temp.badFoods.map(f => (
+                <div key={f} className="flex items-center gap-2">
+                  <span className="text-red-400 text-xs flex-none">✕</span>
+                  <span className="text-xs text-slate-700">{f}</span>
+                </div>
+              ))}
+            </div>
+          </InfoSection>
+
+          <InfoSection color="#d97706" bg="rgba(255,251,235,0.9)" borderColor="rgba(245,158,11,0.2)" icon="⛔" title="피해야 할 습관">
+            <div className="space-y-1.5">
+              {temp.badHabits.map(h => (
+                <div key={h} className="flex items-center gap-2">
+                  <span className="text-amber-500 text-xs flex-none">✕</span>
+                  <span className="text-xs text-slate-700">{h}</span>
+                </div>
+              ))}
+            </div>
+          </InfoSection>
+
+          <InfoSection color="#16a34a" bg="rgba(240,253,244,0.9)" borderColor="rgba(22,163,74,0.18)" icon="🌱" title="나를 위한 좋은 습관">
+            <div className="space-y-1.5">
+              {temp.harmony.map(h => (
+                <div key={h} className="flex items-center gap-2">
+                  <span className="text-emerald-500 text-xs flex-none">✓</span>
+                  <span className="text-xs text-slate-700">{h}</span>
+                </div>
+              ))}
+            </div>
+          </InfoSection>
+
+          <InfoSection color={accent} icon="🥗" title="내 기질에 맞는 식품">
+            <div className="flex flex-wrap gap-1.5">
+              {temp.foods.map(f => (
+                <span key={f} className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                  style={{ background: `${accent}18`, color: accent, border: `1px solid ${accent}28` }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          </InfoSection>
+
+          <button
+            onClick={handleClose}
+            className="w-full py-4 rounded-2xl text-sm font-bold text-white transition-all active:scale-95"
+            style={{ background: accent, boxShadow: `0 6px 24px ${accent}44` }}
+          >
+            닫기
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Info section helper ──────────────────────────────────────── */
+function InfoSection({
+  icon, title, color, bg, borderColor, children,
+}: {
+  icon: string; title: string; color?: string; bg?: string; borderColor?: string; children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl p-4"
+      style={{ background: bg ?? 'rgba(248,250,252,0.9)', border: `1px solid ${borderColor ?? 'rgba(226,232,240,0.8)'}` }}>
+      <p className="text-[10px] font-bold uppercase tracking-wider mb-2.5" style={{ color: color ?? '#64748b' }}>
+        {icon} {title}
+      </p>
+      {children}
+    </div>
+  )
+}
+
+const VEGGIE_FILE_MAP: Record<OrganKey, string> = {
+  heart:  'heart-beet',
+  liver:  'liver-broccoli',
+  spleen: 'spleen-pumpkin',
+  lung:   'lung-onion',
+  kidney: 'kidney-blackbean',
+}
+
+const ORGAN_BASE_BG: Record<OrganKey, string> = {
+  heart:  'rgba(244,63,117,0.12)',
+  liver:  'rgba(34,197,94,0.12)',
+  spleen: 'rgba(251,146,60,0.12)',
+  lung:   'rgba(167,139,250,0.12)',
+  kidney: 'rgba(99,102,241,0.12)',
+}
+
 /* ── Main GardenField ─────────────────────────────────────────── */
 export function GardenField({ primaryOrgan }: { primaryOrgan: OrganKey }) {
   const [selected, setSelected] = useState<OrganKey>(primaryOrgan)
+  const [showInfoSheet, setShowInfoSheet] = useState(false)
   const { result, inputs } = useGarden()
   const state   = result.organStates[selected]
   const gc      = GROWTH_CONFIG[state.growthStage as GrowthStage]
@@ -216,8 +409,38 @@ export function GardenField({ primaryOrgan }: { primaryOrgan: OrganKey }) {
   const accent  = ORGAN_ACCENT[selected]
   const organs: OrganKey[] = ['heart', 'liver', 'spleen', 'lung', 'kidney']
 
+  const temp = TEMPERAMENTS[selected]
+
   return (
     <div className="space-y-3">
+
+      {/* ── Temperament info banner ── */}
+      <button
+        onClick={() => setShowInfoSheet(true)}
+        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl transition-all active:scale-95"
+        style={{
+          background: `${accent}0e`,
+          border: `1.5px solid ${accent}28`,
+          boxShadow: `0 2px 10px ${accent}0a`,
+        }}
+      >
+        <div className="w-9 h-9 rounded-xl overflow-hidden flex-none"
+          style={{ background: `${accent}1a`, border: `1px solid ${accent}25` }}>
+          <img
+            src={`${BASE}/garden/${VEGGIE_FILE_MAP[selected]}.png`}
+            alt={info.vegetable}
+            className="w-full h-full object-contain"
+          />
+        </div>
+        <div className="flex-1 min-w-0 text-left">
+          <p className="text-xs font-bold text-slate-800 leading-tight">{temp.title}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">{temp.emoji} {temp.subtitle}</p>
+        </div>
+        <div className="flex items-center gap-0.5 flex-none">
+          <span className="text-[10px] font-semibold" style={{ color: accent }}>기질 보기</span>
+          <ChevronRight className="w-3.5 h-3.5" style={{ color: accent }} />
+        </div>
+      </button>
 
       {/* ── Featured plot ── */}
       <div className="relative rounded-3xl overflow-hidden" style={{ height: 260 }}>
@@ -321,6 +544,10 @@ export function GardenField({ primaryOrgan }: { primaryOrgan: OrganKey }) {
           </div>
         ))}
       </div>
+
+      {showInfoSheet && (
+        <CharacterInfoSheet organ={selected} onClose={() => setShowInfoSheet(false)} />
+      )}
     </div>
   )
 }
