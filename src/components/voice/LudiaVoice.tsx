@@ -286,7 +286,35 @@ function makeWelcome(name: string, cycleDay: number, phase: CyclePhase): Message
   }
 }
 
-const EXAMPLES = ['오늘 컨디션 어때?','스트레스가 너무 심해','다음 생리 언제야?','수면이 부족해','지금 단계에 뭐 먹으면 좋아?','피부 트러블이 심해']
+const SUGGESTION_BANK = [
+  // 주기·생리
+  '다음 생리 언제야?', '지금 어떤 주기야?', '생리 예정일 알려줘', '생리통이 심해',
+  // 컨디션
+  '오늘 컨디션 어때?', '몸이 너무 무거워', '요즘 너무 피곤해', '기력이 없어',
+  // 증상
+  '두통이 심해', '배가 자주 아파', '부종이 있어', '허리가 아파', '가슴이 두근거려', '소화가 안 돼',
+  // 스트레스·감정
+  '스트레스가 너무 심해', '요즘 예민해진 것 같아', '감정 기복이 심한데', '불안감이 심해',
+  '요즘 우울해', '집중이 안 돼', '의욕이 없어',
+  // 수면
+  '수면이 부족해', '잠을 잘 못 자', '잠이 너무 많이 와', '밤에 자꾸 깨',
+  // 영양·식단
+  '지금 단계에 뭐 먹으면 좋아?', '철분이 부족한 것 같아', '비타민 뭘 먹어야 해?',
+  '카페인 먹어도 돼?', '술 마셔도 괜찮아?',
+  // 피부
+  '피부 트러블이 심해', '피부가 건조해', '얼굴이 푸석해',
+  // 운동
+  '운동해도 괜찮아?', '어떤 운동이 좋을까?', '요즘 운동하기 싫어',
+  // 호르몬
+  '호르몬이 불균형한 것 같아', '배란일은 언제야?', '에스트로겐이 뭐야?',
+]
+
+function pickSuggestions(exclude: Set<string>): string[] {
+  let pool = SUGGESTION_BANK.filter(s => !exclude.has(s))
+  if (pool.length < 3) pool = [...SUGGESTION_BANK]
+  const shuffled = pool.slice().sort(() => Math.random() - 0.5)
+  return shuffled.slice(0, 3)
+}
 
 const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
   menstrual:  { badge: 'rgba(244,63,117,0.12)', text: '#d94f5c' },
@@ -308,11 +336,13 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
   const [interim, setInterim]                 = useState('')
   const [inputText, setInputText]             = useState('')
   const [recurringPending, setRecurringPending] = useState<RecurringPending | null>(null)
+  const [suggestions, setSuggestions]         = useState<string[]>(() => pickSuggestions(new Set()))
 
-  const vsRef       = useRef<VoiceState>('idle')
-  const recogRef    = useRef<any>(null)
-  const chatRef     = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const vsRef          = useRef<VoiceState>('idle')
+  const recogRef       = useRef<any>(null)
+  const chatRef        = useRef<HTMLDivElement>(null)
+  const textareaRef    = useRef<HTMLTextAreaElement>(null)
+  const usedSugRef     = useRef<Set<string>>(new Set())
 
   const setVsSync = useCallback((s: VoiceState) => { vsRef.current = s; setVs(s) }, [])
 
@@ -333,6 +363,16 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
     recogRef.current?.stop()
     if (typeof window !== 'undefined') window.speechSynthesis?.cancel()
   }, [])
+
+  /* 새 LUDIA 답변이 오면 제안 칩 갱신 */
+  useEffect(() => {
+    const last = messages[messages.length - 1]
+    if (!last || last.role !== 'ludia') return
+    const next = pickSuggestions(usedSugRef.current)
+    next.forEach(s => usedSugRef.current.add(s))
+    if (usedSugRef.current.size > SUGGESTION_BANK.length * 0.7) usedSugRef.current.clear()
+    setSuggestions(next)
+  }, [messages])
 
   /* save calendar event as proper ScheduleEvent */
   const saveEvent = useCallback((ev: ParsedEvent) => {
@@ -728,27 +768,31 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
             </div>
           )}
 
-          {/* Example chips */}
-          {vs === 'idle' && messages.length <= 1 && (
-            <div className="pt-3 pb-2" style={{ animation: 'ludia-msg 0.35s ease-out both' }}>
-              <p className="text-[11px] text-slate-400 text-center mb-3 leading-relaxed">
-                아래 예시를 탭하거나 직접 입력해보세요
-              </p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {EXAMPLES.map(ex => (
-                  <button key={ex} onClick={() => processText(ex)}
-                    className="text-xs px-3.5 py-1.5 rounded-full transition-all hover:scale-105 active:scale-95"
-                    style={{ background: 'rgba(244,63,117,0.07)', border: '1px solid rgba(244,63,117,0.2)', color: '#c0395e' }}>
-                    {ex}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── Input bar — flex-none, always at the bottom of flex column ── */}
-        <div className="flex-none px-3 pt-1.5 pb-3 border-t border-rose-50">
+        <div className="flex-none px-3 pt-2 pb-3 border-t border-rose-50">
+
+          {/* ── 제안 칩 — 항상 표시, LUDIA 답변 후 자동 교체 ── */}
+          {vs !== 'thinking' && vs !== 'listening' && (
+            <div className="flex gap-2 overflow-x-auto mb-2 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+              {suggestions.map(s => (
+                <button
+                  key={s}
+                  onClick={() => processText(s)}
+                  className="flex-none text-xs px-3 py-1.5 rounded-full transition-all active:scale-95"
+                  style={{
+                    background: 'rgba(244,63,117,0.07)',
+                    border: '1px solid rgba(244,63,117,0.18)',
+                    color: '#c0395e',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Interim / status label */}
           {(interim || vs !== 'idle') && (
