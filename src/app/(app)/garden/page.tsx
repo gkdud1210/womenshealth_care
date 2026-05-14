@@ -5,6 +5,7 @@ import { GardenProvider, useGarden } from '@/contexts/GardenContext'
 import { GardenField } from '@/components/garden/GardenField'
 import { GardenSimulator } from '@/components/garden/GardenSimulator'
 import { GardenSurvey } from '@/components/garden/GardenSurvey'
+import { TemperamentModal } from '@/components/garden/TemperamentModal'
 import { ORGANS } from '@/lib/tkm-scoring'
 import { GROWTH_CONFIG } from '@/lib/bio-digital-twin'
 import type { GardenResult, OrganKey } from '@/lib/tkm-scoring'
@@ -126,8 +127,9 @@ function GardenInner({ saved, onRescan }: { saved: Saved | null; onRescan: () =>
 
 /* ── Root page with state management ─────────────────────────── */
 export default function GardenPage() {
-  const [view, setView]   = useState<View>('landing')
-  const [saved, setSaved] = useState<Saved | null>(null)
+  const [view, setView]         = useState<View>('landing')
+  const [saved, setSaved]       = useState<Saved | null>(null)
+  const [pendingResult, setPendingResult] = useState<{ result: GardenResult; answers: Record<string, number> } | null>(null)
 
   useEffect(() => {
     try {
@@ -140,9 +142,16 @@ export default function GardenPage() {
   }, [])
 
   function handleSurveyComplete(result: GardenResult, answers: Record<string, number>) {
-    const data: Saved = { result, answers, date: new Date().toISOString() }
+    // 설문 완료 → 기질 모달 먼저 표시
+    setPendingResult({ result, answers })
+  }
+
+  function handleTemperamentClose() {
+    if (!pendingResult) return
+    const data: Saved = { result: pendingResult.result, answers: pendingResult.answers, date: new Date().toISOString() }
     setSaved(data)
     try { localStorage.setItem(SURVEY_KEY, JSON.stringify(data)) } catch {}
+    setPendingResult(null)
     setView('garden')
   }
 
@@ -219,6 +228,9 @@ export default function GardenPage() {
           <h1 className="text-base font-bold text-slate-700">오장(五臟) 에너지 진단</h1>
         </div>
         <GardenSurvey onComplete={handleSurveyComplete} />
+        {pendingResult && (
+          <TemperamentModal result={pendingResult.result} onClose={handleTemperamentClose} />
+        )}
       </div>
     )
   }
