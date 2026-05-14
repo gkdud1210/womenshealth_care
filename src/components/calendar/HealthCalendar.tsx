@@ -22,6 +22,7 @@ type IrregularType   = 'none' | 'frequent' | 'delayed' | 'amenorrhea'
 interface ModeData {
   mode: CycleMode
   pregnancyLMP?: string
+  pregnancyEDD?: string   // estimated due date (display only — LMP is source of truth)
   menopauseDate?: string
 }
 
@@ -127,7 +128,9 @@ interface PregnancyStageData {
   title: string
   subtitle: string
   getMessage: (name: string) => string
+  fetalDev: string[]
   nutrients: { name: string; reason: string }[]
+  recommendedFoods: { emoji: string; name: string; benefit: string }[]
   bodyChanges: string[]
   products: { label: string; tag: string; color: string }[]
 }
@@ -138,11 +141,27 @@ const PREGNANCY_STAGES: PregnancyStageData[] = [
     emoji: '🌱', title: '임신 초기', subtitle: '1 ~ 12주',
     getMessage: (n) =>
       `${n}님, 새 생명이 싹트기 시작했어요! 아기의 뇌와 심장이 형성되는 가장 중요한 시기예요. 입덧이 힘드시더라도 엽산과 B6는 꼭 챙겨주세요 💜`,
+    fetalDev: [
+      '🫀 심장이 뛰기 시작해요 (4~5주)',
+      '🧠 뇌·척수·신경관 형성 중',
+      '🖐 작은 팔·다리 싹이 자라요 (6주)',
+      '👁 눈·코·입 윤곽 생겨요 (8주)',
+      '🦷 손가락·발가락이 뚜렷해져요 (10주)',
+      '📏 크기 약 5~6cm, 무게 14g (12주)',
+    ],
     nutrients: [
       { name: '엽산', reason: '신경관 형성' },
       { name: '비타민 B6', reason: '입덧 완화' },
       { name: '철분', reason: '혈액 생성' },
       { name: '비타민 C', reason: '면역 강화' },
+    ],
+    recommendedFoods: [
+      { emoji: '🥬', name: '시금치·브로콜리', benefit: '엽산 풍부' },
+      { emoji: '🥚', name: '달걀', benefit: '단백질 + 콜린' },
+      { emoji: '🍊', name: '오렌지·귤', benefit: '비타민 C · 엽산' },
+      { emoji: '🫘', name: '렌틸콩·두부', benefit: '식물성 철분' },
+      { emoji: '🥜', name: '아몬드', benefit: '비타민 E · 엽산' },
+      { emoji: '🍗', name: '닭가슴살', benefit: '저지방 단백질' },
     ],
     bodyChanges: ['입덧', '유방 민감도 ↑', '잦은 소변', '극심한 피로', '감정 기복'],
     products: [
@@ -155,11 +174,27 @@ const PREGNANCY_STAGES: PregnancyStageData[] = [
     emoji: '🌿', title: '임신 중기', subtitle: '13 ~ 27주',
     getMessage: (n) =>
       `${n}님, 이제 안정기예요! 입덧도 줄고 에너지가 돌아오는 시기예요. 아기 뇌 발달을 위한 DHA를 놓치지 마세요. 곧 태동을 느끼는 설레는 순간이 다가오고 있어요 🌿`,
+    fetalDev: [
+      '👂 엄마 목소리를 들을 수 있어요 (16주)',
+      '🤸 태동을 처음 느끼게 돼요 (18~20주)',
+      '🦴 뼈가 단단하게 굳어져요',
+      '👁 눈꺼풀이 열리기 시작해요 (24주)',
+      '💆 뇌 주름과 감각 발달이 빨라요',
+      '📏 크기 약 35cm, 무게 900g (27주)',
+    ],
     nutrients: [
       { name: 'DHA', reason: '아기 뇌 발달' },
       { name: '철분', reason: '빈혈 예방' },
       { name: '칼슘', reason: '골격 형성' },
       { name: '단백질', reason: '조직 성장' },
+    ],
+    recommendedFoods: [
+      { emoji: '🐟', name: '연어·고등어', benefit: 'DHA 오메가3' },
+      { emoji: '🥛', name: '우유·요거트', benefit: '칼슘 + 단백질' },
+      { emoji: '🥩', name: '소고기·닭고기', benefit: '헴철 + 단백질' },
+      { emoji: '🫐', name: '베리류', benefit: '항산화 비타민' },
+      { emoji: '🥦', name: '브로콜리', benefit: '칼슘 · 엽산' },
+      { emoji: '🌰', name: '호두', benefit: 'DHA 식물성 공급' },
     ],
     bodyChanges: ['배가 뚜렷이 커짐', '태동 시작', '허리 통증', '다리 붓기', '피부 변화'],
     products: [
@@ -172,11 +207,27 @@ const PREGNANCY_STAGES: PregnancyStageData[] = [
     emoji: '🍃', title: '임신 후기', subtitle: '28 ~ 40주',
     getMessage: (n) =>
       `${n}님, 거의 다 왔어요! 아기도 ${n}님도 마지막 준비를 하고 있어요. 칼슘과 비타민 D로 아기 뼈를 튼튼히 하고 충분한 휴식을 취해주세요 🌙`,
+    fetalDev: [
+      '🧠 뇌 성장이 가장 빠른 시기예요',
+      '🫁 폐가 호흡 연습을 시작해요',
+      '🛡 엄마 항체를 받아 면역력이 생겨요',
+      '🍑 피부 아래 지방이 쌓여 포동포동해져요',
+      '🔄 머리가 아래쪽으로 자리를 잡아요 (36주~)',
+      '📏 키 약 47~51cm, 무게 2.5~3.5kg (40주)',
+    ],
     nutrients: [
       { name: '칼슘', reason: '아기 뼈 발달' },
       { name: '비타민 D', reason: '칼슘 흡수' },
       { name: '식이섬유', reason: '변비 예방' },
       { name: 'DHA', reason: '뇌 완성' },
+    ],
+    recommendedFoods: [
+      { emoji: '🥑', name: '아보카도', benefit: '건강지방 + 엽산' },
+      { emoji: '🍠', name: '고구마', benefit: '식이섬유 + 비타민 A' },
+      { emoji: '🌰', name: '호두·아몬드', benefit: '오메가3 + 칼슘' },
+      { emoji: '🥛', name: '두유·우유', benefit: '칼슘 + 비타민 D' },
+      { emoji: '🫘', name: '검은콩', benefit: '식물성 단백질' },
+      { emoji: '🍚', name: '현미밥', benefit: '식이섬유 + 철분' },
     ],
     bodyChanges: ['잦은 태동', '골반 압박감', '수면 어려움', '가진통', '부종 심화'],
     products: [
@@ -189,11 +240,26 @@ const PREGNANCY_STAGES: PregnancyStageData[] = [
     emoji: '🌸', title: '산후조리기', subtitle: '출산 후',
     getMessage: (n) =>
       `정말 수고하셨어요, ${n}님! 이제 회복이 가장 중요한 시기예요. 모유 수유 중이시라면 단백질과 요오드를 충분히 챙겨주세요. 루디아가 회복 과정을 함께 지켜볼게요 💜`,
+    fetalDev: [
+      '🍼 신생아 수유 리듬 잡기가 중요해요',
+      '💤 아기는 하루 16~18시간 잠을 자요',
+      '👶 배꼽이 1~2주 안에 떨어져요',
+      '🌡 체온 조절이 아직 미숙해요',
+      '📸 시력은 30cm 전후를 가장 잘 봐요',
+    ],
     nutrients: [
       { name: '단백질', reason: '회복 & 모유 생성' },
       { name: '요오드', reason: '모유 수유 지원' },
       { name: '철분', reason: '출혈 후 회복' },
       { name: '오메가3', reason: '산후 우울 완화' },
+    ],
+    recommendedFoods: [
+      { emoji: '🍲', name: '미역국', benefit: '요오드 + 칼슘 보충' },
+      { emoji: '🥩', name: '소고기·돼지족발', benefit: '단백질 + 콜라겐' },
+      { emoji: '🐟', name: '가물치·잉어', benefit: '산후 회복 전통 보양식' },
+      { emoji: '🫘', name: '검은깨·흑임자', benefit: '철분 + 칼슘' },
+      { emoji: '🥜', name: '땅콩·견과류', benefit: '수유 중 에너지' },
+      { emoji: '🥚', name: '달걀', benefit: '완전 단백질 + DHA' },
     ],
     bodyChanges: ['오로 분비', '유방 충혈', '산후 통증', '감정 기복', '호르몬 급변'],
     products: [
@@ -842,9 +908,33 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
   onCancel: () => void
 }) {
   const [lmpDate,       setLmpDate]       = useState(currentModeData.pregnancyLMP    ?? '')
+  const [eddDate,       setEddDate]       = useState(currentModeData.pregnancyEDD    ?? '')
+  const [dateInputMode, setDateInputMode] = useState<'lmp' | 'edd'>('lmp')
   const [menopauseDate, setMenopauseDate] = useState(currentModeData.menopauseDate   ?? '')
 
   const modeInfo = MODES.find(m => m.id === targetMode)!
+
+  // Sync LMP ↔ EDD when one changes
+  function handleLmpChange(val: string) {
+    setLmpDate(val)
+    if (val) {
+      const edd = new Date(val + 'T00:00:00')
+      edd.setDate(edd.getDate() + 280)
+      setEddDate(edd.toISOString().split('T')[0])
+    } else {
+      setEddDate('')
+    }
+  }
+  function handleEddChange(val: string) {
+    setEddDate(val)
+    if (val) {
+      const lmp = new Date(val + 'T00:00:00')
+      lmp.setDate(lmp.getDate() - 280)
+      setLmpDate(lmp.toISOString().split('T')[0])
+    } else {
+      setLmpDate('')
+    }
+  }
 
   const MESSAGE: Record<CycleMode, string> = {
     normal:    `다시 일반 모드로 돌아왔어요. ${userName}님의 생리 주기를 함께 관리할게요 💜`,
@@ -857,6 +947,7 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
     onConfirm({
       mode:          targetMode,
       pregnancyLMP:  targetMode === 'pregnancy' ? (lmpDate || undefined) : undefined,
+      pregnancyEDD:  targetMode === 'pregnancy' ? (eddDate || undefined) : undefined,
       menopauseDate: targetMode === 'menopause' ? (menopauseDate || undefined) : undefined,
     })
   }
@@ -888,12 +979,48 @@ function ModeDialog({ targetMode, userName, currentModeData, onConfirm, onCancel
 
         <div className="px-5 py-4 space-y-4">
           {targetMode === 'pregnancy' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">마지막 생리 시작일 (LMP)</label>
-              <input type="date" value={lmpDate} onChange={e => setLmpDate(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none transition-all"
-                style={{ background: modeInfo.color + '0a', border: `1.5px solid ${modeInfo.color}35` }} />
-              <p className="text-[11px] text-slate-400 mt-1">출산 예정일 자동 계산에 사용돼요</p>
+            <div className="space-y-2.5">
+              {/* Tab toggle */}
+              <div className="flex rounded-xl overflow-hidden border"
+                style={{ borderColor: modeInfo.color + '30' }}>
+                {(['lmp', 'edd'] as const).map(tab => (
+                  <button key={tab}
+                    onClick={() => setDateInputMode(tab)}
+                    className="flex-1 py-2 text-xs font-semibold transition-all"
+                    style={dateInputMode === tab
+                      ? { background: modeInfo.color, color: '#fff' }
+                      : { background: modeInfo.color + '08', color: '#64748b' }
+                    }>
+                    {tab === 'lmp' ? '마지막 생리일' : '출산 예정일'}
+                  </button>
+                ))}
+              </div>
+
+              {dateInputMode === 'lmp' ? (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">마지막 생리 시작일 (LMP)</label>
+                  <input type="date" value={lmpDate} onChange={e => handleLmpChange(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none transition-all"
+                    style={{ background: modeInfo.color + '0a', border: `1.5px solid ${modeInfo.color}35` }} />
+                  {eddDate && (
+                    <p className="text-[11px] mt-1.5 font-semibold" style={{ color: modeInfo.color }}>
+                      출산 예정일: {new Date(eddDate + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">출산 예정일 (EDD)</label>
+                  <input type="date" value={eddDate} onChange={e => handleEddChange(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-2xl text-sm text-slate-700 outline-none transition-all"
+                    style={{ background: modeInfo.color + '0a', border: `1.5px solid ${modeInfo.color}35` }} />
+                  {lmpDate && (
+                    <p className="text-[11px] mt-1.5 font-semibold" style={{ color: modeInfo.color }}>
+                      마지막 생리일: {new Date(lmpDate + 'T00:00:00').toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {targetMode === 'menopause' && (
@@ -1214,6 +1341,35 @@ function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: s
       </div>
 
       <div className="px-4 py-3 space-y-3.5">
+
+        {/* ── Fetal development ── */}
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">👶 태아 발달 이야기</p>
+          <div className="rounded-2xl overflow-hidden" style={{ background: `${accent}07`, border: `1px solid ${accent}18` }}>
+            {stage.fetalDev.map((item, i) => (
+              <div key={i} className="flex items-start gap-2.5 px-3 py-2 border-b last:border-b-0"
+                style={{ borderColor: `${accent}12` }}>
+                <span className="text-sm leading-none mt-0.5">{item.slice(0, 2)}</span>
+                <span className="text-[11px] text-slate-700 leading-snug">{item.slice(2).trim()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Recommended foods ── */}
+        <div>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">🥗 이 시기 좋은 음식</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {stage.recommendedFoods.map(({ emoji, name, benefit }) => (
+              <div key={name} className="flex flex-col items-center text-center gap-0.5 px-2 py-2.5 rounded-2xl"
+                style={{ background: `${accent}08`, border: `1px solid ${accent}18` }}>
+                <span className="text-xl leading-none">{emoji}</span>
+                <p className="text-[10px] font-bold text-slate-700 mt-0.5">{name}</p>
+                <p className="text-[9px] text-slate-400 leading-tight">{benefit}</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ── Nutrients ── */}
         <div>
