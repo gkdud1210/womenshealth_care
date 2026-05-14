@@ -8,14 +8,12 @@ import { GROWTH_CONFIG, SOIL_STYLE } from '@/lib/bio-digital-twin'
 import type { OrganKey } from '@/lib/tkm-scoring'
 import type { GrowthStage, AnimationMode } from '@/lib/bio-digital-twin'
 
-const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
-
 const CHAR_IMAGES: Record<OrganKey, string> = {
-  heart:  `${BASE}/garden/heart-beet.png`,
-  liver:  `${BASE}/garden/liver-broccoli.png`,
-  spleen: `${BASE}/garden/spleen-pumpkin.png`,
-  lung:   `${BASE}/garden/lung-onion.png`,
-  kidney: `${BASE}/garden/kidney-blackbean.png`,
+  heart:  '/garden/heart-beet.png',
+  liver:  '/garden/liver-broccoli.png',
+  spleen: '/garden/spleen-pumpkin.png',
+  lung:   '/garden/lung-onion.png',
+  kidney: '/garden/kidney-blackbean.png',
 }
 
 const ORGAN_GLOW: Record<OrganKey, string> = {
