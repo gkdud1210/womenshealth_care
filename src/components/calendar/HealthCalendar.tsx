@@ -331,10 +331,16 @@ export function HealthCalendar({
     } catch {}
   }, [])
 
-  // Sync mode from parent (user profile) — takes precedence over localStorage
+  // Sync mode from parent — re-read localStorage so pregnancyLMP/EDD etc. are not lost
   useEffect(() => {
     if (cycleMode) {
-      setModeData(prev => ({ ...prev, mode: cycleMode as CycleMode }))
+      try {
+        const saved = localStorage.getItem(MODE_STORAGE_KEY)
+        const parsed: ModeData = saved ? JSON.parse(saved) : { mode: cycleMode as CycleMode }
+        setModeData({ ...parsed, mode: cycleMode as CycleMode })
+      } catch {
+        setModeData(prev => ({ ...prev, mode: cycleMode as CycleMode }))
+      }
     }
   }, [cycleMode])
 
@@ -401,17 +407,20 @@ export function HealthCalendar({
   function getModeCellInfo(day: Date): {
     bg: string | undefined; label: string | null; isWarning: boolean; isDue: boolean
   } {
-    if (modeData.mode === 'pregnancy' && modeData.pregnancyLMP) {
-      const lmp  = new Date(modeData.pregnancyLMP)
-      const diff = Math.floor((day.getTime() - lmp.getTime()) / 86400000)
+    if (modeData.mode === 'pregnancy') {
+      if (!modeData.pregnancyLMP) {
+        return { bg: 'rgba(16,185,129,0.12)', label: null, isWarning: false, isDue: false }
+      }
+      const lmp   = new Date(modeData.pregnancyLMP)
+      const diff  = Math.floor((day.getTime() - lmp.getTime()) / 86400000)
       const isDue = dueDate ? isSameDay(day, dueDate) : false
-      if (isDue) return { bg: 'rgba(245,158,11,0.25)', label: '🎉출산예정', isWarning: false, isDue: true }
+      if (isDue) return { bg: 'rgba(245,158,11,0.30)', label: '🎉출산예정', isWarning: false, isDue: true }
       if (diff >= 0 && diff < 290) {
         const w = Math.floor(diff / 7) + 1
         const d = diff % 7
-        return { bg: 'rgba(16,185,129,0.13)', label: `${w}주${d > 0 ? d + 'd' : ''}`, isWarning: false, isDue: false }
+        return { bg: 'rgba(16,185,129,0.22)', label: `${w}주${d > 0 ? d + 'd' : ''}`, isWarning: false, isDue: false }
       }
-      return { bg: 'rgba(16,185,129,0.06)', label: null, isWarning: false, isDue: false }
+      return { bg: 'rgba(16,185,129,0.10)', label: null, isWarning: false, isDue: false }
     }
     if (modeData.mode === 'menopause') {
       return { bg: 'rgba(139,92,246,0.10)', label: null, isWarning: false, isDue: false }
@@ -444,6 +453,8 @@ export function HealthCalendar({
           ? getModeCellInfo(day)
           : { bg: undefined, label: null, isWarning: false, isDue: false }
 
+      const isPregnancyMode = modeData.mode === 'pregnancy'
+
       const isPredicted = inMonth && modeData.mode === 'normal'
         && phase === 'menstrual' && !log?.isPeriod
       const predDayInCycle = isPredicted && effectiveCycleStart
@@ -454,9 +465,10 @@ export function HealthCalendar({
 
       const background = modeData.mode === 'normal'
         ? isPredicted && !isSel ? 'rgba(255,179,179,0.38)' : cellBgFor(phase, isSel)
-        : isSel ? (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)') : modeBg
+        : isSel ? (isPregnancyMode ? 'rgba(16,185,129,0.35)' : (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)')) : modeBg
 
       const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444'
+        : isPregnancyMode ? '#10b981'
         : phase ? getPhaseColor(phase) : '#f43f75'
 
       return (
@@ -479,7 +491,7 @@ export function HealthCalendar({
             outlineOffset: '-1px',
             boxShadow: isSel
               ? `inset 0 0 0 2px ${ringColor}`
-              : isNow   ? 'inset 0 0 0 2px #f43f75'
+              : isNow   ? `inset 0 0 0 2px ${isPregnancyMode ? '#10b981' : '#f43f75'}`
                 : isDue ? `inset 0 0 0 1.5px #f59e0b88`
                   : undefined,
           }}>
@@ -493,7 +505,10 @@ export function HealthCalendar({
                     : isSel ? 'text-slate-800 font-black'
                       : 'text-slate-700'
           )}
-          style={isNow ? { background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 2px 8px rgba(244,63,117,0.45)' } : undefined}
+          style={isNow ? (isPregnancyMode
+            ? { background: 'linear-gradient(135deg, #10b981, #34d399)', boxShadow: '0 2px 8px rgba(16,185,129,0.50)' }
+            : { background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 2px 8px rgba(244,63,117,0.45)' }
+          ) : undefined}
           >
             {format(day, 'd')}
           </span>
