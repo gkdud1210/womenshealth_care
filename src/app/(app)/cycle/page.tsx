@@ -1,6 +1,8 @@
 'use client'
 
 import { useMemo, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { getPhaseColor } from '@/lib/cycle-utils'
 import { useOnboardingProfile, isHighConcern } from '@/lib/onboarding-profile'
 import { useAuth } from '@/hooks/useAuth'
@@ -10,6 +12,60 @@ import type { CyclePhase } from '@/types/health'
 /* ── 28-day normalized (0–100) hormone curves ─────────────────── */
 const E2 = [10,10,11,13,11,18,26,37,51,66,79,89,97,100,76,48,42,50,53,51,47,43,38,32,26,20,16,12]
 const P4 = [2,2,2,2,3,3,3,4,4,5,5,5,6,6,8,16,30,46,63,76,86,91,89,78,60,41,24,10]
+
+/* ── Menopause hormone curves (9 points: years -4 to +4 from FMP) ─
+   M_E2  : 에스트로겐 — 완경 전후 급격히 감소
+   M_P4  : 프로게스테론 — 에스트로겐보다 먼저 감소
+   M_FSH : 난포자극호르몬 — 완경 지표, 급격히 상승
+   ──────────────────────────────────────────────────────────────── */
+const M_E2  = [92, 86, 70, 52, 28, 17, 13, 11, 10]
+const M_P4  = [76, 60, 44, 28, 12,  7,  5,  4,  3]
+const M_FSH = [12, 22, 38, 58, 80, 89, 93, 96, 98]
+
+const MENO_W = 270
+function menoX(i: number) { return (i / 8) * MENO_W }
+
+function menoLinePath(data: number[]) {
+  let d = `M ${menoX(0)},${yv(data[0])}`
+  for (let i = 1; i < data.length; i++) {
+    const cpx = (menoX(i - 1) + menoX(i)) / 2
+    d += ` C ${cpx},${yv(data[i-1])} ${cpx},${yv(data[i])} ${menoX(i)},${yv(data[i])}`
+  }
+  return d
+}
+function menoAreaPath(data: number[]) {
+  let d = `M ${menoX(0)},${CHART_H} L ${menoX(0)},${yv(data[0])}`
+  for (let i = 1; i < data.length; i++) {
+    const cpx = (menoX(i - 1) + menoX(i)) / 2
+    d += ` C ${cpx},${yv(data[i-1])} ${cpx},${yv(data[i])} ${menoX(i)},${yv(data[i])}`
+  }
+  d += ` L ${menoX(8)},${CHART_H} Z`
+  return d
+}
+
+/* ── Menopause stage reference data ──────────────────────────── */
+interface MenoStage {
+  label: string; emoji: string; years: string
+  e2: string; p4: string; fsh: string
+  color: string; bg: string; border: string
+}
+const MENO_STAGES: MenoStage[] = [
+  {
+    label: '폐경 이행기', emoji: '🌅', years: '완경 4~1년 전',
+    e2: '20–300 pg/mL (변동)', p4: '0.5–10 ng/mL', fsh: '10–40 IU/L',
+    color: '#f97316', bg: 'rgba(249,115,22,0.08)', border: 'rgba(249,115,22,0.25)',
+  },
+  {
+    label: '완경', emoji: '✨', years: '최후 생리 후 12개월',
+    e2: '10–20 pg/mL', p4: '0.1–1 ng/mL', fsh: '40–100 IU/L',
+    color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.25)',
+  },
+  {
+    label: '완경 후기', emoji: '🌷', years: '완경 1년 이후',
+    e2: '5–15 pg/mL', p4: '< 0.1 ng/mL', fsh: '> 40 IU/L',
+    color: '#d97706', bg: 'rgba(217,119,6,0.08)', border: 'rgba(217,119,6,0.25)',
+  },
+]
 
 /* ── 40-week pregnancy hormone curves (normalized 0–100) ────────
    P_HCG : hCG (인간 융모성 생식선 자극 호르몬) — peaks ~week 8, then drops
@@ -209,8 +265,9 @@ export default function CyclePage() {
   const profile = useOnboardingProfile()
   const cycle = useCycleData(28, 5)
 
-  // Pregnancy mode detection
+  // Mode detection
   const isPregnancy = (user?.cycleMode ?? 'normal') === 'pregnancy'
+  const isMenopause = (user?.cycleMode ?? 'normal') === 'menopause'
   const [pregnancyLMP, setPregnancyLMP] = useState<string | null>(null)
   useEffect(() => {
     try {
@@ -252,6 +309,10 @@ export default function CyclePage() {
     [phase, profile],
   )
 
+  if (isMenopause) {
+    return <MenopauseCyclePage userName={user?.name ?? '님'} />
+  }
+
   if (isPregnancy) {
     return <PregnancyCyclePage gestWeek={gestWeek} pregnancyLMP={pregnancyLMP} userName={user?.name ?? '님'} />
   }
@@ -275,14 +336,19 @@ export default function CyclePage() {
 
       {/* ── Header ── */}
       <div className="mb-5">
-        <div className="flex items-center gap-2 mb-0.5">
+        <div className="flex items-center gap-2 mb-1">
+          <Link href="/calendar"
+            className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
+            style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.15)' }}>
+            <ChevronLeft className="w-4 h-4 text-rose-400" />
+          </Link>
           <h1 className="text-xl font-bold text-slate-800">호르몬 사이클</h1>
           <span className="px-2 py-0.5 rounded-full text-[11px] font-bold"
             style={{ background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
             {meta.emoji} D+{cycleDay}
           </span>
         </div>
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-slate-400 pl-10">
           {hasRealData
             ? `마지막 생리 시작일 기준 · ${user?.name ?? ''}님의 오늘`
             : `캘린더에 생리를 기록하면 정확한 주기가 표시돼요`}
@@ -879,6 +945,222 @@ function PregnancyCyclePage({
               </div>
             )
           })}
+        </div>
+        <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
+          수치는 일반적인 참고 범위이며 개인차가 있습니다.<br />
+          정확한 호르몬 수치는 혈액 검사로만 확인 가능해요.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   완경 호르몬 사이클 페이지
+   ══════════════════════════════════════════════════════════════════ */
+function MenopauseCyclePage({ userName }: { userName: string }) {
+  const e2Line  = useMemo(() => menoLinePath(M_E2), [])
+  const p4Line  = useMemo(() => menoLinePath(M_P4), [])
+  const fshLine = useMemo(() => menoLinePath(M_FSH), [])
+  const e2Area  = useMemo(() => menoAreaPath(M_E2), [])
+  const p4Area  = useMemo(() => menoAreaPath(M_P4), [])
+  const fshArea = useMemo(() => menoAreaPath(M_FSH), [])
+
+  // FMP divider x position (index 4 = year 0)
+  const fmpX = menoX(4)
+
+  const TICK_YEARS = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+
+  const MENO_TIPS = [
+    { icon: '🌡', title: '홍조·발한', body: '핫플래시는 에스트로겐 감소로 체온 조절 중추가 예민해져 발생해요. 시원한 환경과 레이어드 의류로 대처하세요.' },
+    { icon: '😴', title: '수면 변화', body: '프로게스테론 감소로 수면의 질이 낮아질 수 있어요. 취침 전 카페인을 피하고 일정한 수면 시간을 유지해요.' },
+    { icon: '🦴', title: '골밀도 관리', body: '에스트로겐은 뼈 보호 역할을 해요. 칼슘(유제품·두부)과 비타민 D(햇빛·연어)를 꾸준히 섭취하세요.' },
+    { icon: '💜', title: '심혈관 건강', body: '완경 후 심혈관 질환 위험이 높아질 수 있어요. 주 3회 이상 유산소 운동과 저염·저지방 식단을 권장해요.' },
+  ]
+
+  return (
+    <div className="min-h-screen pb-28 px-4 pt-5 max-w-lg mx-auto"
+      style={{ background: 'linear-gradient(160deg,#fffbeb 0%,#fef3c7 45%,#fde68a 100%)' }}>
+
+      {/* ── Header ── */}
+      <div className="mb-5">
+        <div className="flex items-center gap-2 mb-0.5">
+          <h1 className="text-xl font-bold text-slate-800">완경 호르몬 변화</h1>
+          <span className="px-2 py-0.5 rounded-full text-[11px] font-bold"
+            style={{ background: 'rgba(245,158,11,0.15)', color: '#d97706', border: '1px solid rgba(245,158,11,0.35)' }}>
+            ✨ 완경 모드
+          </span>
+        </div>
+        <p className="text-xs text-slate-400">{userName}님의 완경 전후 호르몬 변화 추이</p>
+      </div>
+
+      {/* ── Stage pills ── */}
+      <div className="flex gap-2 mb-4">
+        {MENO_STAGES.map((s) => (
+          <div key={s.label} className="flex-1 rounded-2xl px-2 py-3 text-center"
+            style={{ background: 'rgba(255,255,255,0.92)', border: `1px solid ${s.border}`, boxShadow: '0 2px 12px rgba(245,158,11,0.07)' }}>
+            <p className="text-base leading-none mb-1">{s.emoji}</p>
+            <p className="text-[9px] font-bold" style={{ color: s.color }}>{s.label}</p>
+            <p className="text-[8px] text-slate-400 mt-0.5 leading-tight">{s.years}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Menopause Hormone Chart ── */}
+      <div className="rounded-3xl p-4 mb-4"
+        style={{ background: 'rgba(255,255,255,0.95)', boxShadow: '0 6px 32px rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.18)' }}>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">호르몬 변화 곡선 (완경 전후 4년)</p>
+        <p className="text-[9px] text-slate-400 mb-2">0 = 최후 생리 (FMP) 기준</p>
+
+        <div className="relative w-full" style={{ paddingBottom: '34%' }}>
+          <svg viewBox="0 0 270 92" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+
+            {/* Phase background bands */}
+            <rect x={0}    y={0} width={fmpX}       height={CHART_H} fill="rgba(249,115,22,0.07)" />
+            <rect x={fmpX} y={0} width={MENO_W - fmpX} height={CHART_H} fill="rgba(217,119,6,0.06)" />
+            <line x1={fmpX} y1={0} x2={fmpX} y2={CHART_H}
+              stroke="rgba(245,158,11,0.5)" strokeWidth="1.2" strokeDasharray="3,2" />
+
+            {/* FSH area + line (amber — rising) */}
+            <path d={fshArea} fill="rgba(245,158,11,0.12)" />
+            <path d={fshLine} fill="none" stroke="#f59e0b" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* E2 area + line (rose — declining) */}
+            <path d={e2Area} fill="rgba(244,63,117,0.10)" />
+            <path d={e2Line} fill="none" stroke="#f43f75" strokeWidth="1.8"
+              strokeLinecap="round" strokeLinejoin="round" />
+
+            {/* P4 area + line (purple — declining, dashed) */}
+            <path d={p4Area} fill="rgba(168,85,247,0.07)" />
+            <path d={p4Line} fill="none" stroke="#a855f7" strokeWidth="1.6"
+              strokeLinecap="round" strokeLinejoin="round" strokeDasharray="5,3" />
+
+            {/* X axis */}
+            <line x1={0} y1={CHART_H} x2={MENO_W} y2={CHART_H}
+              stroke="rgba(200,200,220,0.5)" strokeWidth="0.5" />
+
+            {/* FMP label bubble */}
+            <rect x={fmpX - 12} y={0} width={24} height={10} rx="3" fill="#f59e0b" opacity="1" />
+            <text x={fmpX} y={7.5} textAnchor="middle" fontSize="5.2" fill="white" fontWeight="bold">완경</text>
+
+            {/* Tick labels */}
+            {TICK_YEARS.map((y, i) => (
+              <text key={y} x={menoX(i)} y={CHART_H + 7} textAnchor="middle"
+                fontSize="5" fill="rgba(100,100,120,0.7)">{y > 0 ? `+${y}` : y}</text>
+            ))}
+            <text x={135} y={CHART_H + 13} textAnchor="middle" fontSize="4.5" fill="rgba(140,140,160,0.8)">
+              years from final menstrual period
+            </text>
+          </svg>
+        </div>
+
+        {/* Legend */}
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px]">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-5 h-0.5 rounded" style={{ background: '#f59e0b' }} />
+            <span className="text-slate-500">FSH (난포자극호르몬)</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-5 h-0.5 rounded" style={{ background: '#f43f75' }} />
+            <span className="text-slate-500">에스트로겐 E2</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: '#a855f7' }} />
+            <span className="text-slate-500">프로게스테론 P4</span>
+          </span>
+        </div>
+
+        {/* Level bars */}
+        <div className="mt-3 space-y-2">
+          {[
+            { label: 'FSH 난포자극호르몬', color: '#f59e0b', desc: '완경 기준 > 40 IU/L (상승)', pct: 88 },
+            { label: '에스트로겐 E2', color: '#f43f75', desc: '완경 후 5–20 pg/mL (감소)', pct: 15 },
+            { label: '프로게스테론 P4', color: '#a855f7', desc: '완경 후 < 0.1 ng/mL (감소)', pct: 5 },
+          ].map(({ label, color, desc, pct }) => (
+            <div key={label}>
+              <div className="flex justify-between items-center mb-1">
+                <span className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                  <span className="inline-block w-3 h-0.5 rounded" style={{ background: color }} />
+                  {label}
+                </span>
+                <span className="text-[10px] font-bold" style={{ color }}>{desc}</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: `${color}18` }}>
+                <div className="h-full rounded-full transition-all duration-700"
+                  style={{ width: `${pct}%`, background: color }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Stage label bar */}
+        <div className="flex mt-3 rounded-xl overflow-hidden text-center text-[9px]">
+          {MENO_STAGES.map((s, i) => (
+            <div key={i}
+              style={{
+                flex: i === 0 ? 4 : i === 1 ? 1 : 4,
+                background: s.bg,
+                padding: '4px 0', color: s.color, fontWeight: '700',
+                borderBottom: `2px solid ${s.border}`,
+              }}>
+              {s.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Symptom & Care Tips ── */}
+      <div className="rounded-3xl p-5 mb-4"
+        style={{ background: 'rgba(255,255,255,0.92)', boxShadow: '0 6px 32px rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)' }}>
+
+        <div className="flex items-center gap-2.5 mb-4">
+          <div className="w-8 h-8 rounded-2xl flex items-center justify-center flex-none"
+            style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow: '0 3px 12px rgba(245,158,11,0.3)' }}>
+            <span className="text-[11px] font-black text-white">L</span>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-slate-800 leading-none">루디아의 완경 케어 가이드</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">호르몬 변화에 맞춘 생활 습관 안내</p>
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {MENO_TIPS.map((tip) => (
+            <div key={tip.title} className="flex items-start gap-3 px-3 py-3 rounded-2xl"
+              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
+              <span className="text-xl flex-none">{tip.icon}</span>
+              <div>
+                <p className="text-xs font-bold text-slate-800 mb-0.5">{tip.title}</p>
+                <p className="text-xs text-slate-600 leading-relaxed">{tip.body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Stage hormone reference table ── */}
+      <div className="rounded-3xl p-5"
+        style={{ background: 'rgba(255,255,255,0.92)', boxShadow: '0 6px 32px rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.12)' }}>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">단계별 호르몬 정상 범위</p>
+        <div className="space-y-2">
+          {MENO_STAGES.map((s) => (
+            <div key={s.label}
+              className="flex items-center gap-3 px-3 py-3 rounded-2xl"
+              style={{ background: s.bg, border: `1.5px solid ${s.border}` }}>
+              <span className="text-xl flex-none">{s.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <p className="text-xs font-bold text-slate-800">{s.label}</p>
+                  <span className="text-[9px] text-slate-400">{s.years}</span>
+                </div>
+                <p className="text-[9px] text-slate-400 leading-relaxed">
+                  FSH {s.fsh}<br />
+                  E2 {s.e2} · P4 {s.p4}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-4 leading-relaxed">
           수치는 일반적인 참고 범위이며 개인차가 있습니다.<br />

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Mic, MicOff, Volume2, CalendarCheck, Send, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { Mic, MicOff, Volume2, CalendarCheck, Send, Loader2, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { askLudia } from '@/lib/ludia-engine'
 import { useOnboardingProfile } from '@/lib/onboarding-profile'
@@ -598,6 +599,11 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         {/* ── Header ───────────────────────────────────────────────── */}
         <header className="flex-none flex items-center justify-between px-5 pt-4 pb-3 border-b border-rose-50">
           <div className="flex items-center gap-2.5">
+            <Link href="/calendar"
+              className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
+              style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.15)' }}>
+              <ChevronLeft className="w-4 h-4 text-rose-400" />
+            </Link>
             <div className="w-9 h-9 rounded-2xl flex items-center justify-center"
               style={{
                 background: 'linear-gradient(135deg, #f43f75, #a855f7)',

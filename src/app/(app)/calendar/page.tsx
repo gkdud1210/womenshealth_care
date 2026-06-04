@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react'
-import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X } from 'lucide-react'
+import Link from 'next/link'
+import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X, Activity, ChevronRight } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
@@ -212,6 +213,19 @@ export default function CalendarPage() {
         </div>
       </div>
 
+      {/* ── 루디아 호출 버튼 ── */}
+      <div className="flex justify-end mb-3">
+        <Link href="/"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all active:scale-95"
+          style={{
+            background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',
+            boxShadow: '0 2px 10px rgba(244,63,117,0.2)',
+          }}>
+          <Sparkles className="w-3 h-3 text-rose-300" />
+          <span className="text-xs font-bold text-white tracking-wide">루디아 호출</span>
+        </Link>
+      </div>
+
       {/* ── Cycle summary card ── */}
       {(user?.cycleMode ?? 'normal') === 'normal' && (
         <div className="mb-4 rounded-3xl overflow-hidden"
@@ -249,7 +263,7 @@ export default function CalendarPage() {
           </div>
 
           {/* Progress bar */}
-          <div className="px-4 py-2">
+          <div className="px-4 pt-2 pb-1">
             <div className="flex justify-between text-[9px] text-slate-400 mb-1">
               <span>생리 시작</span>
               <span>D+{cycleDay} / {CYCLE_LENGTH}일</span>
@@ -263,6 +277,21 @@ export default function CalendarPage() {
                 }} />
             </div>
           </div>
+
+          {/* 호르몬 사이클 페이지 링크 */}
+          <Link href="/cycle"
+            className="flex items-center gap-2 px-4 py-2.5 transition-all active:scale-[0.98]"
+            style={{ borderTop: `1px solid ${phaseColor}18` }}>
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ background: `${phaseColor}18` }}>
+              <Activity className="w-3.5 h-3.5" style={{ color: phaseColor }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-700">호르몬 사이클 차트</p>
+              <p className="text-[10px] text-slate-400">에스트로겐 · 프로게스테론 변화 보기</p>
+            </div>
+            <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: phaseColor }} />
+          </Link>
         </div>
       )}
 

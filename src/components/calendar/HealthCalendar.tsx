@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle, Pencil, Check } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle, Pencil, Check, Plus } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths, addDays
@@ -286,12 +286,19 @@ export function HealthCalendar({
 
   // ── Voice schedule state ──
   const { addEvents, getEventsByDate, deleteEvent, updateEvent } = useSchedule()
-  const [scheduleSheetDate, setScheduleSheetDate] = useState<Date | null>(null)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
   const [flipState, setFlipState] = useState<{
     outgoing: Date; incoming: Date; dir: 'next' | 'prev'
   } | null>(null)
   const touchStartX = useRef<number | null>(null)
+
+  // ── Drag-to-select ──────────────────────────────────────────────────────
+  const gridRef         = useRef<HTMLDivElement>(null)
+  const [selRange,      setSelRange]      = useState<{ start: Date; end: Date } | null>(null)
+  const [dragHighlight, setDragHighlight] = useState<{ start: Date; end: Date } | null>(null)
+  const dragAnchorRef   = useRef<Date | null>(null)
+  const isDraggingRef   = useRef(false)
+  const dragMovedRef    = useRef(false)
 
   function navigateMonth(dir: 'next' | 'prev') {
     if (flipState) return
@@ -318,7 +325,7 @@ export function HealthCalendar({
   function handleTouchEnd(e: React.TouchEvent) {
     if (touchStartX.current === null) return
     const delta = e.changedTouches[0].clientX - touchStartX.current
-    if (Math.abs(delta) > 50) {
+    if (Math.abs(delta) > 50 && !dragMovedRef.current) {
       navigateMonth(delta < 0 ? 'next' : 'prev')
     }
     touchStartX.current = null
@@ -439,145 +446,274 @@ export function HealthCalendar({
   const selectedPhase = selectedDate ? getDayPhase(selectedDate) : undefined
 
   function renderCalGrid(days: Date[], forMonth: Date) {
-    return days.map((day, i) => {
-      const inMonth    = isSameMonth(day, forMonth)
-      const isNow      = isToday(day)
-      const isSel      = selectedDate ? isSameDay(day, selectedDate) : false
-      const log        = inMonth ? logs[getKey(day)] : undefined
-      const phase      = modeData.mode === 'normal' ? getDayPhase(day) : undefined
-      const dow        = day.getDay()
-      const dayEvents  = inMonth ? getEventsByDate(getKey(day)) : []
+    // ── 1. Build multi-day chains ──────────────────────────────────────────
+    const allInMonth: ScheduleEvent[] = []
+    for (const d of days) {
+      if (isSameMonth(d, forMonth)) allInMonth.push(...getEventsByDate(getKey(d)))
+    }
+    const groups = new Map<string, ScheduleEvent[]>()
+    for (const ev of allInMonth) {
+      const k = `${ev.title}||${ev.category}||${ev.startTime}||${ev.endTime}`
+      const arr = groups.get(k) ?? []; arr.push(ev); groups.set(k, arr)
+    }
+    interface Chain { key: string; title: string; category: ScheduleEvent['category']; startDate: string; endDate: string }
+    const chains: Chain[] = []
+    const chainIds = new Set<string>()
+    for (const [k, evts] of Array.from(groups.entries())) {
+      const sorted = evts.slice().sort((a: ScheduleEvent, b: ScheduleEvent) => a.date.localeCompare(b.date))
+      let run = [sorted[0]]
+      const flush = () => {
+        if (run.length >= 2) {
+          run.forEach(e => chainIds.add(e.id))
+          chains.push({ key: k + run[0].date, title: run[0].title, category: run[0].category, startDate: run[0].date, endDate: run[run.length - 1].date })
+        }
+      }
+      for (let i = 1; i < sorted.length; i++) {
+        const diff = Math.round((new Date(sorted[i].date + 'T00:00:00').getTime() - new Date(sorted[i - 1].date + 'T00:00:00').getTime()) / 86400000)
+        if (diff === 1) run.push(sorted[i]); else { flush(); run = [sorted[i]] }
+      }
+      flush()
+    }
 
-      const { bg: modeBg, label: modeLabel, isWarning, isDue } =
-        (inMonth && modeData.mode !== 'normal')
-          ? getModeCellInfo(day)
-          : { bg: undefined, label: null, isWarning: false, isDue: false }
+    // ── 2. Per-week track assignment (so overlapping chains get different vertical slots) ──
+    const CHAIN_TOP    = 22   // px below top of cell (below date number)
+    const CHAIN_H      = 13   // bar height
+    const CHAIN_STRIDE = 15   // CHAIN_H + 2px gap
+    const totalWeeks = Math.ceil(days.length / 7)
 
-      const isPregnancyMode = modeData.mode === 'pregnancy'
+    // weekTrackMap[w][chainKey] = track index (0, 1, 2 …)
+    const weekTrackMaps: Map<string, number>[] = []
+    for (let w = 0; w < totalWeeks; w++) {
+      const weekDays = days.slice(w * 7, w * 7 + 7)
+      const weekStart = weekDays[0]; const weekEnd = weekDays[weekDays.length - 1]
+      const overlapping = chains
+        .map(c => {
+          const cs = new Date(c.startDate + 'T00:00:00'); const ce = new Date(c.endDate + 'T00:00:00')
+          if (cs > weekEnd || ce < weekStart) return null
+          const dispStart = cs < weekStart ? weekStart : cs
+          const dispEnd   = ce > weekEnd   ? weekEnd   : ce
+          const si = weekDays.findIndex(d => isSameDay(d, dispStart))
+          const ei = weekDays.findIndex(d => isSameDay(d, dispEnd))
+          return { ...c, startCol: si >= 0 ? si : 0, endCol: ei >= 0 ? ei : weekDays.length - 1 }
+        })
+        .filter((c): c is NonNullable<typeof c> => c !== null)
+        .sort((a, b) => a.startCol - b.startCol)
 
-      const isPredicted = inMonth && modeData.mode === 'normal'
-        && phase === 'menstrual' && !log?.isPeriod
-      const predDayInCycle = isPredicted && effectiveCycleStart
-        ? ((Math.floor((day.getTime() - effectiveCycleStart.getTime()) / 86400000)) % cycleLength) + 1
-        : 0
-      const isPredictedStart = isPredicted && predDayInCycle === 1
-      const isPredictedEnd   = isPredicted && predDayInCycle === periodLength
+      const tracks: number[] = []
+      const tMap = new Map<string, number>()
+      for (let i = 0; i < overlapping.length; i++) {
+        const used = new Set<number>()
+        for (let j = 0; j < i; j++) {
+          if (overlapping[j].endCol >= overlapping[i].startCol) used.add(tracks[j])
+        }
+        let t = 0; while (used.has(t)) t++
+        tracks.push(t); tMap.set(overlapping[i].key, t)
+      }
+      weekTrackMaps.push(tMap)
+    }
 
-      const background = modeData.mode === 'normal'
-        ? isPredicted && !isSel ? 'rgba(255,179,179,0.38)' : cellBgFor(phase, isSel)
-        : isSel ? (isPregnancyMode ? 'rgba(16,185,129,0.35)' : (modeBg?.replace(/[\d.]+\)$/, '0.32)') ?? 'rgba(244,63,117,0.1)')) : modeBg
+    // ── 3. Render cells (flat array — no strip rows) ───────────────────────
+    const result: React.ReactNode[] = []
+    for (let w = 0; w < totalWeeks; w++) {
+      const weekDays  = days.slice(w * 7, w * 7 + 7)
+      const weekStart = weekDays[0]; const weekEnd = weekDays[weekDays.length - 1]
+      const tMap      = weekTrackMaps[w]
 
-      const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444'
-        : isPregnancyMode ? '#10b981'
-        : phase ? getPhaseColor(phase) : '#f43f75'
+      result.push(
+        ...weekDays.map((day, ci) => {
+          const gi      = w * 7 + ci
+          const inMonth = isSameMonth(day, forMonth)
+          const dayKey  = getKey(day)
+          const isNow   = isToday(day)
 
-      return (
-        <button key={i}
-          onClick={() => {
-            if (!inMonth) return
-            if (isSel) { setSelectedDate(null); setDayMode(null) }
-            else { setSelectedDate(day); setDayMode('action') }
-          }}
-          disabled={!inMonth}
-          className={cn(
-            'relative flex flex-col items-center py-1 gap-0.5 transition-all duration-150',
-            'min-h-[3.5rem] sm:min-h-[5rem] active:scale-95',
-            'border-r border-b border-slate-100',
-            !inMonth && 'opacity-0 pointer-events-none',
-          )}
-          style={{
-            background: background ?? 'transparent',
-            outline: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.3)' : undefined,
-            outlineOffset: '-1px',
-            boxShadow: isSel
-              ? `inset 0 0 0 2px ${ringColor}`
-              : isNow   ? `inset 0 0 0 2px ${isPregnancyMode ? '#10b981' : '#f43f75'}`
-                : isDue ? `inset 0 0 0 1.5px #f59e0b88`
-                  : undefined,
-          }}>
-          <span className={cn(
-            'text-xs sm:text-sm font-bold leading-none mt-0.5 z-10',
-            isNow
-              ? 'w-6 h-6 sm:w-7 sm:h-7 rounded-full text-white flex items-center justify-center text-[11px] sm:text-xs font-black'
-              : isDue  ? 'text-amber-600 font-bold'
-                : dow === 0 ? 'text-rose-600'
-                  : dow === 6 ? 'text-blue-500'
-                    : isSel ? 'text-slate-800 font-black'
-                      : 'text-slate-700'
-          )}
-          style={isNow ? (isPregnancyMode
-            ? { background: 'linear-gradient(135deg, #10b981, #34d399)', boxShadow: '0 2px 8px rgba(16,185,129,0.50)' }
-            : { background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 2px 8px rgba(244,63,117,0.45)' }
-          ) : undefined}
-          >
-            {format(day, 'd')}
-          </span>
-          {isPredictedStart && <span className="text-[7px] font-semibold text-rose-400 leading-none">예상시작</span>}
-          {isPredictedEnd   && <span className="text-[7px] font-semibold text-rose-400 leading-none">예상종료</span>}
-          {modeLabel && (
-            <span className={cn('text-[8px] font-semibold leading-none',
-              isWarning ? 'text-amber-700' : isDue ? 'text-amber-600' : 'text-emerald-700')}>
-              {modeLabel}
-            </span>
-          )}
-          {log && (
-            <>
-              {/* 기분 이모지 */}
-              {log.mood && (
-                <span className="text-[13px] leading-none z-10">
-                  {MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}
-                </span>
-              )}
-              {/* 생리 물방울 — 기분 없을 때만 */}
-              {log.isPeriod && !log.mood && (
-                <span className="text-[10px] leading-none z-10">
-                  {log.periodFlow === 'heavy' || log.periodFlow === 'very_heavy' ? '💧💧'
-                    : log.periodFlow === 'medium' ? '💧💧'
-                    : '💧'}
-                </span>
-              )}
-              {/* HRV 작은 뱃지 */}
-              {log.hrv != null && (
-                <span
-                  onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}
-                  className="leading-none px-1 py-0.5 rounded-md cursor-pointer z-10"
-                  style={{ fontSize: '7px', color: '#3b82f6', background: 'rgba(59,130,246,0.12)' }}>
-                  ♥{log.hrv}
-                </span>
-              )}
-            </>
-          )}
-          {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
-            <div className="w-1.5 h-1.5 rounded-full absolute bottom-1 right-1.5 z-10"
-              style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
-          )}
-
-          {/* ── Schedule event dots — separate tap target ── */}
-          {dayEvents.length > 0 && (
-            <button
-              onClick={e => { e.stopPropagation(); setScheduleSheetDate(day) }}
-              className="flex items-center justify-center gap-0.5 mt-auto z-10 w-full px-0.5 py-0.5 rounded-md transition-colors"
-              style={{ background: 'rgba(168,85,247,0.08)' }}
-              aria-label="일정 보기"
-            >
-              {dayEvents.length <= 3
-                ? dayEvents.slice(0, 3).map(ev => (
-                    <div key={ev.id}
-                      className="w-1.5 h-1.5 rounded-full flex-none"
-                      style={{ background: SCHEDULE_CATEGORY_COLORS[ev.category] }} />
-                  ))
-                : (
-                  <span className="text-[8px] font-bold"
-                    style={{ color: '#a855f7' }}>
-                    +{dayEvents.length}
-                  </span>
-                )
+          // Chains that overlap THIS cell (for rendering a segment inside it)
+          const cellChains = !inMonth ? [] : chains
+            .filter(c => c.startDate <= dayKey && c.endDate >= dayKey)
+            .map(c => {
+              const cs = new Date(c.startDate + 'T00:00:00')
+              const ce = new Date(c.endDate   + 'T00:00:00')
+              const dispStart = cs < weekStart ? weekStart : cs
+              const dispEnd   = ce > weekEnd   ? weekEnd   : ce
+              return {
+                c, track: tMap.get(c.key) ?? 0,
+                isFirstInWeek: isSameDay(dispStart, day),  // show title here
+                isLastInWeek:  isSameDay(dispEnd,   day),  // show rounded end
+                isActualStart: c.startDate === dayKey,
+                isActualEnd:   c.endDate   === dayKey,
+                continuesRight: !isSameDay(ce, dispEnd),   // chain continues past this week
               }
+            })
+            .sort((a, b) => a.track - b.track)
+
+          const maxTrack = cellChains.length ? Math.max(...cellChains.map(b => b.track)) : -1
+
+          const activeRange = dragHighlight ?? selRange
+          const isInRange   = inMonth && !!activeRange
+            && day.getTime() >= activeRange.start.getTime()
+            && day.getTime() <= activeRange.end.getTime()
+          const isSel      = inMonth && (isInRange
+            ? isSameDay(day, activeRange!.start) || isSameDay(day, activeRange!.end)
+            : (selectedDate ? isSameDay(day, selectedDate) : false))
+          const isRangeMid = isInRange && !isSel
+          const log        = inMonth ? logs[dayKey] : undefined
+          const phase      = modeData.mode === 'normal' ? getDayPhase(day) : undefined
+          const dow        = day.getDay()
+          const dayEvents  = inMonth ? getEventsByDate(dayKey).filter(ev => !chainIds.has(ev.id)) : []
+          const { bg: modeBg, label: modeLabel, isWarning, isDue } = (inMonth && modeData.mode !== 'normal')
+            ? getModeCellInfo(day) : { bg: undefined, label: null, isWarning: false, isDue: false }
+          const isPregnancyMode = modeData.mode === 'pregnancy'
+          const isPredicted = inMonth && modeData.mode === 'normal' && phase === 'menstrual' && !log?.isPeriod
+          const predDayInCycle = isPredicted && effectiveCycleStart
+            ? ((Math.floor((day.getTime() - effectiveCycleStart.getTime()) / 86400000)) % cycleLength) + 1 : 0
+          const isPredictedStart = isPredicted && predDayInCycle === 1
+          const isPredictedEnd   = isPredicted && predDayInCycle === periodLength
+          // 셀 배경: 범위 선택·출산예정일만 표시, 나머지는 흰색 유지
+          const background = isRangeMid ? 'rgba(168,85,247,0.12)'
+            : isDue ? 'rgba(245,158,11,0.12)'
+            : undefined
+          const ringColor = isDue ? '#f59e0b' : isWarning ? '#ef4444'
+            : isPregnancyMode ? '#10b981' : phase ? getPhaseColor(phase) : '#f43f75'
+
+          // 날짜 숫자 원형 배경 (phase 색상 → 숫자만 색 표시)
+          const numCircleBg = isNow ? undefined
+            : phase ? getPhaseCellBg(phase)
+            : undefined
+          const numColor = isNow ? undefined
+            : isDue ? '#b45309'
+            : phase ? getPhaseColor(phase)
+            : dow === 0 ? '#f43f75'
+            : dow === 6 ? '#3b82f6'
+            : isSel ? '#1e293b'
+            : '#475569'
+
+          // Top offset for single-day events (below chains)
+          const singleEventTop = CHAIN_TOP + (maxTrack + 1) * CHAIN_STRIDE
+
+          return (
+            <button key={gi}
+              data-date={inMonth ? dayKey : ''}
+              disabled={!inMonth}
+              className={cn(
+                'relative flex flex-col items-center py-1 gap-0 transition-all duration-150',
+                'min-h-[4.5rem] sm:min-h-[5.5rem]',
+                'border-r border-b border-slate-100',
+                !inMonth && 'opacity-0 pointer-events-none',
+              )}
+              style={{
+                background: background ?? 'transparent',
+                // 예상 생리일: 셀 테두리만 점선 (배경색 없음)
+                outline: isPredicted && !isSel ? '1.5px dashed rgba(217,79,92,0.25)' : undefined,
+                outlineOffset: '-1px',
+                // 선택 시 ring만 표시 (배경색 없이도 선택 인식)
+                boxShadow: isSel ? `inset 0 0 0 2px ${ringColor}` : undefined,
+              }}>
+
+              {/* Date number — 원형 배경으로 phase 색상 표시, 셀 자체는 흰색 유지 */}
+              <span className={cn(
+                'relative z-10 flex items-center justify-center rounded-full',
+                'w-6 h-6 sm:w-7 sm:h-7 text-[11px] sm:text-xs leading-none mt-0.5',
+                isNow ? 'text-white font-black' : isSel ? 'font-black' : 'font-semibold',
+              )}
+              style={isNow
+                ? (isPregnancyMode
+                    ? { background: 'linear-gradient(135deg, #10b981, #34d399)', boxShadow: '0 2px 8px rgba(16,185,129,0.50)' }
+                    : { background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 2px 8px rgba(244,63,117,0.45)' }
+                  )
+                : { background: numCircleBg, color: numColor }
+              }>
+                {format(day, 'd')}
+              </span>
+              {isPredictedStart && <span className="relative z-10 text-[7px] font-semibold text-rose-400 leading-none">예상시작</span>}
+              {isPredictedEnd   && <span className="relative z-10 text-[7px] font-semibold text-rose-400 leading-none">예상종료</span>}
+              {modeLabel && (
+                <span className={cn('relative z-10 text-[8px] font-semibold leading-none',
+                  isWarning ? 'text-amber-700' : isDue ? 'text-amber-600' : 'text-emerald-700')}>
+                  {modeLabel}
+                </span>
+              )}
+
+              {/* Health indicators — placed at bottom of cell */}
+              {log && (
+                <div className="absolute bottom-1 flex flex-col items-center gap-0.5 z-10 w-full pointer-events-none">
+                  {log.mood && <span className="text-[11px] leading-none">{MOODS.find(m => m.key === log.mood)?.emoji ?? '😊'}</span>}
+                  {log.isPeriod && !log.mood && (
+                    <span className="text-[9px] leading-none">
+                      {log.periodFlow === 'heavy' || log.periodFlow === 'very_heavy' ? '💧💧' : log.periodFlow === 'medium' ? '💧💧' : '💧'}
+                    </span>
+                  )}
+                  {log.hrv != null && (
+                    <span className="leading-none px-1 rounded-md pointer-events-auto"
+                      style={{ fontSize: '7px', color: '#3b82f6', background: 'rgba(59,130,246,0.12)' }}
+                      onClick={e => { e.stopPropagation(); setSelectedDate(day); setShowDetailModal(true) }}>
+                      ♥{log.hrv}
+                    </span>
+                  )}
+                </div>
+              )}
+              {log?.painIntensity !== undefined && log.painIntensity >= 4 && (
+                <div className="w-1.5 h-1.5 rounded-full absolute top-1 right-1 z-10"
+                  style={{ backgroundColor: log.painIntensity >= 7 ? '#ef4444' : '#f59e0b' }} />
+              )}
+
+              {/* ── Multi-day chain bar segment ──────────────────────────── */}
+              {/* Each cell renders its OWN segment. Same track = same top = visually connected across cells */}
+              {cellChains.map(({ c, track, isFirstInWeek, isLastInWeek, isActualStart, isActualEnd, continuesRight }) => {
+                const color = SCHEDULE_CATEGORY_COLORS[c.category]
+                const rL    = isActualStart ? '4px' : '0'
+                const rR    = isActualEnd   ? '4px' : '0'
+                return (
+                  <div key={c.key} style={{
+                    position: 'absolute',
+                    left: 0, right: 0,
+                    top:    CHAIN_TOP + track * CHAIN_STRIDE,
+                    height: CHAIN_H,
+                    background:   color + '22',
+                    borderRadius: `${rL} ${rR} ${rR} ${rL}`,
+                    borderLeft:   isActualStart ? `3px solid ${color}` : 'none',
+                    borderTop:    `1px solid ${color}2a`,
+                    borderBottom: `1px solid ${color}2a`,
+                    borderRight:  isActualEnd   ? `1px solid ${color}2a` : 'none',
+                    display: 'flex', alignItems: 'center',
+                    paddingLeft: isActualStart ? 4 : 2, paddingRight: 2,
+                    zIndex: 3, pointerEvents: 'none', overflow: 'hidden',
+                  }}>
+                    {isFirstInWeek && (
+                      <span style={{ fontSize: '9px', fontWeight: 700, color, flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {c.title}
+                      </span>
+                    )}
+                    {/* › only at the last visible cell in the week when chain continues */}
+                    {isLastInWeek && continuesRight && (
+                      <span style={{ fontSize: '8px', color: color + '99', flexShrink: 0, marginLeft: 'auto' }}>›</span>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Single-day event bars — positioned below chains */}
+              {dayEvents.slice(0, 2).map((ev, ei) => (
+                <div key={ev.id} style={{
+                  position: 'absolute', left: 2, right: 2,
+                  top: singleEventTop + ei * 15,
+                  zIndex: 4, pointerEvents: 'none',
+                }}>
+                  <div className="rounded-[3px] text-[7px] sm:text-[8px] font-semibold px-1 py-0.5 truncate leading-tight"
+                    style={{ background: SCHEDULE_CATEGORY_COLORS[ev.category] + '28', color: SCHEDULE_CATEGORY_COLORS[ev.category] }}>
+                    {ev.title}
+                  </div>
+                </div>
+              ))}
+              {dayEvents.length > 2 && (
+                <span style={{ position: 'absolute', bottom: 1, left: 2, fontSize: '7px', fontWeight: 700, color: '#a855f7', zIndex: 4 }}>
+                  +{dayEvents.length - 2}
+                </span>
+              )}
             </button>
-          )}
-        </button>
+          )
+        })
       )
-    })
+    }
+    return result
   }
 
   return (
@@ -636,9 +772,66 @@ export function HealthCalendar({
 
         {/* ── Calendar grid — slide animation ── */}
         <div
-          style={{ position: 'relative', overflow: 'hidden' }}
+          ref={gridRef}
+          style={{ position: 'relative', overflow: 'hidden', userSelect: 'none', touchAction: isDraggingRef.current ? 'none' : 'pan-y' }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
+          onPointerDown={e => {
+            const dateStr = (e.target as HTMLElement).closest('[data-date]')?.getAttribute('data-date')
+            if (!dateStr) return
+            const d = new Date(dateStr + 'T00:00:00')
+            isDraggingRef.current = true
+            dragMovedRef.current  = false
+            dragAnchorRef.current = d
+            setDragHighlight({ start: d, end: d })
+            gridRef.current?.setPointerCapture(e.pointerId)
+          }}
+          onPointerMove={e => {
+            if (!isDraggingRef.current || !dragAnchorRef.current) return
+            const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+            const dateStr = el?.closest('[data-date]')?.getAttribute('data-date')
+            if (!dateStr) return
+            const d      = new Date(dateStr + 'T00:00:00')
+            const anchor = dragAnchorRef.current
+            if (!isSameDay(d, anchor)) dragMovedRef.current = true
+            const start  = d < anchor ? d : anchor
+            const end    = d < anchor ? anchor : d
+            setDragHighlight({ start, end })
+          }}
+          onPointerUp={e => {
+            if (!isDraggingRef.current) return
+            gridRef.current?.releasePointerCapture(e.pointerId)
+            isDraggingRef.current = false
+            const anchor = dragAnchorRef.current
+            dragAnchorRef.current = null
+            setDragHighlight(null)
+            if (!anchor) return
+
+            const el      = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null
+            const dateStr = el?.closest('[data-date]')?.getAttribute('data-date')
+            const endDay  = dateStr ? new Date(dateStr + 'T00:00:00') : anchor
+            const start   = endDay < anchor ? endDay : anchor
+            const end     = endDay < anchor ? anchor : endDay
+
+            if (!dragMovedRef.current) {
+              const isSameAsPrev = selRange
+                && isSameDay(selRange.start, start) && isSameDay(selRange.end, start)
+              if (isSameAsPrev) {
+                setSelRange(null); setSelectedDate(null); setDayMode(null)
+              } else {
+                setSelRange({ start, end: start })
+                setSelectedDate(start); setDayMode('action')
+              }
+            } else {
+              setSelRange({ start, end })
+              setSelectedDate(start); setDayMode('action')
+            }
+          }}
+          onPointerCancel={() => {
+            isDraggingRef.current = false
+            dragAnchorRef.current = null
+            setDragHighlight(null)
+          }}
         >
           <style>{`
             @keyframes cal-slide-in-next  { from { transform: translateX(100%) } to { transform: translateX(0) } }
@@ -699,14 +892,23 @@ export function HealthCalendar({
         <PregnancyInfoCard lmpDate={modeData.pregnancyLMP} userName={userName} />
       )}
 
-      {/* ── Day action sheet ── */}
-      {selectedDate && dayMode === 'action' && (
-        <DayActionSheet
-          date={selectedDate}
+      {/* ── Day event panel ── */}
+      {selectedDate && dayMode === 'action' && selRange && (
+        <DayEventPanel
+          selRange={selRange}
+          events={
+            isSameDay(selRange.start, selRange.end)
+              ? getEventsByDate(getKey(selRange.start))
+              : eachDayOfInterval({ start: selRange.start, end: selRange.end })
+                  .flatMap(d => getEventsByDate(getKey(d)))
+          }
           log={selectedLog}
+          phase={selectedPhase}
+          onDeleteEvent={deleteEvent}
+          onUpdateEvent={updateEvent}
+          onAddEvents={addEvents}
           onHealthLog={() => setDayMode('health')}
-          onAddSchedule={() => setDayMode('schedule')}
-          onClose={() => { setSelectedDate(null); setDayMode(null) }}
+          onClose={() => { setSelRange(null); setSelectedDate(null); setDayMode(null) }}
         />
       )}
 
@@ -723,15 +925,6 @@ export function HealthCalendar({
         />
       )}
 
-      {/* ── Add schedule sheet ── */}
-      {selectedDate && dayMode === 'schedule' && (
-        <AddScheduleSheet
-          date={selectedDate}
-          onSave={(ev) => { addEvents([ev]); setSelectedDate(null); setDayMode(null) }}
-          onBack={() => setDayMode('action')}
-          onClose={() => { setSelectedDate(null); setDayMode(null) }}
-        />
-      )}
 
       {/* ── Full log modal ── */}
       {showModal && selectedDate && (
@@ -768,16 +961,6 @@ export function HealthCalendar({
         />
       )}
 
-      {/* ── Schedule sheet ── */}
-      {scheduleSheetDate && (
-        <ScheduleSheet
-          date={scheduleSheetDate}
-          events={getEventsByDate(getKey(scheduleSheetDate))}
-          onDelete={deleteEvent}
-          onUpdate={updateEvent}
-          onClose={() => setScheduleSheetDate(null)}
-        />
-      )}
 
       {/* ── Toast ── */}
       {toastMsg && (
@@ -1440,195 +1623,6 @@ function PregnancyInfoCard({ lmpDate, userName }: { lmpDate: string; userName: s
   )
 }
 
-// ── DayActionSheet ────────────────────────────────────────────────────────────
-function DayActionSheet({
-  date, log, onHealthLog, onAddSchedule, onClose,
-}: {
-  date: Date
-  log?: DailyLogFormData
-  onHealthLog: () => void
-  onAddSchedule: () => void
-  onClose: () => void
-}) {
-  const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
-  const isPeriodDay = !!log?.isPeriod
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl"
-        style={{ background: 'rgba(255,248,252,0.98)', backdropFilter: 'blur(24px)', border: '1px solid rgba(244,63,117,0.1)' }}>
-        <div className="px-5 pt-5 pb-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <p className="text-base font-bold text-slate-800">{dateLabel}</p>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {isPeriodDay ? '🩸 생리 중인 날이에요' : '무엇을 하시겠어요?'}
-              </p>
-            </div>
-            <button onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
-              <X className="w-4 h-4 text-slate-500" />
-            </button>
-          </div>
-
-          {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={onHealthLog}
-              className="flex flex-col items-center gap-2.5 py-5 rounded-2xl transition-all active:scale-95"
-              style={{ background: 'linear-gradient(135deg, rgba(244,63,117,0.08), rgba(225,29,90,0.06))', border: '1.5px solid rgba(244,63,117,0.2)' }}>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)', boxShadow: '0 4px 14px rgba(244,63,117,0.35)' }}>
-                <span className="text-xl">🩸</span>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-800">
-                  {isPeriodDay ? '생리 기록 수정' : '생리 체크하기'}
-                </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">몸 상태 기록</p>
-              </div>
-            </button>
-
-            <button onClick={onAddSchedule}
-              className="flex flex-col items-center gap-2.5 py-5 rounded-2xl transition-all active:scale-95"
-              style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(124,58,237,0.06))', border: '1.5px solid rgba(168,85,247,0.2)' }}>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 4px 14px rgba(168,85,247,0.35)' }}>
-                <span className="text-xl">📅</span>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-bold text-slate-800">일정 추가하기</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">스케줄 등록</p>
-              </div>
-            </button>
-          </div>
-
-        </div>
-      </div>
-    </>
-  )
-}
-
-// ── AddScheduleSheet ──────────────────────────────────────────────────────────
-function AddScheduleSheet({
-  date, onSave, onBack, onClose,
-}: {
-  date: Date
-  onSave: (ev: ScheduleEvent) => void
-  onBack: () => void
-  onClose: () => void
-}) {
-  const dateStr   = format(date, 'yyyy-MM-dd')
-  const dateLabel = format(date, 'M월 d일 (eee)', { locale: ko })
-  const [title, setTitle]         = useState('')
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime]     = useState('10:00')
-  const [category, setCategory]   = useState<ScheduleEvent['category']>('other')
-
-  function handleSave() {
-    if (!title.trim()) return
-    onSave({
-      id: `manual-${Date.now()}`,
-      date: dateStr,
-      startTime,
-      endTime,
-      title: title.trim(),
-      category,
-      intensity: 'medium',
-      source: 'manual',
-      createdAt: new Date().toISOString(),
-    })
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px]" onClick={onClose} />
-      <div className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl"
-        style={{ background: 'rgba(255,248,255,0.98)', backdropFilter: 'blur(24px)', border: '1px solid rgba(168,85,247,0.14)' }}>
-        <div className="px-5 pt-5 pb-6 space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <button onClick={onBack}
-                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
-                <ChevronLeft className="w-4 h-4 text-slate-500" />
-              </button>
-              <div>
-                <p className="text-sm font-bold text-slate-800">일정 추가</p>
-                <p className="text-xs text-slate-400">{dateLabel}</p>
-              </div>
-            </div>
-            <button onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
-              <X className="w-4 h-4 text-slate-500" />
-            </button>
-          </div>
-
-          {/* Title */}
-          <div>
-            <p className="text-xs font-semibold text-slate-500 mb-1.5">일정 이름</p>
-            <input
-              autoFocus
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              placeholder="예: 병원 예약, 운동, 회의..."
-              className="w-full text-sm text-slate-800 bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-purple-400 transition-colors placeholder-slate-300"
-            />
-          </div>
-
-          {/* Time */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1.5">시작 시간</p>
-              <input type="time" value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className="w-full text-sm text-slate-700 bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-purple-400 transition-colors" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-slate-500 mb-1.5">종료 시간</p>
-              <input type="time" value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className="w-full text-sm text-slate-700 bg-white border border-slate-200 rounded-2xl px-4 py-3 outline-none focus:border-purple-400 transition-colors" />
-            </div>
-          </div>
-
-          {/* Category */}
-          <div>
-            <p className="text-xs font-semibold text-slate-500 mb-2">카테고리</p>
-            <div className="flex flex-wrap gap-2">
-              {CATEGORY_OPTIONS.map(o => {
-                const c = SCHEDULE_CATEGORY_COLORS[o.value]
-                const active = category === o.value
-                return (
-                  <button key={o.value} onClick={() => setCategory(o.value)}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95"
-                    style={{
-                      background: active ? c + '18' : 'rgba(248,248,250,0.9)',
-                      border: `1.5px solid ${active ? c + '55' : 'rgba(200,200,210,0.5)'}`,
-                      color: active ? c : '#94a3b8',
-                      boxShadow: active ? `0 2px 8px ${c}22` : undefined,
-                    }}>
-                    {o.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Save */}
-          <button
-            onClick={handleSave}
-            disabled={!title.trim()}
-            className="w-full py-3.5 rounded-2xl text-sm font-bold text-white transition-all active:scale-95 disabled:opacity-40"
-            style={{ background: `linear-gradient(135deg, #a855f7, #7c3aed)`, boxShadow: title.trim() ? '0 4px 16px rgba(168,85,247,0.4)' : 'none' }}>
-            일정 저장하기 ✓
-          </button>
-        </div>
-      </div>
-    </>
-  )
-}
 
 // ── ScheduleSheet ─────────────────────────────────────────────────────────────
 function fmtHHMM(t: string) {
@@ -1649,7 +1643,309 @@ const CATEGORY_OPTIONS: { value: ScheduleEvent['category']; label: string }[] = 
   { value: 'other',    label: '기타' },
 ]
 
-function ScheduleSheet({
+// ── DayEventPanel ─────────────────────────────────────────────────────────────
+function DayEventPanel({
+  selRange, events, log, phase,
+  onDeleteEvent, onUpdateEvent, onAddEvents, onHealthLog, onClose,
+}: {
+  selRange: { start: Date; end: Date }
+  events: ScheduleEvent[]
+  log?: DailyLogFormData
+  phase?: CyclePhase
+  onDeleteEvent: (id: string) => void
+  onUpdateEvent: (id: string, patch: Partial<ScheduleEvent>) => void
+  onAddEvents: (evs: ScheduleEvent[]) => void
+  onHealthLog: () => void
+  onClose: () => void
+}) {
+  const isSingleDay = isSameDay(selRange.start, selRange.end)
+  const dayCount    = Math.round((selRange.end.getTime() - selRange.start.getTime()) / 86400000) + 1
+  const dateLabel   = isSingleDay
+    ? format(selRange.start, 'M월 d일 EEEE', { locale: ko })
+    : `${format(selRange.start, 'M월 d일', { locale: ko })} ~ ${format(selRange.end, 'M월 d일', { locale: ko })} (${dayCount}일)`
+  const phaseColor = phase ? getPhaseColor(phase) : '#f43f75'
+
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [title,       setTitle]       = useState('')
+  const [startTime,   setStartTime]   = useState('09:00')
+  const [endTime,     setEndTime]     = useState('10:00')
+  const [endDateStr,  setEndDateStr]  = useState(format(selRange.end, 'yyyy-MM-dd'))
+  const [category,    setCategory]    = useState<ScheduleEvent['category']>('other')
+  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [editForm,    setEditForm]    = useState<Partial<ScheduleEvent>>({})
+
+  // reset endDateStr when selRange changes
+  const startDateStr = format(selRange.start, 'yyyy-MM-dd')
+
+  function handleAdd() {
+    if (!title.trim()) return
+    const rangeEnd  = endDateStr >= startDateStr ? endDateStr : startDateStr
+    const days      = eachDayOfInterval({
+      start: new Date(startDateStr + 'T00:00:00'),
+      end:   new Date(rangeEnd    + 'T00:00:00'),
+    })
+    const now = new Date().toISOString()
+    onAddEvents(days.map((d, i) => ({
+      id:        `manual-${Date.now()}-${i}`,
+      date:      format(d, 'yyyy-MM-dd'),
+      startTime,
+      endTime,
+      title:     title.trim(),
+      category,
+      intensity: 'medium' as const,
+      source:    'manual' as const,
+      createdAt: now,
+    })))
+    setTitle(''); setShowAddForm(false)
+  }
+
+  function startEdit(ev: ScheduleEvent) {
+    setEditingId(ev.id)
+    setEditForm({ title: ev.title, startTime: ev.startTime, endTime: ev.endTime, category: ev.category })
+  }
+
+  function saveEdit(id: string) {
+    if (!editForm.title?.trim()) return
+    onUpdateEvent(id, editForm)
+    setEditingId(null)
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-[2px]" onClick={onClose} />
+      <div className="fixed z-50 bottom-0 left-0 right-0 rounded-t-3xl shadow-2xl flex flex-col"
+        style={{ background: 'rgba(255,251,255,0.98)', backdropFilter: 'blur(24px)', border: '1px solid rgba(168,85,247,0.12)', maxHeight: '88dvh' }}>
+
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full bg-slate-200" />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0 border-b border-slate-100">
+          <div>
+            <p className="text-base font-bold text-slate-800">{dateLabel}</p>
+            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+              {phase && isSingleDay && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: getPhaseCellBg(phase), color: phaseColor }}>
+                  {getPhaseLabel(phase)}
+                </span>
+              )}
+              {!isSingleDay && (
+                <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
+                  📅 {dayCount}일 선택됨
+                </span>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+            <X className="w-4 h-4 text-slate-500" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5 pb-6">
+
+          {/* ── Quick add ── */}
+          {showAddForm ? (
+            <div className="rounded-2xl border border-purple-200 overflow-hidden"
+              style={{ background: 'rgba(168,85,247,0.04)' }}>
+              <div className="p-3.5 space-y-2.5">
+                <input
+                  autoFocus
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAdd() }}
+                  placeholder="일정 이름..."
+                  className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-purple-400 transition-colors placeholder-slate-300"
+                />
+                {/* 기간: 시작일 ~ 종료일 */}
+                <div className="flex items-center gap-1.5">
+                  <div className="flex-1">
+                    <p className="text-[10px] text-slate-400 mb-1">시작일</p>
+                    <input type="date" value={startDateStr} readOnly
+                      className="w-full text-xs text-slate-600 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 outline-none" />
+                  </div>
+                  <span className="text-slate-300 mt-4">~</span>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-slate-400 mb-1">종료일</p>
+                    <input type="date" value={endDateStr} min={startDateStr}
+                      onChange={e => setEndDateStr(e.target.value)}
+                      className="w-full text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:border-purple-400" />
+                  </div>
+                </div>
+                {endDateStr > startDateStr && (
+                  <p className="text-[10px] text-purple-500 font-semibold -mt-1">
+                    ✓ {Math.round((new Date(endDateStr + 'T00:00:00').getTime() - new Date(startDateStr + 'T00:00:00').getTime()) / 86400000) + 1}일간 동일 일정이 생성됩니다
+                  </p>
+                )}
+                {/* 시간 */}
+                <div className="flex items-center gap-1.5">
+                  <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)}
+                    className="flex-1 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400" />
+                  <span className="text-slate-300 text-sm">–</span>
+                  <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)}
+                    className="flex-1 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400" />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {CATEGORY_OPTIONS.map(o => {
+                    const c = SCHEDULE_CATEGORY_COLORS[o.value]
+                    const on = category === o.value
+                    return (
+                      <button key={o.value} onClick={() => setCategory(o.value)}
+                        className="px-2.5 py-1 rounded-full text-xs font-semibold transition-all"
+                        style={{ background: on ? c + '18' : '#f1f5f9', border: `1.5px solid ${on ? c + '55' : 'transparent'}`, color: on ? c : '#94a3b8' }}>
+                        {o.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setShowAddForm(false)}
+                    className="flex-1 py-2 rounded-xl text-xs text-slate-400 border border-slate-100 hover:bg-slate-50">취소</button>
+                  <button onClick={handleAdd} disabled={!title.trim()}
+                    className="flex-1 py-2 rounded-xl text-xs font-bold text-white disabled:opacity-40 transition-all active:scale-95"
+                    style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }}>
+                    추가하기 ✓
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setShowAddForm(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-semibold transition-all active:scale-95"
+              style={{ background: 'rgba(168,85,247,0.06)', border: '1.5px dashed rgba(168,85,247,0.3)', color: '#a855f7' }}>
+              <Plus className="w-4 h-4" />일정 추가하기
+            </button>
+          )}
+
+          {/* ── Events ── */}
+          {events.length > 0 && (
+            <div className="space-y-2">
+              {events
+                .slice()
+                .sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))
+                .map(ev => {
+                  const c = SCHEDULE_CATEGORY_COLORS[ev.category]
+                  const isEditing = editingId === ev.id
+                  return (
+                    <div key={ev.id} className="rounded-2xl overflow-hidden transition-all"
+                      style={{ background: c + '0d', border: `1.5px solid ${isEditing ? c + '55' : c + '28'}` }}>
+                      {isEditing ? (
+                        <div className="p-3 space-y-2.5">
+                          <input autoFocus value={editForm.title ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                            className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-purple-400" />
+                          <div className="flex items-center gap-1.5">
+                            <input type="time" value={editForm.startTime ?? ''}
+                              onChange={e => setEditForm(f => ({ ...f, startTime: e.target.value }))}
+                              className="flex-1 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none" />
+                            <span className="text-slate-300">–</span>
+                            <input type="time" value={editForm.endTime ?? ''}
+                              onChange={e => setEditForm(f => ({ ...f, endTime: e.target.value }))}
+                              className="flex-1 text-sm text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2 outline-none" />
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {CATEGORY_OPTIONS.map(o => {
+                              const oc = SCHEDULE_CATEGORY_COLORS[o.value]
+                              const on = editForm.category === o.value
+                              return (
+                                <button key={o.value} onClick={() => setEditForm(f => ({ ...f, category: o.value }))}
+                                  className="px-2.5 py-1 rounded-full text-xs font-semibold transition-all"
+                                  style={{ background: on ? oc + '18' : '#f1f5f9', border: `1.5px solid ${on ? oc + '55' : 'transparent'}`, color: on ? oc : '#94a3b8' }}>
+                                  {o.label}
+                                </button>
+                              )
+                            })}
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => setEditingId(null)}
+                              className="flex-1 py-2 rounded-xl text-xs text-slate-400 border border-slate-100">취소</button>
+                            <button onClick={() => saveEdit(ev.id)}
+                              className="flex-1 py-2 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1 active:scale-95"
+                              style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }}>
+                              <Check className="w-3.5 h-3.5" />저장
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 px-4 py-3">
+                          <div className="w-1 self-stretch rounded-full flex-none" style={{ background: c }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                              {!isSingleDay && (
+                                <span className="mr-1.5 font-medium text-slate-500">
+                                  {format(new Date(ev.date + 'T00:00:00'), 'M/d')}
+                                </span>
+                              )}
+                              {fmtHHMM(ev.startTime)} – {fmtHHMM(ev.endTime)}
+                              <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+                                style={{ background: c + '18', color: c }}>
+                                {SCHEDULE_CATEGORY_LABELS[ev.category]}
+                              </span>
+                            </p>
+                          </div>
+                          <button onClick={() => startEdit(ev)}
+                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-purple-50 transition-colors">
+                            <Pencil className="w-3.5 h-3.5 text-slate-300 hover:text-purple-400" />
+                          </button>
+                          <button onClick={() => onDeleteEvent(ev.id)}
+                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-red-50 transition-colors">
+                            <X className="w-3.5 h-3.5 text-slate-300 hover:text-red-400" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+          {events.length === 0 && !showAddForm && (
+            <p className="text-xs text-slate-300 text-center py-1">이 날 등록된 일정이 없어요</p>
+          )}
+
+          {/* ── Health log divider ── */}
+          <div className="border-t border-slate-100 pt-3 mt-1">
+            <p className="text-xs font-semibold text-slate-500 mb-2">건강 기록</p>
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {log?.isPeriod && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium"
+                  style={{ background: 'rgba(244,63,117,0.1)', color: '#f43f75' }}>🩸 생리 중</span>
+              )}
+              {log?.mood && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium bg-amber-50 text-amber-600">
+                  {MOODS.find(m => m.key === log.mood)?.emoji} {MOODS.find(m => m.key === log.mood)?.label}
+                </span>
+              )}
+              {log?.painIntensity != null && log.painIntensity > 0 && (
+                <span className="text-xs px-2.5 py-1 rounded-full font-medium"
+                  style={{ background: log.painIntensity >= 7 ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)', color: log.painIntensity >= 7 ? '#ef4444' : '#d97706' }}>
+                  💊 통증 {log.painIntensity}/10
+                </span>
+              )}
+              {!log?.isPeriod && !log?.mood && !log?.painIntensity && (
+                <span className="text-xs text-slate-300">기록 없음</span>
+              )}
+            </div>
+            <button onClick={onHealthLog}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-2xl text-sm font-semibold transition-all active:scale-95"
+              style={{ background: 'rgba(244,63,117,0.06)', border: '1.5px solid rgba(244,63,117,0.18)', color: '#f43f75' }}>
+              <span>{log ? '✏️' : '📝'}</span>
+              {log ? '건강 기록 수정하기' : '건강 기록하기'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+function _ScheduleSheet({
   date, events, onDelete, onUpdate, onClose,
 }: {
   date: Date
