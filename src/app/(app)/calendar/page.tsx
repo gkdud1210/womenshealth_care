@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X, Activity, ChevronRight } from 'lucide-react'
+import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X, Activity, ChevronRight, Leaf } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
@@ -213,8 +213,17 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ── 루디아 호출 버튼 ── */}
-      <div className="flex justify-end mb-3">
+      {/* ── 퀵 버튼 행 ── */}
+      <div className="flex justify-end gap-2 mb-3">
+        <Link href="/garden"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all active:scale-95"
+          style={{
+            background: 'rgba(22,163,74,0.1)',
+            border: '1px solid rgba(22,163,74,0.25)',
+          }}>
+          <Leaf className="w-3 h-3 text-green-600" />
+          <span className="text-xs font-semibold text-green-700">내 치유 정원</span>
+        </Link>
         <Link href="/"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all active:scale-95"
           style={{

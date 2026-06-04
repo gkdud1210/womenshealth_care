@@ -12,7 +12,7 @@ export default function RootPage() {
 
   useEffect(() => {
     if (!ready) return
-    if (hasSession && user && isOnboarded) return  // 앱 진입
+    if (hasSession && user && isOnboarded) { router.replace('/calendar'); return }
 
     if (hasSession && user && !isOnboarded) {
       router.replace('/onboarding')

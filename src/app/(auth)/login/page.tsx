@@ -45,7 +45,7 @@ export default function LoginPage() {
     }
 
     startSession()
-    router.push('/')
+    router.push('/calendar')
   }
 
   return (

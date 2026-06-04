@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
+import { ChevronLeft } from 'lucide-react'
 import { GardenProvider, useGarden } from '@/contexts/GardenContext'
 import { GardenField } from '@/components/garden/GardenField'
 import { GardenSimulator } from '@/components/garden/GardenSimulator'
@@ -41,9 +43,16 @@ function GardenInner({ saved, onRescan }: { saved: Saved | null; onRescan: () =>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-lg font-bold text-slate-800">내 치유 정원</h1>
-          <p className="text-[10px] text-slate-400">{user?.name ?? ''}님의 바이오 디지털 트윈</p>
+        <div className="flex items-center gap-2">
+          <Link href="/calendar"
+            className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
+            style={{ background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.2)' }}>
+            <ChevronLeft className="w-4 h-4 text-green-600" />
+          </Link>
+          <div>
+            <h1 className="text-lg font-bold text-slate-800">내 치유 정원</h1>
+            <p className="text-[10px] text-slate-400">{user?.name ?? ''}님의 바이오 디지털 트윈</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <div className="px-2.5 py-1 rounded-xl text-[10px] font-bold"
