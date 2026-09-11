@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   CalendarHeart, Microscope,
-  ShoppingBag, Settings, Apple
+  ShoppingBag, Settings, Apple, Leaf, Users
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LudiaLogo } from '@/components/LudiaLogo'
@@ -12,8 +12,10 @@ import { LudiaLogo } from '@/components/LudiaLogo'
 const navItems = [
   { href: '/calendar',   icon: CalendarHeart,   label: '건강 캘린더' },
   { href: '/diagnostic', icon: Microscope,      label: '진단 분석' },
-  { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
+  { href: '/garden',     icon: Leaf,            label: '내 치유 정원' },
   { href: '/nutrition',  icon: Apple,           label: '헬스피드' },
+  { href: '/community',  icon: Users,           label: '루디아 모임' },
+  { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
   { href: '/settings',   icon: Settings,        label: '설정' },
 ]
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check } from 'lucide-react'
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { HealthMode } from '@/data/nutritionData'
@@ -26,7 +26,8 @@ interface SnsPost {
   type: 'recipe' | 'tip'
   title: string
   content: string
-  image?: string
+  image?: string   // 하위 호환용 (단일 이미지 기존 게시글)
+  images?: string[] // 다중 이미지
   coverEmoji?: string
   coverGradient?: string
   tags: HealthMode[]
@@ -37,9 +38,9 @@ interface SnsPost {
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
-const POSTS_KEY  = 'ludia_sns_v3'
-const LIKES_KEY  = 'ludia_sns_likes_v3'
-const SAVES_KEY  = 'ludia_sns_saves_v3'
+const POSTS_KEY  = 'ludia_sns_v4'
+const LIKES_KEY  = 'ludia_sns_likes_v4'
+const SAVES_KEY  = 'ludia_sns_saves_v4'
 
 const SEED: SnsPost[] = [
   {
@@ -178,6 +179,21 @@ const SEED: SnsPost[] = [
       { id: 'c17', authorName: '투병중', authorEmoji: '💪', text: '치료 중에도 걷기 운동 꾸준히 하고 있어요. 정말 도움돼요', createdAt: new Date(Date.now() - 100000000).toISOString() },
     ],
   },
+  {
+    id: 'multi-1', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    type: 'recipe', title: '닭가슴살 볶음밥 — 단계별 사진',
+    content: '사진으로 보는 고단백 볶음밥 레시피예요 📸\n\n재료 (1인분)\n• 닭가슴살 120g\n• 현미밥 150g\n• 달걀 1개\n• 파프리카 1/4개, 양파 1/4개\n• 간장 1큰술, 참기름 1작은술\n• 다진 마늘 1작은술\n\n▶ Step 1 재료를 먹기 좋게 손질하고\n▶ Step 2 강불에 달걀→닭가슴살→채소 순서로 볶다가\n▶ 완성! 밥을 넣고 간장으로 간 맞추면 끝\n\n🔥 480kcal · 단백질 35g · 조리시간 15분',
+    images: [
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MDAnIGhlaWdodD0nNDAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJyB5MT0nMCcgeDI9JzEnIHkyPScxJz48c3RvcCBvZmZzZXQ9JzAlJyBzdG9wLWNvbG9yPScjZmVmM2M3Jy8+PHN0b3Agb2Zmc2V0PScxMDAlJyBzdG9wLWNvbG9yPScjZmNkMzRkJy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzQwMCcgaGVpZ2h0PSc0MDAnIGZpbGw9J3VybCgjZyknLz48dGV4dCB4PScyMDAnIHk9JzE3MCcgZm9udC1zaXplPScxMTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPvCfpZc8L3RleHQ+PHRleHQgeD0nMjAwJyB5PSczMDAnIGZvbnQtc2l6ZT0nMjYnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyM5MjQwMGUnIGZvbnQtZmFtaWx5PSdzeXN0ZW0tdWknIGZvbnQtd2VpZ2h0PSc3MDAnPlN0ZXAgMSDCtyDsnqzro4wg7KSA67mEPC90ZXh0Pjwvc3ZnPg==',
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MDAnIGhlaWdodD0nNDAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJyB5MT0nMCcgeDI9JzEnIHkyPScxJz48c3RvcCBvZmZzZXQ9JzAlJyBzdG9wLWNvbG9yPScjZDFmYWU1Jy8+PHN0b3Agb2Zmc2V0PScxMDAlJyBzdG9wLWNvbG9yPScjNmVlN2I3Jy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzQwMCcgaGVpZ2h0PSc0MDAnIGZpbGw9J3VybCgjZyknLz48dGV4dCB4PScyMDAnIHk9JzE3MCcgZm9udC1zaXplPScxMTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPvCfjbM8L3RleHQ+PHRleHQgeD0nMjAwJyB5PSczMDAnIGZvbnQtc2l6ZT0nMjYnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyMwNjVmNDYnIGZvbnQtZmFtaWx5PSdzeXN0ZW0tdWknIGZvbnQtd2VpZ2h0PSc3MDAnPlN0ZXAgMiDCtyDrs7bquLA8L3RleHQ+PC9zdmc+',
+      'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MDAnIGhlaWdodD0nNDAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJyB5MT0nMCcgeDI9JzEnIHkyPScxJz48c3RvcCBvZmZzZXQ9JzAlJyBzdG9wLWNvbG9yPScjZmNlN2YzJy8+PHN0b3Agb2Zmc2V0PScxMDAlJyBzdG9wLWNvbG9yPScjZjlhOGQ0Jy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzQwMCcgaGVpZ2h0PSc0MDAnIGZpbGw9J3VybCgjZyknLz48dGV4dCB4PScyMDAnIHk9JzE3MCcgZm9udC1zaXplPScxMTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPvCfjbE8L3RleHQ+PHRleHQgeD0nMjAwJyB5PSczMDAnIGZvbnQtc2l6ZT0nMjYnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyM5ZDE3NGQnIGZvbnQtZmFtaWx5PSdzeXN0ZW0tdWknIGZvbnQtd2VpZ2h0PSc3MDAnPuyZhOyEsSEg66eb7J6I6rKMIOuTnOyEuOyalCDwn46JPC90ZXh0Pjwvc3ZnPg==',
+    ],
+    tags: ['다이어트', '일반'], likes: 58,
+    comments: [
+      { id: 'cm1', authorName: '다이어터', authorEmoji: '🏃', text: '사진으로 보니까 훨씬 쉬워 보여요! 도전해볼게요 🙌', createdAt: new Date(Date.now() - 1800000).toISOString() },
+    ],
+  },
 ]
 
 function loadPosts(): SnsPost[] {
@@ -261,13 +277,19 @@ function PostCard({
   onDelete: (id: string) => void
   onAddComment: (postId: string, text: string) => void
 }) {
-  const [expanded, setExpanded]     = useState(false)
+  const [expanded, setExpanded]       = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [commentText, setCommentText] = useState('')
-  const [showMenu, setShowMenu]     = useState(false)
+  const [showMenu, setShowMenu]       = useState(false)
+  const [imgIdx, setImgIdx]           = useState(0)
+  const touchX = useRef<number | null>(null)
   const isOwn = currentUserId && post.authorId === currentUserId
   const preview = post.content.slice(0, 100)
   const needsExpand = post.content.length > 100
+
+  // 이미지 배열 통합 (하위 호환)
+  const allImages = post.images?.length ? post.images : post.image ? [post.image] : []
+  const hasImages = allImages.length > 0
 
   function submitComment() {
     const t = commentText.trim()
@@ -277,37 +299,52 @@ function PostCard({
   }
 
   return (
-    <article className="bg-white border-b border-slate-100">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div className="w-9 h-9 rounded-full flex items-center justify-center text-lg flex-shrink-0"
-          style={{ background: post.authorVerified ? 'linear-gradient(135deg,#f43f75,#a855f7)' : 'rgba(244,63,117,0.1)' }}>
-          {post.authorVerified ? <span className="text-white text-sm font-black">L</span> : post.authorEmoji}
+    <article className="bg-white rounded-xl shadow-sm mb-2 overflow-hidden">
+
+      {/* ── Header ── */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-2">
+        <div className="w-11 h-11 rounded-full flex items-center justify-center text-xl flex-shrink-0 shadow-sm"
+          style={{ background: post.authorVerified ? 'linear-gradient(135deg,#f43f75,#a855f7)' : 'rgba(244,63,117,0.12)' }}>
+          {post.authorVerified ? <span className="text-white text-base font-black">L</span> : post.authorEmoji}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold text-slate-900">{post.authorName}</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[15px] font-bold text-slate-900">{post.authorName}</span>
             {post.authorVerified && (
-              <span className="w-3.5 h-3.5 rounded-full flex items-center justify-center flex-shrink-0"
+              <span className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0"
                 style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
-                <Check className="w-2 h-2 text-white" strokeWidth={3} />
+                <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
               </span>
             )}
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: post.type === 'recipe' ? 'rgba(234,179,8,0.15)' : 'rgba(59,130,246,0.12)', color: post.type === 'recipe' ? '#a16207' : '#1d4ed8' }}>
+              {post.type === 'recipe' ? '🍳 레시피' : '💡 팁'}
+            </span>
           </div>
-          <p className="text-[11px] text-slate-400">{timeAgo(post.createdAt)}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[11px] text-slate-400">{timeAgo(post.createdAt)}</span>
+            <span className="text-slate-300">·</span>
+            <span className="text-[11px]">🌐</span>
+            {post.tags.map(t => (
+              <span key={t} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: TAG_META[t].bg, color: TAG_META[t].color }}>
+                {TAG_META[t].emoji} {t}
+              </span>
+            ))}
+          </div>
         </div>
         <div className="relative">
-          <button onClick={() => setShowMenu(v => !v)} className="p-1.5 rounded-full hover:bg-slate-50">
-            <MoreHorizontal className="w-5 h-5 text-slate-400" />
+          <button onClick={() => setShowMenu(v => !v)} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors">
+            <MoreHorizontal className="w-5 h-5 text-slate-500" />
           </button>
           {showMenu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-8 z-20 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden min-w-[120px]">
+              <div className="absolute right-0 top-10 z-20 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden min-w-[130px]">
                 {isOwn && (
                   <button onClick={() => { onDelete(post.id); setShowMenu(false) }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-sm text-red-500 hover:bg-red-50">
-                    삭제
+                    className="w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 text-left">
+                    🗑 삭제하기
                   </button>
                 )}
                 <button onClick={() => setShowMenu(false)}
@@ -320,99 +357,152 @@ function PostCard({
         </div>
       </div>
 
-      {/* Cover image / gradient */}
-      <div className="w-full aspect-square relative overflow-hidden"
-        style={{ background: post.image ? '#000' : post.coverGradient ?? 'linear-gradient(135deg,#fce7f3,#ede9fe)' }}>
-        {post.image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={post.image} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-3 px-6 text-center">
-            <span className="text-7xl leading-none">{post.coverEmoji ?? '🍽️'}</span>
-            <p className="text-base font-bold text-slate-700 leading-snug">{post.title}</p>
-            <div className="flex flex-wrap gap-1.5 justify-center">
-              {post.tags.map(t => (
-                <span key={t} className="text-xs font-semibold px-2.5 py-1 rounded-full"
-                  style={{ background: 'rgba(255,255,255,0.7)', color: TAG_META[t].color }}>
-                  {TAG_META[t].emoji} {t}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Recipe / tip badge */}
-        <div className="absolute top-3 right-3">
-          <span className="text-[10px] font-bold px-2 py-1 rounded-full backdrop-blur-sm"
-            style={{ background: post.type === 'recipe' ? 'rgba(234,179,8,0.85)' : 'rgba(59,130,246,0.85)', color: '#fff' }}>
-            {post.type === 'recipe' ? '🍳 레시피' : '💡 팁'}
-          </span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 px-3 pt-2.5 pb-1">
-        <button onClick={() => onLike(post.id)}
-          className="p-1.5 rounded-full transition-transform active:scale-90">
-          <Heart className={cn('w-6 h-6 transition-colors', liked ? 'text-red-500 fill-red-500' : 'text-slate-800')} />
-        </button>
-        <button onClick={() => { setShowComments(v => !v) }}
-          className="p-1.5 rounded-full">
-          <MessageCircle className="w-6 h-6 text-slate-800" />
-        </button>
-        <div className="flex-1" />
-        <button onClick={() => onSave(post.id)}
-          className="p-1.5 rounded-full transition-transform active:scale-90">
-          <Bookmark className={cn('w-6 h-6 transition-colors', saved ? 'text-slate-900 fill-slate-900' : 'text-slate-800')} />
-        </button>
-      </div>
-
-      {/* Likes */}
-      <p className="px-4 text-sm font-bold text-slate-900">좋아요 {post.likes.toLocaleString()}개</p>
-
-      {/* Caption */}
-      <div className="px-4 pt-1 pb-1">
-        <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-line">
-          <span className="font-bold mr-1.5">{post.authorName}</span>
+      {/* ── Caption (text first, Facebook style) ── */}
+      <div className="px-4 pb-3">
+        <p className="text-[14px] text-slate-800 leading-relaxed whitespace-pre-line">
           {expanded || !needsExpand ? post.content : preview + '...'}
         </p>
         {needsExpand && !expanded && (
-          <button onClick={() => setExpanded(true)} className="text-sm text-slate-400 mt-0.5">더 보기</button>
+          <button onClick={() => setExpanded(true)} className="text-[13px] font-semibold text-slate-500 mt-1">더 보기</button>
         )}
       </div>
 
-      {/* Comments preview */}
-      {post.comments.length > 0 && !showComments && (
-        <button onClick={() => setShowComments(true)}
-          className="px-4 py-1 text-sm text-slate-400">
-          댓글 {post.comments.length}개 모두 보기
-        </button>
+      {/* ── Image carousel ── */}
+      {(hasImages || post.coverEmoji) && (
+        <div className="w-full relative overflow-hidden"
+          style={{
+            background: hasImages ? '#111' : post.coverGradient ?? 'linear-gradient(135deg,#fce7f3,#ede9fe)',
+            aspectRatio: hasImages ? '4/3' : '16/9',
+          }}
+          onTouchStart={e => { touchX.current = e.touches[0].clientX }}
+          onTouchEnd={e => {
+            if (touchX.current === null) return
+            const dx = e.changedTouches[0].clientX - touchX.current
+            if (Math.abs(dx) > 40) setImgIdx(i => dx < 0 ? Math.min(i + 1, allImages.length - 1) : Math.max(i - 1, 0))
+            touchX.current = null
+          }}>
+          {hasImages ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={allImages[imgIdx]} alt="" className="w-full h-full object-cover" />
+              {allImages.length > 1 && imgIdx > 0 && (
+                <button onClick={() => setImgIdx(i => i - 1)}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center shadow-md"
+                  style={{ background: 'rgba(255,255,255,0.88)' }}>
+                  <span className="text-slate-700 text-base font-bold">‹</span>
+                </button>
+              )}
+              {allImages.length > 1 && imgIdx < allImages.length - 1 && (
+                <button onClick={() => setImgIdx(i => i + 1)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full flex items-center justify-center shadow-md"
+                  style={{ background: 'rgba(255,255,255,0.88)' }}>
+                  <span className="text-slate-700 text-base font-bold">›</span>
+                </button>
+              )}
+              {allImages.length > 1 && (
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {allImages.map((_, i) => (
+                    <button key={i} onClick={() => setImgIdx(i)}
+                      className="rounded-full transition-all"
+                      style={{ width: i === imgIdx ? 18 : 7, height: 7, background: i === imgIdx ? '#f43f75' : 'rgba(255,255,255,0.7)' }} />
+                  ))}
+                </div>
+              )}
+              {allImages.length > 1 && (
+                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full text-[11px] font-bold"
+                  style={{ background: 'rgba(0,0,0,0.45)', color: '#fff' }}>
+                  {imgIdx + 1} / {allImages.length}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+              <span className="text-6xl leading-none">{post.coverEmoji ?? '🍽️'}</span>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Comments expanded */}
+      {/* ── Reaction count row ── */}
+      <div className="flex items-center justify-between px-4 py-2">
+        <div className="flex items-center gap-1.5">
+          <div className="flex -space-x-1">
+            <span className="w-5 h-5 rounded-full flex items-center justify-center text-[11px]"
+              style={{ background: liked ? '#ef4444' : '#1877f2' }}>
+              {liked ? '❤️' : '👍'}
+            </span>
+          </div>
+          <span className="text-[13px] text-slate-500">{post.likes.toLocaleString()}명</span>
+        </div>
+        {post.comments.length > 0 && (
+          <button onClick={() => setShowComments(v => !v)}
+            className="text-[13px] text-slate-500 hover:underline">
+            댓글 {post.comments.length}개
+          </button>
+        )}
+      </div>
+
+      {/* ── Action buttons (Facebook style) ── */}
+      <div className="flex border-t border-b border-slate-100 mx-4">
+        <button onClick={() => onLike(post.id)}
+          className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg my-1 mx-0.5 transition-all active:scale-95',
+            liked ? 'text-rose-500' : 'text-slate-500 hover:bg-slate-50')}>
+          <Heart className={cn('w-4.5 h-4.5', liked && 'fill-rose-500')} style={{ width: 18, height: 18 }} />
+          <span className="text-[13px] font-semibold">좋아요</span>
+        </button>
+        <button onClick={() => setShowComments(v => !v)}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg my-1 mx-0.5 text-slate-500 hover:bg-slate-50 transition-all active:scale-95">
+          <MessageCircle style={{ width: 18, height: 18 }} />
+          <span className="text-[13px] font-semibold">댓글</span>
+        </button>
+        <button onClick={() => onSave(post.id)}
+          className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg my-1 mx-0.5 transition-all active:scale-95',
+            saved ? 'text-rose-500' : 'text-slate-500 hover:bg-slate-50')}>
+          <Bookmark className={cn('w-4.5 h-4.5', saved && 'fill-rose-500')} style={{ width: 18, height: 18 }} />
+          <span className="text-[13px] font-semibold">저장</span>
+        </button>
+      </div>
+
+      {/* ── Comments ── */}
       {showComments && post.comments.length > 0 && (
-        <div className="px-4 pb-1 space-y-1.5">
+        <div className="px-4 pt-2 pb-1 space-y-3">
           {post.comments.map(c => (
-            <p key={c.id} className="text-sm text-slate-700 leading-relaxed">
-              <span className="font-bold mr-1.5">{c.authorName}</span>{c.text}
-              <span className="text-[10px] text-slate-400 ml-2">{timeAgo(c.createdAt)}</span>
-            </p>
+            <div key={c.id} className="flex gap-2.5">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+                style={{ background: 'rgba(244,63,117,0.1)' }}>
+                {c.authorEmoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="inline-block px-3 py-2 rounded-2xl rounded-tl-sm"
+                  style={{ background: '#f0f2f5' }}>
+                  <p className="text-[12px] font-bold text-slate-900">{c.authorName}</p>
+                  <p className="text-[13px] text-slate-700 leading-relaxed">{c.text}</p>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5 px-1">{timeAgo(c.createdAt)}</p>
+              </div>
+            </div>
           ))}
         </div>
       )}
 
-      {/* Comment input */}
-      <div className="flex items-center gap-2.5 px-4 py-2.5 border-t border-slate-50">
-        <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+      {/* ── Comment input ── */}
+      <div className="flex items-center gap-2.5 px-4 py-3">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
           style={{ background: 'rgba(244,63,117,0.1)' }}>
           {currentUserEmoji}
         </div>
-        <input value={commentText} onChange={e => setCommentText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
-          placeholder="댓글 달기..."
-          className="flex-1 text-sm bg-transparent outline-none placeholder-slate-400 text-slate-800" />
-        {commentText.trim() && (
-          <button onClick={submitComment} className="text-sm font-bold text-rose-500">게시</button>
-        )}
+        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-full"
+          style={{ background: '#f0f2f5' }}>
+          <input value={commentText} onChange={e => setCommentText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
+            placeholder="댓글 달기..."
+            className="flex-1 text-[13px] bg-transparent outline-none placeholder-slate-400 text-slate-800" />
+          {commentText.trim() && (
+            <button onClick={submitComment}>
+              <Send className="w-4 h-4 text-rose-400" />
+            </button>
+          )}
+        </div>
       </div>
     </article>
   )
@@ -428,12 +518,14 @@ function WriteModal({
   onClose: () => void
   onSubmit: (post: Omit<SnsPost, 'id' | 'createdAt' | 'likes' | 'comments'>) => void
 }) {
-  const [image,     setImage]     = useState<string | undefined>()
+  const [images,    setImages]    = useState<string[]>([])
   const [content,   setContent]   = useState('')
   const [type,      setType]      = useState<'recipe' | 'tip'>('recipe')
   const [tags,      setTags]      = useState<HealthMode[]>([])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const MAX_IMAGES = 10
 
   const coverGradients: Record<HealthMode, string> = {
     임신: 'linear-gradient(135deg,#d1fae5,#6ee7b7)',
@@ -443,10 +535,23 @@ function WriteModal({
     일반: 'linear-gradient(135deg,#ffe4e6,#fecdd3)',
   }
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f) return
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
     setUploading(true)
-    try { setImage(await compressImage(f)) } finally { setUploading(false) }
+    try {
+      const remaining = MAX_IMAGES - images.length
+      const toProcess = files.slice(0, remaining)
+      const compressed = await Promise.all(toProcess.map(compressImage))
+      setImages(prev => [...prev, ...compressed])
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  function removeImage(idx: number) {
+    setImages(prev => prev.filter((_, i) => i !== idx))
   }
 
   function submit() {
@@ -455,7 +560,7 @@ function WriteModal({
     onSubmit({
       authorId: 'me', authorName, authorEmoji,
       type, title: firstLine, content: content.trim(),
-      image,
+      images: images.length > 0 ? images : undefined,
       coverEmoji: type === 'recipe' ? '🍽️' : '💡',
       coverGradient: tags[0] ? coverGradients[tags[0]] : 'linear-gradient(135deg,#fce7f3,#ede9fe)',
       tags,
@@ -478,29 +583,48 @@ function WriteModal({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Image area */}
-        {image ? (
-          <div className="relative w-full aspect-square">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image} alt="" className="w-full h-full object-cover" />
-            <button onClick={() => setImage(undefined)}
-              className="absolute top-3 right-3 w-8 h-8 bg-black/50 rounded-full flex items-center justify-center">
-              <X className="w-4 h-4 text-white" />
-            </button>
+        {/* Image grid */}
+        <div className="px-4 pt-4">
+          <div className="grid grid-cols-3 gap-1.5">
+            {images.map((src, i) => (
+              <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" className="w-full h-full object-cover" />
+                <button onClick={() => removeImage(i)}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 bg-black/55 rounded-full flex items-center justify-center">
+                  <X className="w-3.5 h-3.5 text-white" />
+                </button>
+                {i === 0 && (
+                  <span className="absolute bottom-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(0,0,0,0.5)', color: '#fff' }}>대표</span>
+                )}
+              </div>
+            ))}
+            {/* + 추가 버튼 */}
+            {images.length < MAX_IMAGES && (
+              <button onClick={() => fileRef.current?.click()}
+                className="aspect-square rounded-xl flex flex-col items-center justify-center gap-1 transition-colors"
+                style={{ background: 'linear-gradient(135deg,#fdf2f8,#f5f0ff)', border: '1.5px dashed rgba(244,63,117,0.3)' }}>
+                {uploading ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-rose-300 border-t-rose-500 animate-spin" />
+                ) : (
+                  <>
+                    <Camera className="w-6 h-6 text-rose-400" />
+                    <span className="text-[10px] font-semibold text-rose-400">
+                      {images.length === 0 ? '사진 추가' : `+추가 (${images.length}/${MAX_IMAGES})`}
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
-        ) : (
-          <button onClick={() => fileRef.current?.click()}
-            className="w-full aspect-square flex flex-col items-center justify-center gap-3"
-            style={{ background: 'linear-gradient(135deg,#fdf2f8,#f5f0ff)' }}>
-            <div className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(244,63,117,0.1)' }}>
-              <Camera className="w-8 h-8 text-rose-400" />
-            </div>
-            <p className="text-sm font-semibold text-slate-500">사진 추가 (선택)</p>
-            <p className="text-xs text-slate-400">요리 사진이나 음식 사진을 올려보세요</p>
-          </button>
-        )}
-        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          {images.length > 0 && (
+            <p className="text-[11px] text-slate-400 mt-1.5">
+              첫 번째 사진이 대표 이미지로 표시됩니다 · 최대 {MAX_IMAGES}장
+            </p>
+          )}
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFiles} />
 
         <div className="px-4 py-4 space-y-4">
           {/* User row */}
@@ -570,6 +694,7 @@ export default function NutritionPage() {
   const [liked,     setLiked]      = useState<Set<string>>(new Set())
   const [saved,     setSaved]      = useState<Set<string>>(new Set())
   const [filter,    setFilter]     = useState<HealthMode | 'all'>('all')
+  const [query,     setQuery]      = useState('')
   const [showWrite, setShowWrite]  = useState(false)
 
   const authorName  = user?.nickname || user?.name || '나'
@@ -585,6 +710,21 @@ export default function NutritionPage() {
     .slice()
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .filter(p => filter === 'all' || p.tags.includes(filter))
+    .filter(p => {
+      if (!query.trim()) return true
+      const q = query.trim().toLowerCase()
+      // 해시태그 검색: #임신 → tags에서 검색
+      if (q.startsWith('#')) {
+        const tag = q.slice(1)
+        return p.tags.some(t => t.toLowerCase().includes(tag)) ||
+               p.type.toLowerCase().includes(tag)
+      }
+      // 일반 검색: 제목·내용·작성자·태그 전체
+      return p.title.toLowerCase().includes(q) ||
+             p.content.toLowerCase().includes(q) ||
+             p.authorName.toLowerCase().includes(q) ||
+             p.tags.some(t => t.toLowerCase().includes(q))
+    })
 
   const handleLike = useCallback((id: string) => {
     setLiked(prev => {
@@ -645,6 +785,30 @@ export default function NutritionPage() {
           </button>
         </div>
 
+        {/* Search bar */}
+        <div className="px-4 pb-2 max-w-lg mx-auto">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="#해시태그 또는 검색어 입력..."
+              className="w-full pl-9 pr-9 py-2 rounded-2xl text-sm bg-slate-100 border-none outline-none placeholder-slate-400 text-slate-800 focus:bg-white focus:ring-2 focus:ring-rose-200 transition-all"
+            />
+            {query && (
+              <button onClick={() => setQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2">
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            )}
+          </div>
+          {query.startsWith('#') && (
+            <p className="text-[11px] text-rose-400 font-semibold mt-1 pl-1">
+              해시태그 검색: {query}
+            </p>
+          )}
+        </div>
+
         {/* Category filter — stories style */}
         <div className="flex gap-0 overflow-x-auto scrollbar-hide px-4 pt-2 pb-3 max-w-lg mx-auto">
           {([{ key: 'all', emoji: '🏠', label: '전체' }, ...ALL_MODES.map(m => ({ key: m, emoji: TAG_META[m].emoji, label: m }))]).map(({ key, emoji, label }) => {
@@ -671,9 +835,13 @@ export default function NutritionPage() {
       <div className="max-w-lg mx-auto">
         {feed.length === 0 ? (
           <div className="text-center py-20">
-            <p className="text-4xl mb-3">📭</p>
-            <p className="text-sm text-slate-400 font-medium">아직 게시물이 없어요</p>
-            <p className="text-xs text-slate-300 mt-1">+ 버튼을 눌러 첫 번째 레시피를 공유해보세요!</p>
+            <p className="text-4xl mb-3">{query ? '🔍' : '📭'}</p>
+            <p className="text-sm text-slate-400 font-medium">
+              {query ? `"${query}" 검색 결과가 없어요` : '아직 게시물이 없어요'}
+            </p>
+            <p className="text-xs text-slate-300 mt-1">
+              {query ? '다른 검색어나 #해시태그를 입력해보세요' : '+ 버튼을 눌러 첫 번째 레시피를 공유해보세요!'}
+            </p>
           </div>
         ) : (
           feed.map(post => (

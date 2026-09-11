@@ -17,6 +17,7 @@ function load(): ScheduleEvent[] {
 
 function persist(events: ScheduleEvent[]) {
   if (typeof window === 'undefined') return
+  
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
   } catch {}

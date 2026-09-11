@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   Star, X, ShoppingBag, Trash2, PenLine, ImagePlus, Sparkles,
-  Droplets, Shield, Leaf, Wind, Heart, Zap, Search,
+  Droplets, Shield, Leaf, Wind, Heart, Zap, Search, ShieldCheck,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/data/shopProducts'
 import { CARE_CASES } from '@/data/careCases'
 import { useAuth } from '@/hooks/useAuth'
+import { IngredientSafetySheet } from '@/components/shop/IngredientSafetySheet'
 
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? ''
 
@@ -777,6 +778,7 @@ export default function ShopPage() {
   const [selected, setSelected] = useState<ShopProduct | null>(null)
   const [activeTab, setActiveTab] = useState<string>('all')
   const [query, setQuery] = useState('')
+  const [showIngredientSearch, setShowIngredientSearch] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
   const q = query.toLowerCase().trim()
@@ -798,6 +800,31 @@ export default function ShopPage() {
         <h1 className="font-display text-2xl font-semibold text-slate-800">루디아샵</h1>
         <p className="text-sm text-slate-400 mt-0.5">진단 결과 기반으로 큐레이션된 제품</p>
       </div>
+
+      {/* Ingredient Safety Search Banner */}
+      <button
+        onClick={() => setShowIngredientSearch(true)}
+        className="w-full flex items-center gap-3.5 p-4 rounded-2xl mb-4 text-left transition-all active:scale-[0.98]"
+        style={{
+          background: 'linear-gradient(135deg, rgba(244,63,117,0.07), rgba(99,102,241,0.09))',
+          border: '1.5px solid rgba(244,63,117,0.18)',
+          boxShadow: '0 2px 16px rgba(244,63,117,0.07)',
+        }}>
+        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
+          style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
+          <ShieldCheck size={22} color="#fff" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-black text-slate-800">안심 성분 검색</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            내 제품의 내분비계 교란 물질 · 경피독 즉시 확인
+          </p>
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          <span className="text-[11px] font-bold" style={{ color: '#f43f75' }}>분석하기</span>
+          <span className="text-[11px]" style={{ color: '#f43f75' }}>→</span>
+        </div>
+      </button>
 
       {/* search bar */}
       <div className="relative mb-4">
@@ -868,6 +895,10 @@ export default function ShopPage() {
 
       {selected && (
         <ProductDetailSheet product={selected} onClose={() => setSelected(null)} />
+      )}
+
+      {showIngredientSearch && (
+        <IngredientSafetySheet onClose={() => setShowIngredientSearch(false)} />
       )}
     </div>
   )
