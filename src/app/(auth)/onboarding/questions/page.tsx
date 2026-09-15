@@ -452,7 +452,7 @@ function BluetoothScreen({ onFinish }: { onFinish: () => void }) {
               <h2 className="text-2xl font-semibold text-slate-800 mb-2">연결 완료! 🎉</h2>
               <p className="text-sm text-slate-500 leading-relaxed">
                 <span className="font-semibold text-emerald-600">LUDIA-001</span>과 연결됐어요.<br />
-                이제 홍채·열화상·EDA·HRV 정밀 진단을 바로 시작할 수 있어요.<br />
+                이제 홍채·EDA·HRV 정밀 진단을 바로 시작할 수 있어요.<br />
                 <span className="text-xs text-slate-400 mt-1 block">진단 완료 후 LUDIA AI가 맞춤 분석을 드립니다.</span>
               </p>
             </div>

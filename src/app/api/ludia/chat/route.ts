@@ -11,7 +11,6 @@ interface ChatRequest {
     stressIndex: number
     hrv: number
     sleepHours: number
-    uterineTemp: number
     today: string
     userName: string
   }
@@ -59,7 +58,6 @@ export async function POST(req: Request) {
 - EDA 스트레스: ${context.stressIndex}/100
 - HRV: ${context.hrv}ms
 - 수면: ${context.sleepHours}시간
-- 자궁 온도: ${context.uterineTemp}°C
 - 오늘: ${context.today} | 내일: ${tomorrow}
 
 응답 원칙:

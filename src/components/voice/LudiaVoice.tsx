@@ -514,7 +514,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
           context: {
             phase, cycleDay, careTypes: profile.careTypes ?? [],
             stressIndex: data.eda.stressIndex, hrv: data.biosignal.hrv,
-            sleepHours: data.biosignal.sleepHours, uterineTemp: data.thermal.uterineTemp,
+            sleepHours: data.biosignal.sleepHours,
             today: todayStr(), userName,
           },
         }),

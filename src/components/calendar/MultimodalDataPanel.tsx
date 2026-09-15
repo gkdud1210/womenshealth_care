@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, Thermometer, Zap, Activity, ChevronDown, ChevronUp, Sliders, RotateCcw, Info } from 'lucide-react'
+import { Eye, Zap, Activity, ChevronDown, ChevronUp, Sliders, RotateCcw, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MultimodalData } from './LudiaInsightCard'
 
 export const DEFAULT_MULTIMODAL: MultimodalData = {
   iris:      { leftScore: 67, rightScore: 71, skinZone: 48, thyroidZone: 71 },
-  thermal:   { uterineTemp: 35.8, leftOvaryTemp: 36.4, rightOvaryTemp: 36.6 },
   eda:       { conductance: 8.4, stressIndex: 68, tensionLevel: 78, relaxationScore: 65, ansBalance: 42 },
   biosignal: { hrv: 42, sleepHours: 7.5, heartRate: 72, weight: 58.0, bmi: 22.1 },
 }
@@ -46,18 +45,6 @@ const SECTIONS: SectionDef[] = [
       { key: 'rightScore',  label: '우안 밀도',   unit: '점', min: 0, max: 100, step: 1, hint: '75+ 정상', statusFn: v => v >= 75 ? 'ok' : v >= 60 ? 'warn' : 'critical' },
       { key: 'skinZone',    label: '피부 Zone',   unit: '점', min: 0, max: 100, step: 1, hint: '75+ 정상', statusFn: v => v >= 75 ? 'ok' : v >= 60 ? 'warn' : 'critical' },
       { key: 'thyroidZone', label: '갑상선 Zone', unit: '점', min: 0, max: 100, step: 1, hint: '75+ 정상', statusFn: v => v >= 75 ? 'ok' : v >= 60 ? 'warn' : 'critical' },
-    ],
-  },
-  {
-    id: 'thermal',
-    icon: Thermometer,
-    label: '열화상 스캔',
-    sublabel: 'Thermal 320×240 Matrix',
-    iconBg: 'bg-orange-100', iconColor: 'text-orange-600', accentColor: '#f97316',
-    fields: [
-      { key: 'uterineTemp',    label: '자궁 온도',      unit: '°C', min: 34.0, max: 39.0, step: 0.1, hint: '36.5+ 정상', statusFn: v => v >= 36.5 ? 'ok' : v >= 36.0 ? 'warn' : 'critical' },
-      { key: 'leftOvaryTemp',  label: '좌측 난소 온도', unit: '°C', min: 34.0, max: 39.0, step: 0.1, hint: '36.5+ 정상', statusFn: v => v >= 36.5 ? 'ok' : v >= 36.0 ? 'warn' : 'critical' },
-      { key: 'rightOvaryTemp', label: '우측 난소 온도', unit: '°C', min: 34.0, max: 39.0, step: 0.1, hint: '36.5+ 정상', statusFn: v => v >= 36.5 ? 'ok' : v >= 36.0 ? 'warn' : 'critical' },
     ],
   },
   {
@@ -101,7 +88,7 @@ interface Props {
 
 export function MultimodalDataPanel({ value, onChange }: Props) {
   const [open, setOpen]  = useState(false)
-  const [expanded, setExpanded] = useState<Set<keyof MultimodalData>>(new Set<keyof MultimodalData>(['eda', 'thermal']))
+  const [expanded, setExpanded] = useState<Set<keyof MultimodalData>>(new Set<keyof MultimodalData>(['eda']))
 
   function toggle(id: keyof MultimodalData) {
     setExpanded(prev => {
@@ -135,10 +122,10 @@ export function MultimodalDataPanel({ value, onChange }: Props) {
               <span className="text-sm font-semibold text-slate-700">멀티모달 데이터 입력</span>
               <span className="px-2 py-0.5 rounded-full text-[9px] font-bold"
                 style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: '#9a7d26' }}>
-                4-WAY FUSION
+                3-WAY FUSION
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">홍채 · 열화상 · EDA · 바이오신호 → AI 인사이트 연동</p>
+            <p className="text-xs text-slate-400 mt-0.5">홍채 · EDA · 바이오신호 → AI 인사이트 연동</p>
           </div>
         </div>
 

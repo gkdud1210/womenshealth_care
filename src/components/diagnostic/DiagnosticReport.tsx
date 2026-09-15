@@ -25,7 +25,6 @@ interface ProductRec {
 function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
   const findings: Finding[] = []
   const a = p.answers
-  const coldUterus = d.thermal.uterineTemp < 36.2
   const lowHRV = d.biosignal.hrv < 38
   const poorSleep = d.biosignal.sleepHours < 6.5
 
@@ -36,29 +35,6 @@ function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
       title: '부정 출혈 이력 확인됨',
       detail: '문진에서 생리 기간 외 출혈이 보고되었습니다. 자궁근종·물혹·암 조기 선별을 위해 산부인과 정밀 검사를 권장합니다.',
       tags: ['부정 출혈', '정밀 검사 권장'],
-    })
-  }
-
-  // 자궁 냉기 패턴
-  if (coldUterus) {
-    const confirmed = isHighConcern(a.period_coldness)
-    const painLevel = typeof a.period_pain_level === 'number' ? a.period_pain_level : 0
-    const hasFertility = hasCare(p, 'fertility')
-    findings.push({
-      type: 'warning',
-      title: `자궁 냉기 패턴 (열화상 ${d.thermal.uterineTemp}°C)`,
-      detail: [
-        `하복부 자궁 영역 온도 ${d.thermal.uterineTemp}°C — 정상 범위(36.5°C) 이하. 혈액 순환 저하 및 자궁 냉증 의심.`,
-        confirmed ? ' 문진에서도 아랫배 냉감을 자주 느끼는 것으로 확인되어 주의가 필요합니다.' : '',
-        painLevel >= 7 ? ` 생리통 강도 ${painLevel}/10 — 냉기로 인한 혈관 수축이 통증을 악화시킬 수 있습니다.` : '',
-        hasFertility ? ' 임신 준비 중이라면 자궁 온열 환경 개선이 착상 성공률에 직접 영향을 줍니다.' : '',
-      ].join(''),
-      tags: [
-        '자궁 냉증',
-        '혈액 순환 저하',
-        ...(confirmed ? ['문진 일치'] : []),
-        ...(hasFertility ? ['임신 준비 영향'] : []),
-      ],
     })
   }
 
@@ -153,10 +129,9 @@ function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
 // ── 맞춤 제품 추천 동적 생성 ───────────────────────────────────────────────────
 function buildProductRecs(d: MultimodalData, p: OnboardingProfile): ProductRec[] {
   const recs: ProductRec[] = []
-  const coldUterus = d.thermal.uterineTemp < 36.2
 
-  if (coldUterus || hasCare(p, 'period_pain') || hasCare(p, 'healthy_cycle')) {
-    recs.push({ name: '온열 패드 (자궁 전용)', reason: '자궁 냉기 패턴 / 생리통 케어', tag: '🔥 온열', color: 'bg-orange-50 border-orange-200' })
+  if (hasCare(p, 'period_pain') || hasCare(p, 'healthy_cycle')) {
+    recs.push({ name: '온열 패드 (자궁 전용)', reason: '생리통 케어 / 순환 개선', tag: '🔥 온열', color: 'bg-orange-50 border-orange-200' })
     recs.push({ name: '마그네슘 글리시네이트 300mg', reason: '근육 이완 + 생리통 완화', tag: '💊 보충제', color: 'bg-green-50 border-green-200' })
   }
   if (hasCare(p, 'fertility')) {
@@ -191,30 +166,28 @@ function buildProductRecs(d: MultimodalData, p: OnboardingProfile): ProductRec[]
 // ── AI 종합 소견 요약 생성 ─────────────────────────────────────────────────────
 function buildSummary(d: MultimodalData, p: OnboardingProfile): string {
   const issues: string[] = []
-  if (d.thermal.uterineTemp < 36.2) issues.push('자궁 냉기 패턴')
   if (d.iris.skinZone < 65) issues.push('피부 zone 저하')
   if (d.iris.thyroidZone < 70) issues.push('갑상선 zone 주의')
   if (d.biosignal.hrv < 38) issues.push('HRV 저하')
   if (isHighConcern(p.answers.fibroid_bleeding)) issues.push('부정 출혈 이력')
 
   if (issues.length === 0) {
-    return '홍채·열화상·EDA·HRV 데이터 전반이 양호합니다. 현재의 건강 루틴을 유지하고 주기별 변화를 지속 모니터링하세요.'
+    return '홍채·EDA·HRV 데이터 전반이 양호합니다. 현재의 건강 루틴을 유지하고 주기별 변화를 지속 모니터링하세요.'
   }
 
   const careContext = p.careTypes.length > 0
     ? ` 선택하신 관심사(${p.careTypes.slice(0, 2).join(', ')})를 반영한 맞춤 소견입니다.`
     : ''
 
-  return `홍채 분석 및 열화상 데이터를 종합한 결과, ${issues.join('과 ')}이(가) 주요 관심 사항입니다.${careContext} 3개월 연속 데이터 수집 후 정밀 분석을 권장합니다.`
+  return `홍채 분석 데이터를 종합한 결과, ${issues.join('과 ')}이(가) 주요 관심 사항입니다.${careContext} 3개월 연속 데이터 수집 후 정밀 분석을 권장합니다.`
 }
 
 function buildScore(d: MultimodalData): number {
   const irisAvg = (d.iris.leftScore + d.iris.rightScore) / 2
-  const thermal = d.thermal.uterineTemp >= 36.2 ? 100 : Math.max(0, (d.thermal.uterineTemp - 34) / 2.2 * 100)
   const hrv = Math.min(100, d.biosignal.hrv * 2)
   const sleep = Math.min(100, d.biosignal.sleepHours / 8 * 100)
   const stress = 100 - d.eda.stressIndex
-  return Math.round(irisAvg * 0.2 + thermal * 0.25 + hrv * 0.2 + sleep * 0.15 + stress * 0.2)
+  return Math.round(irisAvg * 0.3 + hrv * 0.3 + sleep * 0.2 + stress * 0.2)
 }
 
 const ICON = {
@@ -243,9 +216,7 @@ export function DiagnosticReport() {
 
   const clinicNote = findings.some(f => f.tags.includes('부정 출혈'))
     ? '부정 출혈 이력이 보고되었습니다. 가능한 빠른 시일 내 산부인과 방문을 권장합니다.'
-    : findings.some(f => f.tags.includes('자궁 냉증'))
-      ? '자궁 냉기 패턴이 감지될 경우 산부인과 방문을 권장드립니다.'
-      : '본 분석은 생활습관 가이드 목적이며 의료 진단을 대체하지 않습니다.'
+    : '본 분석은 생활습관 가이드 목적이며 의료 진단을 대체하지 않습니다.'
 
   return (
     <div className="space-y-6">

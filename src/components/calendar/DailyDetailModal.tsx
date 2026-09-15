@@ -54,7 +54,6 @@ export function DailyDetailModal({ date, log, phase, cycleDay, logs, onSave, onC
 
   const multimodalData = useMemo((): MultimodalData => ({
     iris:      { ...DEFAULT_MULTIMODAL.iris },
-    thermal:   { ...DEFAULT_MULTIMODAL.thermal },
     eda:       { ...DEFAULT_MULTIMODAL.eda },
     biosignal: {
       ...DEFAULT_MULTIMODAL.biosignal,

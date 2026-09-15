@@ -1,6 +1,6 @@
 /**
  * LUDIA AI Response Engine
- * Fuses cycle phase, EDA, thermal, iris, and bio-signal data
+ * Fuses cycle phase, EDA, iris, and bio-signal data
  * to generate personalized, context-aware health insights.
  */
 
@@ -29,20 +29,15 @@ export function askLudia(
   const careTypes = profile?.careTypes ?? []
   const a         = profile?.answers ?? {}
   // 온보딩 컨텍스트 헬퍼
-  const hasPainCare    = careTypes.includes('period_pain') || careTypes.includes('healthy_cycle')
   const hasSkinCare    = careTypes.includes('skin_acne')
-  const hasFertility   = careTypes.includes('fertility')
   const hasStressCare  = careTypes.includes('stress')
   const hasThyroid     = careTypes.includes('thyroid_uterus')
-  const painLevel      = typeof a.period_pain_level === 'number' ? a.period_pain_level : 0
-  const coldReported   = a.period_coldness === '자주 그래요'
   const thyroidAlert   = a.thyroid_checkup === '네, 있어요' || a.thyroid_swelling === '자주 그래요'
   const q = question.toLowerCase()
   const phaseName    = getPhaseLabel(phase)
   const irisAvg      = Math.round((data.iris.leftScore + data.iris.rightScore) / 2)
   const stressHigh   = data.eda.stressIndex >= 65
   const stressMid    = data.eda.stressIndex >= 45
-  const coldUterus   = data.thermal.uterineTemp < 36.2
   const lowHRV       = data.biosignal.hrv < 38
   const poorSleep    = data.biosignal.sleepHours < 6.5
   const ansSym       = data.eda.ansBalance < 45
@@ -52,8 +47,8 @@ export function askLudia(
   if (hit(q, ['생리', '월경', '주기', '언제', '예정', '다음', '올까', '주기가'])) {
     if (phase === 'menstrual') {
       return {
-        text: `지금 생리 중이에요 (D+${cycleDay}일째). 자궁 온도 ${data.thermal.uterineTemp}°C ${coldUterus ? '— 냉기 패턴이 감지돼요. 혈관이 수축하면서 통증이 더 심할 수 있어서, 핫팩과 따뜻한 생강차를 지금 바로 챙겨보세요' : '— 정상 범위예요'}. HRV ${data.biosignal.hrv}ms ${lowHRV ? '— 몸이 많이 소모된 상태라 철분·마그네슘 보충과 충분한 수면이 우선이에요' : '— 회복 상태가 양호해요'}. 다음 생리는 약 ${daysLeft + 28}일 후 예정이에요.`,
-        sources: ['열화상', 'HRV', '주기'],
+        text: `지금 생리 중이에요 (D+${cycleDay}일째). HRV ${data.biosignal.hrv}ms ${lowHRV ? '— 몸이 많이 소모된 상태라 철분·마그네슘 보충과 충분한 수면이 우선이에요' : '— 회복 상태가 양호해요'}. 다음 생리는 약 ${daysLeft + 28}일 후 예정이에요.`,
+        sources: ['HRV', '주기'],
         confidence: 'high',
       }
     }
@@ -62,12 +57,12 @@ export function askLudia(
         phase === 'luteal' && cycleDay >= 21
           ? `PMS 구간에 접어들었어요. EDA 스트레스 ${data.eda.stressIndex}점 ${stressHigh ? '— 피부 전도도가 높아 불안·예민함이 올 수 있으니 지금부터 마그네슘 보충을 시작하면 좋아요' : '— 현재는 관리 가능한 수준이에요'}. 카페인을 줄이고 탄수화물보다 단백질 위주 식사를 권장해요.`
           : phase === 'ovulation'
-          ? `배란기라 기초 체온이 약간 상승해요. 자궁 온도 ${data.thermal.uterineTemp}°C — ${coldUterus ? '배란기 치고 다소 낮으니 보온을 신경쓰세요' : '배란 환경이 좋은 상태예요'}.`
+          ? `배란기라 기초 체온이 약간 상승해요. HRV ${data.biosignal.hrv}ms — ${lowHRV ? '회복이 덜 됐으니 무리하지 않게 조절하세요' : '배란 환경이 좋은 상태예요'}.`
           : phase === 'follicular'
           ? `에스트로겐 상승 구간이에요. 에너지가 점점 오르는 시기라 활동량을 늘려도 좋아요. HRV ${data.biosignal.hrv}ms — ${lowHRV ? '회복이 덜 됐으니 무리하지 않게 조절하세요' : '컨디션이 좋아요'}.`
           : `각 단계별 케어 정보가 필요하면 '황체기', '난포기', '배란기' 중 하나를 질문해보세요.`
       }`,
-      sources: ['주기', 'EDA', '열화상'],
+      sources: ['주기', 'EDA', 'HRV'],
       confidence: 'high',
     }
   }
@@ -83,22 +78,6 @@ export function askLudia(
           : `EDA 상태가 좋아요. 현재 상태를 유지하세요.`
       }`,
       sources: ['EDA', '자율신경'],
-      confidence: 'high',
-    }
-  }
-
-  // ── THERMAL / UTERUS / COLD ────────────────────────────────────
-  if (hit(q, ['자궁', '냉기', '냉증', '온도', '열화상', '하복부', '복부', '따뜻', '차가', '차갑'])) {
-    const fertilityNote = hasFertility && coldUterus ? ' 임신 준비 중이라면 자궁 온도 36.5°C 이상 유지가 착상 성공률에 직접 영향을 줘요.' : ''
-    const painNote = hasPainCare && painLevel >= 7 ? ` 생리통이 ${painLevel}/10으로 심한 편이라고 하셨는데, 냉기가 주요 원인 중 하나일 수 있어요.` : ''
-    const coldConfirm = coldReported && coldUterus ? ' 문진에서도 아랫배 냉감을 자주 느낀다고 하셨기 때문에 지속적인 온열 케어가 중요해요.' : ''
-    return {
-      text: `열화상 스캔 데이터예요. 자궁 ${data.thermal.uterineTemp}°C ${coldUterus ? '— 정상(36.5°C)보다 낮아 냉기 패턴이에요' : '— 정상 범위예요'}, 좌측 난소 ${data.thermal.leftOvaryTemp}°C, 우측 난소 ${data.thermal.rightOvaryTemp}°C. ${
-        coldUterus
-          ? `자궁 냉증은 혈액 순환 저하가 원인이에요. 핫팩을 하복부에 15-20분 적용하고, 생강·쑥·계피 차를 꾸준히 마시면 온도가 올라요. ${phase === 'menstrual' ? '생리 중에는 자궁 혈관이 더 예민해서 특히 보온이 중요해요.' : phase === 'luteal' ? '황체기에 자궁이 차면 프로게스테론 활성도도 떨어질 수 있어요.' : ''} 족욕(40°C, 15분)도 자궁 혈류 개선에 매우 효과적이에요.${coldConfirm}${painNote}${fertilityNote}`
-          : `자궁 온도가 건강해요. ${phase === 'ovulation' ? 'LH 서지 영향으로 체온이 자연스럽게 높아진 상태예요.' : '보온 관리가 잘 되고 있어요.'}`
-      }`,
-      sources: ['열화상', '주기'],
       confidence: 'high',
     }
   }
@@ -140,9 +119,9 @@ export function askLudia(
   // ── EXERCISE ───────────────────────────────────────────────────
   if (hit(q, ['운동', '활동', '걷기', '달리기', '요가', '필라테스', '헬스', '근력', 'hiit', '어떤 운동', '운동 해도'])) {
     const recs: Record<CyclePhase, string> = {
-      menstrual: `생리 중에는 고강도 운동보다 가벼운 걷기, 스트레칭, 음 요가(Yin Yoga)가 가장 좋아요. HRV ${data.biosignal.hrv}ms ${lowHRV ? '— 몸이 소모된 상태이니 무리하지 마세요' : '— 가벼운 활동은 괜찮아요'}. 자궁 온도 ${data.thermal.uterineTemp}°C ${coldUterus ? '— 운동 전 하복부 워밍업을 꼭 하세요' : ''}.`,
+      menstrual: `생리 중에는 고강도 운동보다 가벼운 걷기, 스트레칭, 음 요가(Yin Yoga)가 가장 좋아요. HRV ${data.biosignal.hrv}ms ${lowHRV ? '— 몸이 소모된 상태이니 무리하지 마세요' : '— 가벼운 활동은 괜찮아요'}.`,
       follicular: `난포기는 에너지가 빠르게 올라가는 시기예요! HRV ${data.biosignal.hrv}ms로 회복력이 ${lowHRV ? '다소 낮으니 점진적으로 강도를 높이세요' : '좋아요 — 근력 운동이나 HIIT가 효과적이에요'}. 에스트로겐이 근육 회복을 도와주는 구간이라 운동 효과가 극대화돼요.`,
-      ovulation: `배란기에 에너지가 피크예요. 가장 강도 높은 운동도 OK! 자궁 온도 ${data.thermal.uterineTemp}°C ${coldUterus ? '— 워밍업을 충분히 하세요' : '— 최적의 운동 환경이에요'}. 인대가 살짝 느슨해지는 시기라 스트레칭 시 과신전 주의하세요.`,
+      ovulation: `배란기에 에너지가 피크예요. 가장 강도 높은 운동도 OK! HRV ${data.biosignal.hrv}ms — ${lowHRV ? '워밍업을 충분히 하세요' : '최적의 운동 환경이에요'}. 인대가 살짝 느슨해지는 시기라 스트레칭 시 과신전 주의하세요.`,
       luteal: `황체기에는 에너지가 점점 감소해요. ${stressHigh ? `EDA 스트레스 ${data.eda.stressIndex}점 — 고강도 운동이 오히려 코르티솔을 올릴 수 있으니 ` : ''}필라테스, 수영, 가벼운 걷기가 코르티솔 관리에 좋아요. 무리하면 PMS 증상이 심해질 수 있어요.`,
     }
     return {
@@ -155,14 +134,14 @@ export function askLudia(
   // ── NUTRITION ─────────────────────────────────────────────────
   if (hit(q, ['음식', '먹어', '영양', '보충', '비타민', '미네랄', '식단', '뭐 먹', '추천', '먹어야', '식품', '영양제'])) {
     const recs: Record<CyclePhase, string> = {
-      menstrual: `생리 중 필수 영양소: 철분(시금치·적색 육류) + 비타민 C(흡수 극대화), 마그네슘 300mg(경련 완화), 오메가-3(염증·통증 감소). 다크 초콜릿(카카오 70%+)은 마그네슘과 기분 향상 두 마리 토끼예요. ${coldUterus ? '자궁 냉기가 있으니 생강·쑥·계피 같은 온열 식품을 꼭 챙기세요.' : ''}`,
+      menstrual: `생리 중 필수 영양소: 철분(시금치·적색 육류) + 비타민 C(흡수 극대화), 마그네슘 300mg(경련 완화), 오메가-3(염증·통증 감소). 다크 초콜릿(카카오 70%+)은 마그네슘과 기분 향상 두 마리 토끼예요.`,
       follicular: `난포기엔 에스트로겐 대사를 돕는 식품이 열쇠예요: 브로콜리·케일 등 십자화과 채소, 아마씨, 발효식품(김치·된장·요거트). 단백질 섭취를 늘려 근육 합성과 에너지 상승을 지원하세요. ${lowHRV ? 'HRV가 낮으니 코엔자임 Q10도 추가해보세요.' : ''}`,
       ovulation: `배란기엔 아연(굴·호박씨), 비타민 B6(닭고기·바나나), 항산화 베리류를 중점으로 챙기세요. 카페인은 하루 200mg 이하로 줄이면 가임 환경 최적화에 도움돼요. 수분 섭취를 늘리면 자궁경부 점액 분비도 개선돼요.`,
       luteal: `황체기 핵심 영양소: 마그네슘 300-400mg(PMS 핵심 완화제), 칼슘 1000mg(유제품·멸치), 비타민 B6 50mg. ${stressHigh ? `EDA 스트레스가 높으니 트립토판 식품(터키·달걀·오트밀)으로 세로토닌을 보충하세요. ` : ''}단당류·카페인은 증상 악화 원인이에요. 복합 탄수화물(고구마·현미)을 선택하세요.`,
     }
     return {
       text: recs[phase],
-      sources: ['주기', 'EDA', '열화상'],
+      sources: ['주기', 'EDA'],
       confidence: 'high',
     }
   }
@@ -172,12 +151,12 @@ export function askLudia(
     const hMap: Record<CyclePhase, string> = {
       menstrual: `지금은 에스트로겐과 프로게스테론이 모두 최저치예요. 몸이 '초기화'되는 시기입니다. 철분과 엽산으로 호르몬 합성 기반을 만들고, 혈당을 안정시키는 저 GI 식품을 먹어 인슐린을 조절해주세요.`,
       follicular: `에스트로겐이 빠르게 상승 중이에요! 기분 향상, 에너지 증가, 피부 광택이 나타나는 시기입니다. 십자화과 채소로 간의 에스트로겐 대사를 도와 호르몬 균형을 최적화하세요.`,
-      ovulation: `에스트로겐이 피크에 달하고 LH가 급상승합니다. 자궁 온도 ${data.thermal.uterineTemp}°C가 LH 서지를 반영해요. 이 시기 코르티솔 급상승은 배란을 억제할 수 있으니 스트레스를 최소화하세요.`,
+      ovulation: `에스트로겐이 피크에 달하고 LH가 급상승합니다. 이 시기 코르티솔 급상승은 배란을 억제할 수 있으니 스트레스를 최소화하세요.`,
       luteal: `프로게스테론 상승 구간이에요. ${stressHigh ? `EDA 스트레스 지수 ${data.eda.stressIndex}점 — 코르티솔이 프로게스테론 합성 경로(프레그네놀론)를 '훔쳐'가는 '코르티솔 스틸' 현상이 일어날 수 있어요. 지금 스트레스 관리가 호르몬 균형의 핵심이에요. ` : '프로게스테론 생성 환경이 양호해요. '}마그네슘(300mg)과 아연(15mg)이 프로게스테론 합성을 직접 지원해요.`,
     }
     return {
       text: hMap[phase],
-      sources: ['주기', 'EDA', '열화상'],
+      sources: ['주기', 'EDA'],
       confidence: 'medium',
     }
   }
@@ -216,12 +195,12 @@ export function askLudia(
   // ── PAIN / CRAMPS ──────────────────────────────────────────────
   if (hit(q, ['통증', '생리통', '경련', '아파', '허리', '복통', '쥐', '쑤셔', '생리 통증', '진통'])) {
     return {
-      text: `통증 분석: 자궁 온도 ${data.thermal.uterineTemp}°C ${coldUterus ? '— 냉기로 혈관이 수축하면서 통증이 심해지는 패턴이에요. 핫팩이 최우선이에요' : '— 온도 측면은 정상이에요'}. HRV ${data.biosignal.hrv}ms ${lowHRV ? '— 신체 통증 역치가 낮아진 상태라 평소보다 더 예민하게 느껴질 수 있어요' : '— 통증 대응력은 괜찮아요'}. ${
-        coldUterus || lowHRV
+      text: `통증 분석: HRV ${data.biosignal.hrv}ms ${lowHRV ? '— 신체 통증 역치가 낮아진 상태라 평소보다 더 예민하게 느껴질 수 있어요' : '— 통증 대응력은 괜찮아요'}. ${
+        lowHRV
           ? `지금 당장: ① 핫팩(40-45°C) 하복부 15-20분 ② 마그네슘 300mg 복용(30분 내 근육 이완) ③ 생강차 1잔. 프로스타글란딘 억제를 위해 이부프로펜은 통증 시작 직전부터 복용하면 훨씬 효과적이에요.`
           : `오메가-3 EPA를 꾸준히 보충하면 프로스타글란딘 생성이 줄어 생리통이 장기적으로 개선돼요. 마그네슘도 매일 복용해보세요.`
       }`,
-      sources: ['열화상', 'HRV', '주기'],
+      sources: ['HRV', '주기'],
       confidence: 'high',
     }
   }
@@ -254,22 +233,22 @@ export function askLudia(
     )
     const level = score >= 72 ? '양호' : score >= 52 ? '보통' : '주의'
     return {
-      text: `종합 건강 지수 ${score}점 (${level}). D+${cycleDay} ${phaseName} 기준 5가지 지표 분석: EDA 스트레스 ${data.eda.stressIndex}점(${stressHigh ? '↑높음' : stressMid ? '보통' : '↓양호'}), 자궁 온도 ${data.thermal.uterineTemp}°C(${coldUterus ? '냉기' : '정상'}), HRV ${data.biosignal.hrv}ms(${lowHRV ? '낮음' : '정상'}), 홍채 ${irisAvg}점, 수면 ${data.biosignal.sleepHours}h(${poorSleep ? '부족' : '충분'}). ${
+      text: `종합 건강 지수 ${score}점 (${level}). D+${cycleDay} ${phaseName} 기준 4가지 지표 분석: EDA 스트레스 ${data.eda.stressIndex}점(${stressHigh ? '↑높음' : stressMid ? '보통' : '↓양호'}), HRV ${data.biosignal.hrv}ms(${lowHRV ? '낮음' : '정상'}), 홍채 ${irisAvg}점, 수면 ${data.biosignal.sleepHours}h(${poorSleep ? '부족' : '충분'}). ${
         score >= 72
           ? `전반적으로 좋은 컨디션이에요! ${phaseName}의 특성을 활용해 ${phase === 'follicular' || phase === 'ovulation' ? '운동과 활동을 늘려보세요' : '몸을 충분히 쉬어주세요'}.`
           : score >= 52
-          ? `보통 상태예요. ${stressHigh ? 'EDA 스트레스 관리' : ''}${coldUterus ? (stressHigh ? '와 자궁 온열 케어' : '자궁 온열 케어') : ''}${poorSleep ? (stressHigh || coldUterus ? ', 수면 개선' : '수면 개선') : ''}이 지금 가장 중요한 과제예요.`
+          ? `보통 상태예요. ${stressHigh ? 'EDA 스트레스 관리' : ''}${poorSleep ? (stressHigh ? ', 수면 개선' : '수면 개선') : ''}이 지금 가장 중요한 과제예요.`
           : `컨디션이 낮아요. 오늘은 무리하지 말고 충분한 휴식, 따뜻한 식사, 수분 섭취에 집중해주세요. 내일은 더 나아질 거예요.`
       }`,
-      sources: ['주기', 'EDA', '열화상', 'HRV', '홍채'],
+      sources: ['주기', 'EDA', 'HRV', '홍채'],
       confidence: 'high',
     }
   }
 
   // ── DEFAULT ────────────────────────────────────────────────────
   return {
-    text: `D+${cycleDay} ${phaseName} 기준으로 현재 주요 지표예요: EDA 스트레스 ${data.eda.stressIndex}/100, 자궁 온도 ${data.thermal.uterineTemp}°C, HRV ${data.biosignal.hrv}ms, 홍채 점수 ${irisAvg}점, 수면 ${data.biosignal.sleepHours}시간. 더 구체적인 분석을 원하시면 아래 추천 질문 중 하나를 눌러보세요!`,
-    sources: ['주기', 'EDA', '열화상', '바이오신호'],
+    text: `D+${cycleDay} ${phaseName} 기준으로 현재 주요 지표예요: EDA 스트레스 ${data.eda.stressIndex}/100, HRV ${data.biosignal.hrv}ms, 홍채 점수 ${irisAvg}점, 수면 ${data.biosignal.sleepHours}시간. 더 구체적인 분석을 원하시면 아래 추천 질문 중 하나를 눌러보세요!`,
+    sources: ['주기', 'EDA', '바이오신호'],
     confidence: 'medium',
   }
 }
@@ -277,7 +256,7 @@ export function askLudia(
 export const SUGGESTED_QUESTIONS = [
   '오늘 내 컨디션 어때?',
   '지금 긴장·스트레스가 많은 것 같아',
-  '자궁이 차가운 것 같아',
+  '생리통이 심할 때 뭘 하면 좋아?',
   '다음 생리 언제야?',
   '오늘 어떤 운동이 좋아?',
   '지금 단계에 뭘 먹으면 좋아?',

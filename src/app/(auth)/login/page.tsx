@@ -14,7 +14,7 @@ const inputStyle = {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { storedUser, verifyPassword, startSession } = useAuth()
+  const { storedUser, verifyPassword, startSession, continueAsGuest } = useAuth()
 
   const [userId,   setUserId]   = useState('')
   const [password, setPassword] = useState('')
@@ -46,6 +46,11 @@ export default function LoginPage() {
 
     startSession()
     router.push('/calendar')
+  }
+
+  function handleGuest() {
+    continueAsGuest()
+    router.push('/onboarding')
   }
 
   return (
@@ -154,6 +159,16 @@ export default function LoginPage() {
             회원가입
           </button>
         </p>
+
+        <button
+          onClick={handleGuest}
+          className="w-full mt-3 py-3 rounded-2xl text-xs font-semibold text-slate-400 transition-all active:scale-95"
+          style={{
+            background: 'rgba(255,255,255,0.6)',
+            border: '1.5px solid rgba(158,18,57,0.1)',
+          }}>
+          회원가입 없이 게스트로 둘러보기
+        </button>
       </div>
     </div>
   )

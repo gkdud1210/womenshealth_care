@@ -2,20 +2,18 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Microscope, Eye, Thermometer, Activity, FileText, Download, Zap, Scan, History, ChevronLeft } from 'lucide-react'
+import { Microscope, Eye, Activity, FileText, Download, Zap, Scan, History, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
-import { ThermalMapView } from '@/components/diagnostic/ThermalMapView'
 import { BioSignalPanel } from '@/components/diagnostic/BioSignalPanel'
 import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
 import { EDAAnalysisView } from '@/components/diagnostic/EDAAnalysisView'
 
-type Tab = 'iris' | 'thermal' | 'eda' | 'biosignal' | 'report'
+type Tab = 'iris' | 'eda' | 'biosignal' | 'report'
 type View = 'home' | 'history'
 
 const TABS: { id: Tab; label: string; icon: typeof Eye; badge?: string }[] = [
   { id: 'iris',      label: '홍채 분석',    icon: Eye },
-  { id: 'thermal',   label: '열화상 맵',    icon: Thermometer, badge: '냉기감지' },
   { id: 'eda',       label: 'EDA 피부전도', icon: Zap,         badge: 'NEW' },
   { id: 'biosignal', label: '바이오 신호',  icon: Activity },
   { id: 'report',    label: '종합 리포트',  icon: FileText },
@@ -47,7 +45,7 @@ export default function DiagnosticPage() {
             <Microscope className="w-7 h-7 text-white" />
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-800 mb-2">멀티모달 진단 분석</h1>
-          <p className="text-sm text-slate-400">홍채 3D · 열화상 · EDA · HRV · BMI 융합 분석</p>
+          <p className="text-sm text-slate-400">홍채 3D · EDA · HRV · BMI 융합 분석</p>
         </div>
 
         {/* Two CTA cards */}
@@ -66,7 +64,7 @@ export default function DiagnosticPage() {
             </div>
             <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">새 진단 시작</h2>
             <p className="text-xs text-slate-400 leading-relaxed">
-              홍채 · 열화상 · EDA · HRV · BMI<br />5단계 전신 진단을 시작합니다
+              홍채 · EDA · HRV · BMI<br />4단계 전신 진단을 시작합니다
             </p>
             <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
               style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)' }}>
@@ -87,7 +85,7 @@ export default function DiagnosticPage() {
             </div>
             <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">과거 진단 기록</h2>
             <p className="text-xs text-slate-400 leading-relaxed">
-              이전 진단 결과를 확인하고<br />홍채 · 열화상 · EDA · HRV 기록을 분석합니다
+              이전 진단 결과를 확인하고<br />홍채 · EDA · HRV 기록을 분석합니다
             </p>
             <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
               style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }}>
@@ -115,7 +113,7 @@ export default function DiagnosticPage() {
           </div>
           <div>
             <h1 className="font-display text-xl sm:text-3xl font-semibold text-slate-800">과거 진단 기록</h1>
-            <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">홍채 3D · 열화상 · EDA · HRV · BMI 기록</p>
+            <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">홍채 3D · EDA · HRV · BMI 기록</p>
           </div>
         </div>
         <button className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium btn-ghost">
@@ -217,57 +215,6 @@ export default function DiagnosticPage() {
                     <span className="text-[10px] text-slate-400">{desc}점</span>
                   </div>
                 ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'thermal' && (
-        <div className="animate-fade-in">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
-            <div className="lg:col-span-7 glass-card p-4 sm:p-6">
-              <ThermalMapView />
-            </div>
-            <div className="lg:col-span-5 space-y-4">
-              <div className="glass-card p-5">
-                <h4 className="text-sm font-semibold text-slate-700 mb-4">열화상 분석 기준</h4>
-                <div className="space-y-2.5">
-                  {[
-                    { range: '35.0 – 35.9°C', label: '냉기 감지', color: 'bg-blue-400', desc: '혈액 순환 저하 의심' },
-                    { range: '36.0 – 36.4°C', label: '약간 저온', color: 'bg-cyan-400', desc: '경미한 순환 저하' },
-                    { range: '36.5 – 37.0°C', label: '정상 범위', color: 'bg-green-400', desc: '건강한 혈액 순환' },
-                    { range: '37.1 – 37.9°C', label: '약간 고온', color: 'bg-yellow-400', desc: '염증 반응 가능성' },
-                    { range: '38.0°C 이상',   label: '고온 경보', color: 'bg-red-400',    desc: '염증/감염 의심' },
-                  ].map(({ range, label, color, desc }) => (
-                    <div key={range} className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50">
-                      <div className={cn('w-3 h-3 rounded-full flex-shrink-0', color)} />
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <span className="text-xs font-medium text-slate-700">{label}</span>
-                          <span className="text-[10px] text-slate-400">{range}</span>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-0.5">{desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="glass-card p-5">
-                <h4 className="text-sm font-semibold text-slate-700 mb-3">자궁 냉증 자가 체크</h4>
-                <div className="space-y-2">
-                  {[
-                    '생리통이 심하고 혈색이 어둡다',
-                    '손발이 차고 하복부가 시리다',
-                    '생리 주기가 불규칙하다',
-                    '아랫배가 자주 묵직하다',
-                  ].map((item, i) => (
-                    <label key={i} className="flex items-center gap-2.5 cursor-pointer group">
-                      <div className="w-4 h-4 rounded border-2 border-rose-200 bg-rose-50 group-hover:border-rose-400 transition-colors flex-shrink-0" />
-                      <span className="text-xs text-slate-600">{item}</span>
-                    </label>
-                  ))}
-                </div>
               </div>
             </div>
           </div>

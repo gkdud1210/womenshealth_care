@@ -8,7 +8,6 @@ import type { CyclePhase } from '@/types/health'
 
 export interface MultimodalData {
   iris:      { leftScore: number; rightScore: number; skinZone: number; thyroidZone: number }
-  thermal:   { uterineTemp: number; leftOvaryTemp: number; rightOvaryTemp: number }
   eda:       { conductance: number; stressIndex: number; tensionLevel: number; relaxationScore: number; ansBalance: number }
   biosignal: { hrv: number; sleepHours: number; heartRate: number; weight: number; bmi: number }
 }
@@ -30,7 +29,6 @@ interface Insight {
 function generate(phase: CyclePhase, cycleDay: number, d: MultimodalData): Insight {
   const stressHigh = d.eda.stressIndex >= 65
   const stressMid  = d.eda.stressIndex >= 45
-  const coldUterus = d.thermal.uterineTemp < 36.2
   const lowHRV     = d.biosignal.hrv < 38
   const poorSleep  = d.biosignal.sleepHours < 6.5
   const irisAvg    = Math.round((d.iris.leftScore + d.iris.rightScore) / 2)
@@ -40,17 +38,17 @@ function generate(phase: CyclePhase, cycleDay: number, d: MultimodalData): Insig
 
   // ── LUTEAL ──────────────────────────────────────────────────────
   if (phase === 'luteal') {
-    if (stressHigh && coldUterus) {
+    if (stressHigh && lowHRV) {
       return {
         type: 'critical',
         headline: '황체기 복합 스트레스 패턴 감지',
-        message: `EDA 긴장도 ${d.eda.stressIndex}점 + 자궁 온도 ${d.thermal.uterineTemp}°C 냉기 패턴이 동시에 감지됩니다. 황체기 프로게스테론 저하와 코르티솔 길항이 겹쳐 PMS 증상이 심화될 위험이 높습니다. 즉시 온열 케어와 부교감 활성 프로토콜을 권장합니다.`,
-        actions: ['핫팩 하복부 15분', '마그네슘 300mg', '4-7-8 심호흡', '따뜻한 생강차', '디지털 디톡스 1시간'],
+        message: `EDA 긴장도 ${d.eda.stressIndex}점 + HRV ${d.biosignal.hrv}ms 저하가 동시에 감지됩니다. 황체기 프로게스테론 저하와 코르티솔 길항이 겹쳐 PMS 증상이 심화될 위험이 높습니다. 즉시 이완 케어와 부교감 활성 프로토콜을 권장합니다.`,
+        actions: ['마그네슘 300mg', '4-7-8 심호흡', '따뜻한 생강차', '디지털 디톡스 1시간'],
         dataPoints: [
           mkDP('EDA 긴장도', `${d.eda.stressIndex}/100`, 'critical'),
-          mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, 'critical'),
+          mkDP('HRV', `${d.biosignal.hrv}ms`, 'critical'),
           mkDP('자율신경', ansSym ? '교감 우세' : '균형', ansSym ? 'warn' : 'ok'),
-          mkDP('HRV', `${d.biosignal.hrv}ms`, lowHRV ? 'warn' : 'ok'),
+          mkDP('수면', `${d.biosignal.sleepHours}h`, poorSleep ? 'warn' : 'ok'),
         ],
       }
     }
@@ -64,35 +62,35 @@ function generate(phase: CyclePhase, cycleDay: number, d: MultimodalData): Insig
           mkDP('EDA 긴장도', `${d.eda.stressIndex}/100`, 'warn'),
           mkDP('이완도', `${d.eda.relaxationScore}%`, d.eda.relaxationScore < 40 ? 'warn' : 'ok'),
           mkDP('수면', `${d.biosignal.sleepHours}h`, poorSleep ? 'warn' : 'ok'),
-          mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, coldUterus ? 'warn' : 'ok'),
+          mkDP('HRV', `${d.biosignal.hrv}ms`, lowHRV ? 'warn' : 'ok'),
         ],
       }
     }
     return {
       type: 'info',
       headline: '황체기 안정 — 지속 모니터링 중',
-      message: `D+${cycleDay} 황체기, EDA 긴장도 ${d.eda.stressIndex}점으로 관리 가능한 범위입니다. 자궁 온도 ${d.thermal.uterineTemp}°C, HRV ${d.biosignal.hrv}ms 안정적. 다음 생리 예정일까지 ${28 - cycleDay}일 — 주기 관리를 지속하세요.`,
+      message: `D+${cycleDay} 황체기, EDA 긴장도 ${d.eda.stressIndex}점으로 관리 가능한 범위입니다. HRV ${d.biosignal.hrv}ms 안정적. 다음 생리 예정일까지 ${28 - cycleDay}일 — 주기 관리를 지속하세요.`,
       actions: ['오메가-3 보충', '규칙적 수면 루틴 유지', '항산화 식품 섭취'],
       dataPoints: [
         mkDP('EDA 긴장도', `${d.eda.stressIndex}/100`, 'ok'),
-        mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, coldUterus ? 'warn' : 'ok'),
         mkDP('HRV', `${d.biosignal.hrv}ms`, lowHRV ? 'warn' : 'ok'),
         mkDP('수면', `${d.biosignal.sleepHours}h`, poorSleep ? 'warn' : 'ok'),
+        mkDP('홍채 점수', `${irisAvg}`, irisAvg < 65 ? 'warn' : 'ok'),
       ],
     }
   }
 
   // ── MENSTRUAL ────────────────────────────────────────────────────
   if (phase === 'menstrual') {
-    if (coldUterus && lowHRV) {
+    if (lowHRV && poorSleep) {
       return {
         type: 'critical',
-        headline: '생리기 냉기 + HRV 저하 — 즉각 케어 필요',
-        message: `자궁 온도 ${d.thermal.uterineTemp}°C 냉기 + HRV ${d.biosignal.hrv}ms 저하로 생리통 심화 가능성이 높습니다. 홍채 분석 점수 ${irisAvg}점으로 전신 컨디션도 저하되어 있습니다. 온열 요법과 철분 보충이 우선입니다.`,
-        actions: ['핫팩 하복부 즉시 적용', '철분 + 비타민 C 보충', '수면 8시간 확보', '카페인·알코올 제한'],
+        headline: '생리기 HRV 저하 + 수면 부족 — 즉각 케어 필요',
+        message: `HRV ${d.biosignal.hrv}ms 저하와 수면 ${d.biosignal.sleepHours}h 부족이 겹쳐 생리통 심화 가능성이 높습니다. 홍채 분석 점수 ${irisAvg}점으로 전신 컨디션도 저하되어 있습니다. 충분한 휴식과 철분 보충이 우선입니다.`,
+        actions: ['철분 + 비타민 C 보충', '수면 8시간 확보', '카페인·알코올 제한', '가벼운 스트레칭'],
         dataPoints: [
-          mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, 'critical'),
           mkDP('HRV', `${d.biosignal.hrv}ms`, 'critical'),
+          mkDP('수면', `${d.biosignal.sleepHours}h`, 'critical'),
           mkDP('홍채 점수', `${irisAvg}`, irisAvg < 65 ? 'warn' : 'ok'),
           mkDP('EDA 긴장도', `${d.eda.stressIndex}/100`, stressHigh ? 'warn' : 'ok'),
         ],
@@ -100,14 +98,14 @@ function generate(phase: CyclePhase, cycleDay: number, d: MultimodalData): Insig
     }
     return {
       type: 'info',
-      headline: '생리기 — 자궁 에너지 회복 시간',
-      message: `자궁 온도 ${d.thermal.uterineTemp}°C. 에스트로겐·프로게스테론이 최저치입니다. 생리기는 자궁 내막 재생 시기 — 에너지 소비를 줄이고 내면 회복에 집중하세요. 홍채 분석 ${irisAvg}점, 수면 ${d.biosignal.sleepHours}h 기준으로 가벼운 활동을 권장합니다.`,
+      headline: '생리기 — 에너지 회복 시간',
+      message: `에스트로겐·프로게스테론이 최저치입니다. 생리기는 자궁 내막 재생 시기 — 에너지 소비를 줄이고 내면 회복에 집중하세요. 홍채 분석 ${irisAvg}점, 수면 ${d.biosignal.sleepHours}h 기준으로 가벼운 활동을 권장합니다.`,
       actions: ['따뜻한 수분 충분 섭취', '철분·엽산 보충', '명상·스트레칭', '무리한 운동 자제'],
       dataPoints: [
-        mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, coldUterus ? 'warn' : 'ok'),
         mkDP('HRV', `${d.biosignal.hrv}ms`, lowHRV ? 'warn' : 'ok'),
         mkDP('홍채 점수', `${irisAvg}`, irisAvg < 65 ? 'warn' : 'ok'),
         mkDP('수면', `${d.biosignal.sleepHours}h`, poorSleep ? 'warn' : 'ok'),
+        mkDP('EDA 긴장도', `${d.eda.stressIndex}/100`, stressHigh ? 'warn' : 'ok'),
       ],
     }
   }
@@ -121,9 +119,9 @@ function generate(phase: CyclePhase, cycleDay: number, d: MultimodalData): Insig
       actions: ['고강도 운동 도전', '새로운 학습·창작', '사회적 활동 활성화', '단백질 보충'],
       dataPoints: [
         mkDP('EDA 이완도', `${d.eda.relaxationScore}%`, d.eda.relaxationScore >= 55 ? 'ok' : 'warn'),
-        mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, coldUterus ? 'warn' : 'ok'),
         mkDP('HRV', `${d.biosignal.hrv}ms`, lowHRV ? 'warn' : 'ok'),
         mkDP('수면', `${d.biosignal.sleepHours}h`, poorSleep ? 'warn' : 'ok'),
+        mkDP('홍채 점수', `${irisAvg}`, irisAvg < 65 ? 'warn' : 'ok'),
       ],
     }
   }
@@ -132,13 +130,13 @@ function generate(phase: CyclePhase, cycleDay: number, d: MultimodalData): Insig
   return {
     type: 'ok',
     headline: '배란기 — 생체 에너지 피크 구간',
-    message: `LH 서지로 체온이 상승합니다 (현재 ${d.thermal.uterineTemp}°C). EDA 이완도 ${d.eda.relaxationScore}%로 높고 HRV ${d.biosignal.hrv}ms — 자율신경 균형이 최적입니다. 가임 능력 최고조, 활동 에너지와 집중력 모두 피크 상태입니다.`,
-    actions: ['기초체온 측정 지속', '최대 강도 운동 가능', '중요 의사결정 최적 시기', '항산화 영양소 섭취'],
+    message: `LH 서지로 컨디션이 상승합니다. EDA 이완도 ${d.eda.relaxationScore}%로 높고 HRV ${d.biosignal.hrv}ms — 자율신경 균형이 최적입니다. 가임 능력 최고조, 활동 에너지와 집중력 모두 피크 상태입니다.`,
+    actions: ['최대 강도 운동 가능', '중요 의사결정 최적 시기', '항산화 영양소 섭취', '사회적 활동 확대'],
     dataPoints: [
-      mkDP('자궁 온도', `${d.thermal.uterineTemp}°C`, 'ok'),
       mkDP('HRV', `${d.biosignal.hrv}ms`, lowHRV ? 'warn' : 'ok'),
       mkDP('EDA 이완도', `${d.eda.relaxationScore}%`, 'ok'),
       mkDP('수면', `${d.biosignal.sleepHours}h`, poorSleep ? 'warn' : 'ok'),
+      mkDP('홍채 점수', `${irisAvg}`, irisAvg < 65 ? 'warn' : 'ok'),
     ],
   }
 }

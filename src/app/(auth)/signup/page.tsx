@@ -40,7 +40,7 @@ function Field({
 
 export default function SignupPage() {
   const router = useRouter()
-  const { register, startSession, storedUser } = useAuth()
+  const { register, startSession, storedUser, continueAsGuest } = useAuth()
 
   const [userId,    setUserId]    = useState('')
   const [nickname,  setNickname]  = useState('')
@@ -82,6 +82,11 @@ export default function SignupPage() {
       careTypes: [],
     })
     startSession()
+    router.push('/onboarding')
+  }
+
+  function handleGuest() {
+    continueAsGuest()
     router.push('/onboarding')
   }
 
@@ -160,6 +165,16 @@ export default function SignupPage() {
         <p className="text-[11px] text-slate-300 text-center mt-3">
           입력하신 정보는 이 기기에만 저장되며 외부로 전송되지 않습니다
         </p>
+
+        <button
+          onClick={handleGuest}
+          className="w-full mt-3 py-3 rounded-2xl text-xs font-semibold text-slate-400 transition-all active:scale-95"
+          style={{
+            background: 'rgba(255,255,255,0.6)',
+            border: '1.5px solid rgba(158,18,57,0.1)',
+          }}>
+          회원가입 없이 게스트로 둘러보기
+        </button>
       </div>
     </div>
   )

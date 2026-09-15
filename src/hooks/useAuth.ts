@@ -14,6 +14,7 @@ export interface UserProfile {
 
 const PROFILE_KEY = 'ludia_user_v1'
 const SESSION_KEY = 'ludia_session'
+const GUEST_KEY    = 'ludia_guest_v1'
 
 function hashPassword(pw: string): string {
   // Simple deterministic hash for local storage (not cryptographic)
@@ -24,15 +25,32 @@ function hashPassword(pw: string): string {
   return h.toString(36)
 }
 
+function makeGuestProfile(): UserProfile {
+  return {
+    userId: `guest_${Date.now().toString(36)}`,
+    nickname: '게스트',
+    name: '게스트',
+    birthdate: '',
+    passwordHash: '',
+    careTypes: [],
+  }
+}
+
 export function useAuth() {
   const [user, setUserState]        = useState<UserProfile | null>(null)
   const [hasSession, setHasSession] = useState(false)
   const [ready, setReady]           = useState(false)
+  const [isGuest, setIsGuest]       = useState(false)
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(PROFILE_KEY)
-      if (stored) setUserState(JSON.parse(stored))
+      if (stored) {
+        setUserState(JSON.parse(stored))
+      } else {
+        const guest = sessionStorage.getItem(GUEST_KEY)
+        if (guest) { setUserState(JSON.parse(guest)); setIsGuest(true) }
+      }
     } catch {}
     try {
       setHasSession(!!sessionStorage.getItem(SESSION_KEY))
@@ -42,7 +60,24 @@ export function useAuth() {
 
   const saveUser = useCallback((profile: UserProfile) => {
     setUserState(profile)
-    try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)) } catch {}
+    try {
+      if (isGuest) {
+        sessionStorage.setItem(GUEST_KEY, JSON.stringify(profile))
+      } else {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(profile))
+      }
+    } catch {}
+  }, [isGuest])
+
+  const continueAsGuest = useCallback((): void => {
+    const guest = makeGuestProfile()
+    setUserState(guest)
+    setIsGuest(true)
+    setHasSession(true)
+    try {
+      sessionStorage.setItem(GUEST_KEY, JSON.stringify(guest))
+      sessionStorage.setItem(SESSION_KEY, '1')
+    } catch {}
   }, [])
 
   const register = useCallback((
@@ -71,7 +106,11 @@ export function useAuth() {
   const logout = useCallback(() => {
     setUserState(null)
     setHasSession(false)
-    try { sessionStorage.removeItem(SESSION_KEY) } catch {}
+    setIsGuest(false)
+    try {
+      sessionStorage.removeItem(SESSION_KEY)
+      sessionStorage.removeItem(GUEST_KEY)
+    } catch {}
   }, [])
 
   const isOnboarded = !!user && user.careTypes.length > 0
@@ -84,9 +123,9 @@ export function useAuth() {
   }, [])
 
   return {
-    user, ready, hasSession,
+    user, ready, hasSession, isGuest,
     saveUser, register, verifyPassword,
-    startSession, logout,
+    startSession, logout, continueAsGuest,
     isOnboarded, storedUser,
   }
 }

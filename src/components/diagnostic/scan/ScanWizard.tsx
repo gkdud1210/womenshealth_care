@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import {
-  Eye, Thermometer, Activity, CheckCircle2,
+  Eye, Activity, CheckCircle2,
   Camera, CameraOff, ChevronRight, Scan, Zap,
   ArrowRight, BarChart2, Upload,
 } from 'lucide-react'
@@ -17,10 +17,9 @@ const rngF = (a: number, b: number, d = 1) => parseFloat((a + Math.random() * (b
 
 /* ── step meta ──────────────────────────────────────────────────── */
 const STEPS = [
-  { id: 1, key: 'iris',      label: '홍채 스캔',  icon: Eye,         color: '#a855f7' },
-  { id: 2, key: 'thermal',   label: '열화상',     icon: Thermometer, color: '#f97316' },
-  { id: 3, key: 'eda',       label: 'EDA 피부전도', icon: Zap,         color: '#06b6d4' },
-  { id: 4, key: 'biosignal', label: '바이오신호', icon: Activity,    color: '#f43f75' },
+  { id: 1, key: 'iris',      label: '홍채 스캔',  icon: Eye,      color: '#a855f7' },
+  { id: 2, key: 'eda',       label: 'EDA 피부전도', icon: Zap,      color: '#06b6d4' },
+  { id: 3, key: 'biosignal', label: '바이오신호', icon: Activity, color: '#f43f75' },
 ]
 
 /* ══════════════════════════════════════════════════════════════════
@@ -500,7 +499,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       {bothDone && (
         <button onClick={finish}
           className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">
-          다음 단계: 열화상 스캔 <ChevronRight className="w-4 h-4"/>
+          다음 단계: EDA 피부전도 <ChevronRight className="w-4 h-4"/>
         </button>
       )}
     </div>
@@ -508,162 +507,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   STEP 2 — THERMAL SCAN
-══════════════════════════════════════════════════════════════════ */
-
-type ThermalPhase = 'idle'|'scanning'|'done'
-
-const THERMAL_ZONES = [
-  { key:'uterine',      label:'자궁',        cx:.50, cy:.56, rx:.17, ry:.12, baseTemp:35.8 },
-  { key:'leftOvary',    label:'좌측 난소',   cx:.33, cy:.54, rx:.09, ry:.07, baseTemp:36.2 },
-  { key:'rightOvary',   label:'우측 난소',   cx:.67, cy:.54, rx:.09, ry:.07, baseTemp:36.4 },
-  { key:'lowerLeft',    label:'좌하복부',    cx:.30, cy:.66, rx:.10, ry:.08, baseTemp:36.1 },
-  { key:'lowerRight',   label:'우하복부',    cx:.70, cy:.66, rx:.10, ry:.08, baseTemp:36.3 },
-  { key:'upperAbdomen', label:'상복부',      cx:.50, cy:.38, rx:.16, ry:.10, baseTemp:36.8 },
-]
-
-function tempToRgba(t:number,a=0.7):string {
-  const n=Math.max(0,Math.min(1,(t-35.0)/3.0))
-  const r=Math.round(n*220+20), g=Math.round((1-Math.abs(n-.5)*2)*200), b=Math.round((1-n)*220+20)
-  return `rgba(${r},${g},${b},${a})`
-}
-
-function ThermalStep({ onDone }:{ onDone:(d:MultimodalData['thermal'])=>void }) {
-  const cvRef  = useRef<HTMLCanvasElement>(null)
-  const rafRef = useRef<number>()
-  const [phase,setPhase]=useState<ThermalPhase>('idle')
-  const [pct,setPct]=useState(0)
-  const [temps,setTemps]=useState<Record<string,number>>({})
-  const [res,setRes]=useState<MultimodalData['thermal']|null>(null)
-
-  useEffect(()=>{
-    if(phase==='idle'&&!Object.keys(temps).length) return
-    const cv=cvRef.current!; if(!cv)return; const ctx=cv.getContext('2d')!
-    const W=cv.width, H=cv.height
-    let t=0
-
-    function drawBody(){
-      ctx.clearRect(0,0,W,H)
-      // dark bg
-      ctx.fillStyle='#060412'; ctx.fillRect(0,0,W,H)
-      // body silhouette
-      ctx.fillStyle='rgba(40,20,55,.9)'
-      // torso
-      ctx.beginPath()
-      ctx.ellipse(W*.5,H*.42,W*.22,H*.28,0,0,Math.PI*2); ctx.fill()
-      // pelvis
-      ctx.beginPath()
-      ctx.ellipse(W*.5,H*.65,W*.20,H*.18,0,0,Math.PI*2); ctx.fill()
-      // head
-      ctx.beginPath()
-      ctx.ellipse(W*.5,H*.14,W*.10,H*.12,0,0,Math.PI*2); ctx.fill()
-
-      // scan line
-      if(phase==='scanning'){
-        const sy=H*.05+((t%120)/120)*H*.85
-        const g=ctx.createLinearGradient(0,sy,W,sy)
-        g.addColorStop(0,'transparent'); g.addColorStop(.4,'rgba(251,146,60,.5)')
-        g.addColorStop(.6,'rgba(251,146,60,.5)'); g.addColorStop(1,'transparent')
-        ctx.fillStyle=g; ctx.fillRect(0,sy-1.5,W,3)
-        // scan progress grid
-        ctx.strokeStyle='rgba(251,146,60,.06)'; ctx.lineWidth=.5
-        for(let gy=0;gy<sy;gy+=12){
-          ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(W,gy); ctx.stroke()
-        }
-        for(let gx=0;gx<W;gx+=12){
-          ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,sy); ctx.stroke()
-        }
-      }
-
-      // heat zones
-      THERMAL_ZONES.forEach(z=>{
-        const temp=temps[z.key]??z.baseTemp
-        const scanned=(phase==='scanning'&&pct/100>z.cy-.1)||(phase==='done')
-        if(!scanned) return
-        // zone glow
-        const gr=ctx.createRadialGradient(W*z.cx,H*z.cy,0,W*z.cx,H*z.cy,W*z.rx*1.8)
-        gr.addColorStop(0,tempToRgba(temp,.8))
-        gr.addColorStop(.6,tempToRgba(temp,.35))
-        gr.addColorStop(1,'transparent')
-        ctx.fillStyle=gr
-        ctx.beginPath(); ctx.ellipse(W*z.cx,H*z.cy,W*z.rx*1.8,H*z.ry*1.8,0,0,Math.PI*2)
-        ctx.fill()
-        // zone center ellipse
-        ctx.beginPath(); ctx.ellipse(W*z.cx,H*z.cy,W*z.rx,H*z.ry,0,0,Math.PI*2)
-        ctx.fillStyle=tempToRgba(temp,.7); ctx.fill()
-        ctx.strokeStyle=tempToRgba(temp,1); ctx.lineWidth=1; ctx.stroke()
-        // label + temp
-        const pulse=Math.sin(t*.08+z.cx*10)*.2+.8
-        ctx.fillStyle=`rgba(255,255,255,${phase==='done'?pulse:.5})`
-        ctx.font=`bold ${W*.035}px sans-serif`; ctx.textAlign='center'
-        ctx.fillText(z.label,W*z.cx,H*z.cy-H*z.ry-8)
-        ctx.fillStyle=tempToRgba(temp,phase==='done'?pulse:1)
-        ctx.font=`bold ${W*.04}px sans-serif`
-        ctx.fillText(`${temp.toFixed(1)}°`,W*z.cx,H*z.cy+5)
-      })
-
-      // colour scale bar
-      const barX=W*.85,barY=H*.2,barH=H*.5
-      const barG=ctx.createLinearGradient(barX,barY+barH,barX,barY)
-      barG.addColorStop(0,tempToRgba(35,.9)); barG.addColorStop(.5,tempToRgba(36.5,.9)); barG.addColorStop(1,tempToRgba(38,.9))
-      ctx.fillStyle=barG; ctx.fillRect(barX,barY,8,barH)
-      ctx.fillStyle='rgba(255,255,255,.55)'; ctx.font=`${W*.025}px sans-serif`; ctx.textAlign='left'
-      ctx.fillText('38°C',barX+11,barY+4); ctx.fillText('36.5°',barX+11,barY+barH/2+4); ctx.fillText('35°C',barX+11,barY+barH+4)
-
-      t++; rafRef.current=requestAnimationFrame(drawBody)
-    }
-    drawBody(); return ()=>cancelAnimationFrame(rafRef.current??0)
-  },[phase,temps,pct])
-
-  useEffect(()=>{
-    if(phase!=='scanning')return
-    const newTemps:Record<string,number>={}
-    THERMAL_ZONES.forEach(z=>{ newTemps[z.key]=rngF(z.baseTemp-.6,z.baseTemp+.8) })
-    setTemps(newTemps)
-    let p=0; const iv=setInterval(()=>{
-      p+=1.5; setPct(Math.floor(p))
-      if(p>=100){
-        clearInterval(iv); setPhase('done')
-        setRes({ uterineTemp:newTemps['uterine'], leftOvaryTemp:newTemps['leftOvary'], rightOvaryTemp:newTemps['rightOvary'] })
-      }
-    },60)
-    return ()=>clearInterval(iv)
-  },[phase])
-
-  return (
-    <div className="space-y-4">
-      <div className="relative rounded-2xl overflow-hidden bg-slate-950" style={{aspectRatio:'3/4',maxHeight:400}}>
-        <canvas ref={cvRef} width={320} height={430} className="w-full h-full"/>
-        {phase==='scanning'&&<div className="absolute bottom-3 right-3 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm"><div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse"/><span className="text-[10px] text-orange-300">측정 중 {pct}%</span></div>}
-      </div>
-
-      {phase==='scanning'&&<div className="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className="h-full bg-gradient-to-r from-orange-400 to-red-500 rounded-full transition-all duration-75" style={{width:`${pct}%`}}/></div>}
-
-      {phase==='done'&&res&&(
-        <div className="grid grid-cols-3 gap-2">
-          {[['자궁',res.uterineTemp],['좌측 난소',res.leftOvaryTemp],['우측 난소',res.rightOvaryTemp]].map(([l,v])=>(
-            <div key={String(l)} className="rounded-xl p-2.5 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(251,146,60,.15)'}}>
-              <div className={cn('text-xl font-bold font-display',(v as number)>=36.5?'text-green-600':(v as number)>=36.0?'text-amber-500':'text-rose-600')}>{(v as number).toFixed(1)}°</div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{l}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="text-center text-sm text-slate-500 min-h-[28px]">
-        {phase==='idle'&&'열화상 카메라로 하복부 부위를 촬영합니다'}
-        {phase==='scanning'&&'🌡  열화상 스캔 중 — 움직이지 말아 주세요...'}
-        {phase==='done'&&'✅ 열화상 분석 완료!'}
-      </div>
-
-      {phase==='idle'&&<button onClick={()=>setPhase('scanning')} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2"><Thermometer className="w-4 h-4"/>열화상 스캔 시작</button>}
-      {phase==='done'&&<button onClick={()=>onDone(res!)} className="w-full btn-primary py-3 rounded-2xl text-sm flex items-center justify-center gap-2">다음 단계: EDA 피부전도<ChevronRight className="w-4 h-4"/></button>}
-    </div>
-  )
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   STEP 3 — EDA CAPTURE
+   STEP 2 — EDA CAPTURE
 ══════════════════════════════════════════════════════════════════ */
 
 type EDAPhase='idle'|'capturing'|'done'
@@ -965,15 +809,14 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
 
       <div>
         <div className="text-xs font-black tracking-[.2em] mb-1" style={{background:'linear-gradient(135deg,#d4af37,#b8962e,#e8d07a)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',backgroundClip:'text'}}>LUDIA SCAN COMPLETE</div>
-        <h3 className="font-display text-xl font-semibold text-slate-800">4-Way 진단 완료!</h3>
-        <p className="text-sm text-slate-400 mt-1">홍채 · 열화상 · EDA · 바이오신호 분석 결과가 LUDIA에 저장됐어요</p>
+        <h3 className="font-display text-xl font-semibold text-slate-800">3-Way 진단 완료!</h3>
+        <p className="text-sm text-slate-400 mt-1">홍채 · EDA · 바이오신호 분석 결과가 LUDIA에 저장됐어요</p>
       </div>
 
       {/* summary */}
       <div className="grid grid-cols-2 gap-2 text-left">
         {[
           { icon:Eye, label:'홍채 분석', val:`평균 ${irisAvg}점`, ok:irisAvg>=70, color:'#a855f7' },
-          { icon:Thermometer, label:'자궁 온도', val:`${results.thermal.uterineTemp.toFixed(1)}°C`, ok:results.thermal.uterineTemp>=36.2, color:'#f97316' },
           { icon:Zap,   label:'EDA 스트레스',  val:`${results.eda.stressIndex}/100`, ok:results.eda.stressIndex<65, color:'#06b6d4' },
           { icon:Activity, label:'HRV', val:`${results.biosignal.hrv}ms`, ok:results.biosignal.hrv>=38, color:'#f43f75' },
         ].map(({icon:Icon,label,val,ok,color})=>(
@@ -1005,22 +848,22 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
 ══════════════════════════════════════════════════════════════════ */
 
 export function ScanWizard() {
-  const [step,setStep]=useState(0)   // 0=intro, 1-4=steps, 5=complete
+  const [step,setStep]=useState(0)   // 0=intro, 1-3=steps, 4=complete
   const [results,setResults]=useState<Partial<MultimodalData>>({})
   const { setData }=useMultimodalData()
 
   function save(key:keyof MultimodalData, val:MultimodalData[keyof MultimodalData]) {
     const next={ ...results, [key]:val } as MultimodalData
     setResults(next)
-    if(Object.keys(next).length===4) {
+    if(Object.keys(next).length===3) {
       setData(next as MultimodalData)
-      setStep(5)
+      setStep(4)
     } else {
       setStep(s=>s+1)
     }
   }
 
-  const stepMeta = step>=1&&step<=4 ? STEPS[step-1] : null
+  const stepMeta = step>=1&&step<=3 ? STEPS[step-1] : null
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -1038,7 +881,7 @@ export function ScanWizard() {
         </div>
 
         {/* Step progress */}
-        {step>0&&step<5&&(
+        {step>0&&step<4&&(
           <div className="flex items-center gap-1 mb-1">
             {STEPS.map((s,i)=>(
               <div key={s.id} className="flex items-center flex-1">
@@ -1066,8 +909,8 @@ export function ScanWizard() {
               style={{background:'linear-gradient(135deg,#0f0810,#2d1129)',boxShadow:'0 4px 24px rgba(244,63,117,.3)'}}>
               <Scan className="w-8 h-8 text-rose-300"/>
             </div>
-            <h2 className="font-display text-2xl font-semibold text-slate-800 mb-2">4-Way 진단 시작</h2>
-            <p className="text-sm text-slate-500 mb-6 leading-relaxed">홍채 3D · 열화상 · EDA 피부전도 · 바이오신호를 순서대로 측정해 LUDIA AI가 종합 분석합니다</p>
+            <h2 className="font-display text-2xl font-semibold text-slate-800 mb-2">3-Way 진단 시작</h2>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">홍채 3D · EDA 피부전도 · 바이오신호를 순서대로 측정해 LUDIA AI가 종합 분석합니다</p>
             <div className="space-y-2.5 mb-6">
               {STEPS.map(s=>{
                 const Icon=s.icon
@@ -1079,7 +922,7 @@ export function ScanWizard() {
                     <div>
                       <p className="text-xs font-semibold text-slate-700">Step {s.id} — {s.label}</p>
                       <p className="text-[10px] text-slate-400">
-                        {s.id===1?'홍채 3D 스캔으로 장기 밀도 분석':s.id===2?'자궁·난소 부위 체온 분포 측정':s.id===3?'피부 전도도로 스트레스·자율신경 분석':'HRV·심박수·수면 데이터 측정'}
+                        {s.id===1?'홍채 3D 스캔으로 장기 밀도 분석':s.id===2?'피부 전도도로 스트레스·자율신경 분석':'HRV·심박수·수면 데이터 측정'}
                       </p>
                     </div>
                   </div>
@@ -1092,7 +935,7 @@ export function ScanWizard() {
           </div>
         )}
 
-        {step>=1&&step<=4&&(
+        {step>=1&&step<=3&&(
           <div className="glass-card p-4 sm:p-5 max-w-lg mx-auto">
             {stepMeta&&(
               <div className="flex items-center gap-2.5 mb-5 pb-4 border-b border-rose-100/60">
@@ -1100,19 +943,18 @@ export function ScanWizard() {
                   {<stepMeta.icon className="w-4.5 h-4.5" style={{color:stepMeta.color}}/>}
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Step {stepMeta.id} / 4</p>
+                  <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Step {stepMeta.id} / 3</p>
                   <p className="text-base font-semibold text-slate-700">{stepMeta.label}</p>
                 </div>
               </div>
             )}
-            {step===1&&<IrisStep    onDone={d=>save('iris',d)}/>}
-            {step===2&&<ThermalStep onDone={d=>save('thermal',d)}/>}
-            {step===3&&<EDAStep     onDone={d=>save('eda',d)}/>}
-            {step===4&&<BioStep     onDone={d=>save('biosignal',d)}/>}
+            {step===1&&<IrisStep onDone={d=>save('iris',d)}/>}
+            {step===2&&<EDAStep  onDone={d=>save('eda',d)}/>}
+            {step===3&&<BioStep  onDone={d=>save('biosignal',d)}/>}
           </div>
         )}
 
-        {step===5&&results.iris&&results.thermal&&results.eda&&results.biosignal&&(
+        {step===4&&results.iris&&results.eda&&results.biosignal&&(
           <div className="glass-card p-5 sm:p-6 max-w-md mx-auto">
             <CompleteStep results={results as MultimodalData}/>
           </div>
