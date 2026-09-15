@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle, Pencil, Check, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Droplets, X, AlertCircle, Pencil, Check, Plus, Bell } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isToday, isSameDay, addMonths, subMonths, addDays
@@ -9,8 +9,8 @@ import {
 import { ko } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { getCyclePhase, getPhaseColor, getPhaseCellBg, getPhaseLabel } from '@/lib/cycle-utils'
-import type { DailyLogFormData, CyclePhase, FlowLevel, ScheduleEvent } from '@/types/health'
-import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS } from '@/types/health'
+import type { DailyLogFormData, CyclePhase, FlowLevel, ScheduleEvent, ReminderOffset } from '@/types/health'
+import { SCHEDULE_CATEGORY_COLORS, SCHEDULE_CATEGORY_LABELS, REMINDER_OFFSET_LABELS } from '@/types/health'
 import { useSchedule } from '@/hooks/useSchedule'
 import { DailyLogModal } from './DailyLogModal'
 import { DailyDetailModal } from './DailyDetailModal'
@@ -1643,6 +1643,8 @@ const CATEGORY_OPTIONS: { value: ScheduleEvent['category']; label: string }[] = 
   { value: 'other',    label: '기타' },
 ]
 
+const REMINDER_OPTIONS: ReminderOffset[] = ['none', 'at_time', '5m', '10m', '30m', '1h', '1d']
+
 // ── DayEventPanel ─────────────────────────────────────────────────────────────
 function DayEventPanel({
   selRange, events, log, phase,
@@ -1671,6 +1673,7 @@ function DayEventPanel({
   const [endTime,     setEndTime]     = useState('10:00')
   const [endDateStr,  setEndDateStr]  = useState(format(selRange.end, 'yyyy-MM-dd'))
   const [category,    setCategory]    = useState<ScheduleEvent['category']>('other')
+  const [reminder,    setReminder]    = useState<ReminderOffset>('none')
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editForm,    setEditForm]    = useState<Partial<ScheduleEvent>>({})
 
@@ -1695,13 +1698,14 @@ function DayEventPanel({
       intensity: 'medium' as const,
       source:    'manual' as const,
       createdAt: now,
+      reminder,
     })))
-    setTitle(''); setShowAddForm(false)
+    setTitle(''); setShowAddForm(false); setReminder('none')
   }
 
   function startEdit(ev: ScheduleEvent) {
     setEditingId(ev.id)
-    setEditForm({ title: ev.title, startTime: ev.startTime, endTime: ev.endTime, category: ev.category })
+    setEditForm({ title: ev.title, startTime: ev.startTime, endTime: ev.endTime, category: ev.category, reminder: ev.reminder ?? 'none' })
   }
 
   function saveEdit(id: string) {
@@ -1803,6 +1807,16 @@ function DayEventPanel({
                     )
                   })}
                 </div>
+                {/* 알림 */}
+                <div className="flex items-center gap-2">
+                  <Bell className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+                  <select value={reminder} onChange={e => setReminder(e.target.value as ReminderOffset)}
+                    className="flex-1 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:border-purple-400">
+                    {REMINDER_OPTIONS.map(o => (
+                      <option key={o} value={o}>{REMINDER_OFFSET_LABELS[o]}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex gap-2">
                   <button onClick={() => setShowAddForm(false)}
                     className="flex-1 py-2 rounded-xl text-xs text-slate-400 border border-slate-100 hover:bg-slate-50">취소</button>
@@ -1861,6 +1875,17 @@ function DayEventPanel({
                               )
                             })}
                           </div>
+                          {/* 알림 */}
+                          <div className="flex items-center gap-2">
+                            <Bell className="w-3.5 h-3.5 text-slate-300 flex-shrink-0" />
+                            <select value={editForm.reminder ?? 'none'}
+                              onChange={e => setEditForm(f => ({ ...f, reminder: e.target.value as ReminderOffset }))}
+                              className="flex-1 text-xs text-slate-600 bg-white border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:border-purple-400">
+                              {REMINDER_OPTIONS.map(o => (
+                                <option key={o} value={o}>{REMINDER_OFFSET_LABELS[o]}</option>
+                              ))}
+                            </select>
+                          </div>
                           <div className="flex gap-2">
                             <button onClick={() => setEditingId(null)}
                               className="flex-1 py-2 rounded-xl text-xs text-slate-400 border border-slate-100">취소</button>
@@ -1875,7 +1900,12 @@ function DayEventPanel({
                         <div className="flex items-center gap-3 px-4 py-3">
                           <div className="w-1 self-stretch rounded-full flex-none" style={{ background: c }} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800">{ev.title}</p>
+                            <p className="text-sm font-semibold text-slate-800 flex items-center gap-1.5">
+                              {ev.title}
+                              {ev.reminder && ev.reminder !== 'none' && (
+                                <Bell className="w-3 h-3 text-slate-300 flex-shrink-0" />
+                              )}
+                            </p>
                             <p className="text-xs text-slate-400 mt-0.5">
                               {!isSingleDay && (
                                 <span className="mr-1.5 font-medium text-slate-500">

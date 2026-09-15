@@ -2,6 +2,7 @@
 
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
+import { EventReminderHost } from '@/components/calendar/EventReminderHost'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -18,6 +19,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile bottom nav */}
       <MobileNav />
+
+      {/* Event reminder toasts */}
+      <EventReminderHost />
     </div>
   )
 }

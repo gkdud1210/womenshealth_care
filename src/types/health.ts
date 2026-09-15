@@ -71,6 +71,28 @@ export const SKIN_LABELS: Record<SkinCondition, string> = {
   sensitive: '민감함',
 }
 
+export type ReminderOffset = 'none' | 'at_time' | '5m' | '10m' | '30m' | '1h' | '1d'
+
+export const REMINDER_OFFSET_MINUTES: Record<ReminderOffset, number | null> = {
+  none:    null,
+  at_time: 0,
+  '5m':    5,
+  '10m':   10,
+  '30m':   30,
+  '1h':    60,
+  '1d':    1440,
+}
+
+export const REMINDER_OFFSET_LABELS: Record<ReminderOffset, string> = {
+  none:    '없음',
+  at_time: '이벤트 시간',
+  '5m':    '5분 전',
+  '10m':   '10분 전',
+  '30m':   '30분 전',
+  '1h':    '1시간 전',
+  '1d':    '1일 전',
+}
+
 export interface ScheduleEvent {
   id: string
   date: string          // YYYY-MM-DD
@@ -82,6 +104,7 @@ export interface ScheduleEvent {
   source: 'voice' | 'manual'
   createdAt: string     // ISO timestamp
   notes?: string
+  reminder?: ReminderOffset
 }
 
 export const SCHEDULE_CATEGORY_LABELS: Record<ScheduleEvent['category'], string> = {
