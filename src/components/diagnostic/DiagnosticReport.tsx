@@ -4,6 +4,7 @@ import { FileText, AlertTriangle, CheckCircle, Info, ShoppingBag, ArrowRight, Sp
 import { cn } from '@/lib/utils'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 import { useOnboardingProfile, isHighConcern, hasCare } from '@/lib/onboarding-profile'
+import { HairCareTypeCard } from './HairCareTypeCard'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { OnboardingProfile } from '@/lib/onboarding-profile'
 
@@ -241,6 +242,11 @@ export function DiagnosticReport() {
           </div>
         </div>
       </div>
+
+      {/* 탈모 케어 유형 분류 & 맞춤 웰니스 */}
+      {hasCare(profile, 'hair_care') && (
+        <HairCareTypeCard data={data} profile={profile} />
+      )}
 
       {/* Findings list */}
       <div>

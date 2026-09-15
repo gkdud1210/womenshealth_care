@@ -567,6 +567,13 @@ export default function CommunityPage() {
   const currentUserEmoji = AUTHOR_EMOJIS[Math.abs(currentUserName.charCodeAt(0)) % AUTHOR_EMOJIS.length]
 
   useEffect(() => {
+    try {
+      const cat = new URLSearchParams(window.location.search).get('category') as MeetupCategory | null
+      if (cat && ALL_CATEGORIES.includes(cat)) setCategoryFilter(cat)
+    } catch {}
+  }, [])
+
+  useEffect(() => {
     setGroups(loadGroups())
     setPosts(loadPosts())
     setSubsidy(loadSubsidy())
