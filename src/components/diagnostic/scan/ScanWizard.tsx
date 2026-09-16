@@ -7,9 +7,12 @@ import {
   ArrowRight, BarChart2, Upload,
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
+import { useOnboardingProfile } from '@/lib/onboarding-profile'
+import { useDiagnosticHistory } from '@/lib/diagnosticHistory'
 
 /* ── utils ──────────────────────────────────────────────────────── */
 const rng  = (a: number, b: number) => Math.floor(a + Math.random() * (b - a))
@@ -791,8 +794,21 @@ function BioStep({ onDone }:{ onDone:(d:MultimodalData['biosignal'])=>void }) {
    STEP 5 — COMPLETE
 ══════════════════════════════════════════════════════════════════ */
 
-function CompleteStep({ results }:{ results:MultimodalData }) {
+function CompleteStep({ results, sessionId }:{ results:MultimodalData; sessionId:string | null }) {
   const irisAvg=Math.round((results.iris.leftScore+results.iris.rightScore)/2)
+  const router = useRouter()
+  const [countdown, setCountdown] = useState(2)
+  const reportHref = sessionId ? `/diagnostic/report?id=${sessionId}` : '/diagnostic/report'
+
+  useEffect(() => {
+    if (countdown <= 0) {
+      router.push(reportHref)
+      return
+    }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [countdown, router, reportHref])
+
   return (
     <div className="space-y-5 text-center py-2">
       {/* animated LUDIA brain */}
@@ -834,10 +850,11 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
 
       {/* CTAs */}
       <div className="grid grid-cols-1 gap-3 pt-2">
-        <Link href="/diagnostic" className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-medium transition-all hover:opacity-90 active:scale-95"
-          style={{background:'rgba(248,244,246,.9)',border:'1.5px solid rgba(244,63,117,.2)',color:'#e11d5a'}}>
-          <BarChart2 className="w-4 h-4"/> 상세 결과 보기
+        <Link href={reportHref} className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
+          style={{background:'linear-gradient(135deg,#f43f75,#e11d5a)',boxShadow:'0 4px 20px rgba(244,63,117,.35)'}}>
+          <BarChart2 className="w-4 h-4"/> 지금 바로 상세 리포트 보기
         </Link>
+        <p className="text-[11px] text-slate-400">{countdown}초 후 자동으로 상세 리포트로 이동해요</p>
       </div>
     </div>
   )
@@ -850,13 +867,23 @@ function CompleteStep({ results }:{ results:MultimodalData }) {
 export function ScanWizard() {
   const [step,setStep]=useState(0)   // 0=intro, 1-3=steps, 4=complete
   const [results,setResults]=useState<Partial<MultimodalData>>({})
+  const [sessionId,setSessionId]=useState<string | null>(null)
   const { setData }=useMultimodalData()
+  const profile = useOnboardingProfile()
+  const { addSession } = useDiagnosticHistory()
 
   function save(key:keyof MultimodalData, val:MultimodalData[keyof MultimodalData]) {
     const next={ ...results, [key]:val } as MultimodalData
     setResults(next)
     if(Object.keys(next).length===3) {
       setData(next as MultimodalData)
+      const newId = addSession({
+        source: 'scan',
+        data: next as MultimodalData,
+        answers: profile.answers,
+        careTypes: profile.careTypes,
+      })
+      setSessionId(newId)
       setStep(4)
     } else {
       setStep(s=>s+1)
@@ -956,7 +983,7 @@ export function ScanWizard() {
 
         {step===4&&results.iris&&results.eda&&results.biosignal&&(
           <div className="glass-card p-5 sm:p-6 max-w-md mx-auto">
-            <CompleteStep results={results as MultimodalData}/>
+            <CompleteStep results={results as MultimodalData} sessionId={sessionId}/>
           </div>
         )}
       </div>

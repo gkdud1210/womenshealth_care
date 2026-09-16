@@ -10,6 +10,7 @@ import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
 import { DiagnosticAnswerPanel } from './DiagnosticAnswerPanel'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { OnboardingProfile } from '@/lib/onboarding-profile'
+import type { DiagnosticSession } from '@/lib/diagnosticHistory'
 
 interface Finding {
   type: 'warning' | 'info' | 'ok'
@@ -225,7 +226,7 @@ function buildSummary(d: MultimodalData, p: OnboardingProfile): string {
   return `홍채 분석 데이터를 종합한 결과, ${issues.join('과 ')}이(가) 주요 관심 사항입니다.${careContext} 3개월 연속 데이터 수집 후 정밀 분석을 권장합니다.`
 }
 
-function buildScore(d: MultimodalData): number {
+export function buildScore(d: MultimodalData): number {
   const irisAvg = (d.iris.leftScore + d.iris.rightScore) / 2
   const hrv = Math.min(100, d.biosignal.hrv * 2)
   const sleep = Math.min(100, d.biosignal.sleepHours / 8 * 100)
@@ -245,9 +246,21 @@ const BG = {
   ok:      'bg-green-50 border-green-200',
 }
 
-export function DiagnosticReport() {
-  const { data, setData } = useMultimodalData()
-  const { profile, setAnswer, resetAnswers } = useEditableOnboardingProfile()
+interface Props {
+  // 저장된 과거 기록을 볼 때 전달 — 있으면 그 스냅샷을 읽기 전용으로 렌더링하고,
+  // 없으면 지금 입력 중인 값(라이브)을 편집 패널과 함께 보여준다.
+  session?: DiagnosticSession
+}
+
+export function DiagnosticReport({ session }: Props) {
+  const live = useMultimodalData()
+  const editableProfile = useEditableOnboardingProfile()
+
+  const editable = !session
+  const data: MultimodalData = session ? session.data : live.data
+  const profile: OnboardingProfile = session
+    ? { careTypes: session.careTypes, answers: session.answers }
+    : editableProfile.profile
 
   const findings    = buildFindings(data, profile)
   const productRecs = buildProductRecs(data, profile)
@@ -263,13 +276,17 @@ export function DiagnosticReport() {
 
   return (
     <div className="space-y-6">
-      {/* 기기 진단이 불가능할 때 직접 값을 입력해 리포트를 즉시 갱신할 수 있는 패널 */}
-      <MultimodalDataPanel value={data} onChange={setData} />
-      <DiagnosticAnswerPanel
-        answers={profile.answers}
-        onChange={setAnswer}
-        onReset={resetAnswers}
-      />
+      {/* 기기 진단이 불가능할 때 직접 값을 입력해 리포트를 즉시 갱신할 수 있는 패널 — 과거 기록 열람 시에는 숨김 */}
+      {editable && (
+        <>
+          <MultimodalDataPanel value={live.data} onChange={live.setData} />
+          <DiagnosticAnswerPanel
+            answers={editableProfile.profile.answers}
+            onChange={editableProfile.setAnswer}
+            onReset={editableProfile.resetAnswers}
+          />
+        </>
+      )}
 
       {/* Overall summary */}
       <div className="glass-card p-5 border-l-4 border-rose-400">

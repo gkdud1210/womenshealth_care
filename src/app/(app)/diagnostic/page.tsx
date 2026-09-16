@@ -2,35 +2,64 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Microscope, Eye, Activity, FileText, Download, Zap, Scan, History, ChevronLeft } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
-import { BioSignalPanel } from '@/components/diagnostic/BioSignalPanel'
-import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
-import { EDAAnalysisView } from '@/components/diagnostic/EDAAnalysisView'
+import { useRouter } from 'next/navigation'
+import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen } from 'lucide-react'
+import { useDiagnosticHistory, groupSessionsByYear, type DiagnosticSession } from '@/lib/diagnosticHistory'
+import { buildScore } from '@/components/diagnostic/DiagnosticReport'
 
-type Tab = 'iris' | 'eda' | 'biosignal' | 'report'
 type View = 'home' | 'history'
 
-const TABS: { id: Tab; label: string; icon: typeof Eye; badge?: string }[] = [
-  { id: 'iris',      label: '홍채 분석',    icon: Eye },
-  { id: 'eda',       label: 'EDA 피부전도', icon: Zap,         badge: 'NEW' },
-  { id: 'biosignal', label: '바이오 신호',  icon: Activity },
-  { id: 'report',    label: '종합 리포트',  icon: FileText },
-]
+const SOURCE_META: Record<DiagnosticSession['source'], { label: string; color: string; bg: string }> = {
+  scan:   { label: '기기 스캔', color: '#a855f7', bg: 'rgba(168,85,247,0.1)' },
+  manual: { label: '직접 입력', color: '#f43f75', bg: 'rgba(244,63,117,0.1)' },
+}
 
-const SCAN_META = {
-  date: '2026-04-21',
-  cyclePhase: '황체기 D+14',
-  device: 'LUDIA Iris 3D v2.1',
-  quality: 94,
+function formatDateTime(iso: string) {
+  const d = new Date(iso)
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]}) · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function SessionCard({ session, onDelete }: { session: DiagnosticSession; onDelete: () => void }) {
+  const score = buildScore(session.data)
+  const scoreColor = score >= 72 ? '#10b981' : score >= 52 ? '#f59e0b' : '#ef4444'
+  const src = SOURCE_META[session.source]
+
+  return (
+    <Link href={`/diagnostic/report?id=${session.id}`}
+      className="flex items-center gap-3 p-4 rounded-2xl transition-all active:scale-[0.98] hover-lift"
+      style={{ background: 'rgba(255,255,255,0.85)', border: '1px solid rgba(158,18,57,0.08)', boxShadow: '0 2px 12px rgba(158,18,57,0.05)' }}>
+      <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 text-sm font-black font-display"
+        style={{ background: `${scoreColor}18`, color: scoreColor }}>
+        {score}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold text-slate-800">{formatDateTime(session.createdAt)}</p>
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: src.bg, color: src.color }}>
+            {src.label}
+          </span>
+          <span className="text-[10px] text-slate-400">
+            HRV {session.data.biosignal.hrv}ms · 홍채 {Math.round((session.data.iris.leftScore + session.data.iris.rightScore) / 2)}점
+          </span>
+        </div>
+      </div>
+      <button
+        onClick={e => { e.preventDefault(); e.stopPropagation(); onDelete() }}
+        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 transition-colors hover:bg-rose-50">
+        <Trash2 className="w-3.5 h-3.5 text-slate-300" />
+      </button>
+      <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+    </Link>
+  )
 }
 
 export default function DiagnosticPage() {
-  const [view, setView]           = useState<View>('home')
-  const [activeTab, setActiveTab] = useState<Tab>('iris')
+  const router = useRouter()
+  const [view, setView] = useState<View>('home')
+  const { sessions, ready, removeSession } = useDiagnosticHistory()
 
-  /* ── Landing: two action buttons ── */
+  /* ── Landing: action cards ── */
   if (view === 'home') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 sm:p-10">
@@ -85,7 +114,7 @@ export default function DiagnosticPage() {
             </div>
             <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">과거 진단 기록</h2>
             <p className="text-xs text-slate-400 leading-relaxed">
-              이전 진단 결과를 확인하고<br />홍채 · EDA · HRV 기록을 분석합니다
+              날짜 · 연도별로 지금까지의<br />진단 리포트를 모아봅니다
             </p>
             <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
               style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }}>
@@ -93,151 +122,70 @@ export default function DiagnosticPage() {
             </div>
           </button>
         </div>
+
+        {/* 직접 입력 진입점 */}
+        <button onClick={() => router.push('/diagnostic/report')}
+          className="mt-5 flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-rose-500 transition-colors">
+          <PenLine className="w-3.5 h-3.5" />
+          기기 없이 건강정보를 직접 입력해서 진단할래요
+        </button>
       </div>
     )
   }
 
-  /* ── History: existing diagnostic tabs ── */
+  /* ── History: date/year-grouped session list ── */
+  const grouped = groupSessionsByYear(sessions)
+
   return (
-    <div className="min-h-screen p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-start justify-between mb-5 sm:mb-8">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setView('home')}
-            className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-rose-50 transition-colors text-slate-400 hover:text-rose-500">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="icon-badge-lg bg-gradient-to-br from-purple-400 to-purple-600 shadow-soft">
-            <History className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <h1 className="font-display text-xl sm:text-3xl font-semibold text-slate-800">과거 진단 기록</h1>
-            <p className="text-xs sm:text-sm text-slate-400 hidden sm:block">홍채 3D · EDA · HRV · BMI 기록</p>
-          </div>
-        </div>
-        <button className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-sm font-medium btn-ghost">
-          <Download className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">저장</span>
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={() => setView('home')}
+          className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-rose-50 transition-colors text-slate-400 hover:text-rose-500">
+          <ChevronLeft className="w-5 h-5" />
         </button>
+        <div className="icon-badge-lg bg-gradient-to-br from-purple-400 to-purple-600 shadow-soft">
+          <History className="w-5 h-5 text-white" />
+        </div>
+        <div>
+          <h1 className="font-display text-xl sm:text-2xl font-semibold text-slate-800">과거 진단 기록</h1>
+          <p className="text-xs sm:text-sm text-slate-400">
+            {ready ? `총 ${sessions.length}건의 진단 리포트` : '불러오는 중…'}
+          </p>
+        </div>
       </div>
 
-      {/* Scan Meta Bar */}
-      <div className="glass-card px-4 py-3 mb-5 overflow-x-auto">
-        <div className="flex items-center gap-4 sm:gap-6 min-w-max sm:min-w-0 justify-between">
-          <div className="flex items-center gap-4 sm:gap-6">
-            {[
-              { label: '스캔 일시', value: SCAN_META.date },
-              { label: '주기 단계', value: SCAN_META.cyclePhase },
-              { label: '기기',     value: SCAN_META.device },
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p className="label-caps">{label}</p>
-                <p className="text-xs sm:text-sm font-semibold text-slate-700">{value}</p>
-              </div>
-            ))}
+      {ready && sessions.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+            style={{ background: 'rgba(168,85,247,0.08)' }}>
+            <FolderOpen className="w-7 h-7 text-purple-300" />
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <p className="text-xs font-bold text-green-600">{SCAN_META.quality}%</p>
-            <div className="w-12 h-1.5 bg-green-100 rounded-full overflow-hidden">
-              <div className="h-full bg-green-500 rounded-full" style={{ width: `${SCAN_META.quality}%` }} />
+          <p className="text-sm font-semibold text-slate-500">아직 진단 기록이 없어요</p>
+          <p className="text-xs text-slate-400 mt-1 mb-5">새 진단을 시작하면 여기에 날짜별로 쌓여요</p>
+          <Link href="/diagnostic/scan"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-semibold text-white"
+            style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)' }}>
+            <ScanEye className="w-3.5 h-3.5" /> 새 진단 시작하기
+          </Link>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {grouped.map(([year, list]) => (
+          <div key={year}>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 pl-1">
+              {year}년 <span className="text-slate-300 font-normal">· {list.length}건</span>
+            </p>
+            <div className="space-y-2">
+              {list.map(s => (
+                <SessionCard key={s.id} session={s} onDelete={() => removeSession(s.id)} />
+              ))}
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide pb-1">
-        {TABS.map(({ id, label, icon: Icon, badge }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            className={cn(
-              'flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 relative whitespace-nowrap flex-shrink-0',
-              activeTab === id
-                ? 'bg-white shadow-card text-rose-600 border border-rose-100'
-                : 'text-slate-500 hover:bg-white/60'
-            )}>
-            <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            {label}
-            {badge && (
-              <span className="absolute -top-1.5 -right-1.5 px-1 py-0.5 bg-blue-500 text-white text-[8px] rounded-full font-medium">
-                {badge}
-              </span>
-            )}
-          </button>
         ))}
       </div>
-
-      {/* Content */}
-      {activeTab === 'iris' && (
-        <div className="animate-fade-in">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4 lg:gap-6">
-            <div className="sm:col-span-1 lg:col-span-4 glass-card p-4 sm:p-6">
-              <h3 className="font-display text-lg font-semibold text-slate-700 mb-5">좌안 홍채</h3>
-              <IrisAnalysisView side="left" scanDate="2026-04-21" overallScore={67} />
-            </div>
-            <div className="sm:col-span-1 lg:col-span-4 glass-card p-4 sm:p-6">
-              <h3 className="font-display text-lg font-semibold text-slate-700 mb-5">우안 홍채</h3>
-              <IrisAnalysisView side="right" scanDate="2026-04-21" overallScore={71} />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-4 space-y-4">
-              <div className="glass-card p-5">
-                <h4 className="text-sm font-semibold text-slate-700 mb-4">홍채 zone 가이드</h4>
-                <div className="space-y-2.5">
-                  {[
-                    { zone: '중심부 (동공 주변)', desc: '소화기계, 위장 반영', ring: '1-2링' },
-                    { zone: '자율신경 콜라렛', desc: '자율신경계 경계선', ring: '2-3링' },
-                    { zone: '내부 장기 zone', desc: '내장 기관 밀도 반영', ring: '3-5링' },
-                    { zone: '림프 & 피부 zone', desc: '면역/순환/피부 상태', ring: '6-7링' },
-                  ].map(({ zone, desc, ring }) => (
-                    <div key={zone} className="flex gap-2.5 p-2.5 rounded-xl bg-slate-50/60">
-                      <div className="w-12 text-center">
-                        <span className="text-[9px] text-rose-400 font-medium">{ring}</span>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-slate-700">{zone}</p>
-                        <p className="text-[10px] text-slate-400">{desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="glass-card p-5">
-                <h4 className="text-sm font-semibold text-slate-700 mb-3">밀도 상태 범례</h4>
-                {[
-                  { status: '정상', color: 'bg-green-400', desc: '75-100' },
-                  { status: '주의', color: 'bg-amber-400', desc: '60-74' },
-                  { status: '저하', color: 'bg-rose-400', desc: '40-59' },
-                  { status: '경고', color: 'bg-red-500', desc: '0-39' },
-                ].map(({ status, color, desc }) => (
-                  <div key={status} className="flex items-center gap-2.5 py-1.5">
-                    <div className={cn('w-3 h-3 rounded-full', color)} />
-                    <span className="text-xs text-slate-600 flex-1">{status}</span>
-                    <span className="text-[10px] text-slate-400">{desc}점</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'eda' && (
-        <div className="animate-fade-in">
-          <EDAAnalysisView />
-        </div>
-      )}
-
-      {activeTab === 'biosignal' && (
-        <div className="animate-fade-in">
-          <BioSignalPanel />
-        </div>
-      )}
-
-      {activeTab === 'report' && (
-        <div className="animate-fade-in max-w-2xl">
-          <DiagnosticReport />
-        </div>
-      )}
     </div>
   )
 }
