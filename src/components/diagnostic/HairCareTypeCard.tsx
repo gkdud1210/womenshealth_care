@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Scissors, Users, Salad, Dumbbell, SprayCan, ShoppingBag, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Scissors, Users, Salad, Dumbbell, SprayCan, ShoppingBag, ArrowRight, CheckCircle2, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { HAIR_CARE_TYPES } from '@/data/hairCareTypes'
 import { classifyHairCareType } from '@/lib/hairCareClassifier'
@@ -13,9 +13,20 @@ interface Props {
   profile: OnboardingProfile
 }
 
+function uniq(items: string[]): string[] {
+  return Array.from(new Set(items))
+}
+
 export function HairCareTypeCard({ data, profile }: Props) {
-  const typeId = classifyHairCareType(data, profile)
-  const t = HAIR_CARE_TYPES[typeId]
+  const { primary, secondary } = classifyHairCareType(data, profile)
+  const t = HAIR_CARE_TYPES[primary.id]
+  const s = secondary ? HAIR_CARE_TYPES[secondary.id] : null
+
+  const dietGood = s ? uniq([...t.diet.good, ...s.diet.good]) : t.diet.good
+  const dietAvoid = s ? uniq([...t.diet.avoid, ...s.diet.avoid]) : t.diet.avoid
+  const exercise = s ? uniq([...t.exercise, ...s.exercise]) : t.exercise
+  const homecare = s ? uniq([...t.homecare, ...s.homecare]) : t.homecare
+  const products = s ? [...t.products, ...s.products].slice(0, 4) : t.products
 
   return (
     <div className="space-y-4">
@@ -44,6 +55,28 @@ export function HairCareTypeCard({ data, profile }: Props) {
             </div>
           ))}
         </div>
+
+        {/* 복합 유형 비율 */}
+        {s && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Layers className="w-3.5 h-3.5 text-slate-400" />
+              <p className="text-[11px] font-semibold text-slate-500">복합 원인 분석</p>
+            </div>
+            <div className="flex h-2.5 rounded-full overflow-hidden mb-2">
+              <div style={{ width: `${primary.percent}%`, background: t.gradient }} />
+              <div style={{ width: `${secondary!.percent}%`, background: s.gradient }} />
+            </div>
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-semibold" style={{ color: t.color }}>{t.emoji} {t.label} {primary.percent}%</span>
+              <span className="font-semibold" style={{ color: s.color }}>{s.emoji} {s.label} {secondary!.percent}%</span>
+            </div>
+            <p className="text-xs text-slate-500 mt-2.5 leading-relaxed">
+              당신의 탈모는 <b style={{ color: t.color }}>{t.label}</b> 원인과{' '}
+              <b style={{ color: s.color }}>{s.label}</b> 원인이 결합된 결과예요. 두 원인을 함께 관리하면 더 빠른 개선을 기대할 수 있어요.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* 맞춤 모임 & 루틴 */}
@@ -69,6 +102,26 @@ export function HairCareTypeCard({ data, profile }: Props) {
             추천 모임 보러가기 <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
+
+        {s && (
+          <div className="rounded-2xl p-4 mt-3" style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+            <p className="text-sm font-bold text-slate-800">{s.routineClub.name}</p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {s.routineClub.activities.map(a => (
+                <span key={a} className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/70 border border-white text-slate-600">
+                  {a}
+                </span>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3">{s.meetupNote}</p>
+            <Link
+              href={`/community?category=${s.meetupCategory}`}
+              className="mt-3 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white transition-all active:scale-95"
+              style={{ background: s.gradient, boxShadow: `0 4px 14px ${s.glow}` }}>
+              추천 모임 보러가기 <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* 식습관 · 운동 · 홈케어 */}
@@ -79,12 +132,12 @@ export function HairCareTypeCard({ data, profile }: Props) {
             <h3 className="text-sm font-semibold text-slate-700">식습관</h3>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {t.diet.good.map(f => (
+            {dietGood.map(f => (
               <span key={f} className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-green-50 text-green-700 border border-green-200">
                 ✓ {f}
               </span>
             ))}
-            {t.diet.avoid.map(f => (
+            {dietAvoid.map(f => (
               <span key={f} className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-red-50 text-red-500 border border-red-200">
                 ✕ {f}
               </span>
@@ -98,7 +151,7 @@ export function HairCareTypeCard({ data, profile }: Props) {
             <h3 className="text-sm font-semibold text-slate-700">운동</h3>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {t.exercise.map(e => (
+            {exercise.map(e => (
               <span key={e} className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-50 text-slate-600 border border-slate-200">
                 {e}
               </span>
@@ -112,7 +165,7 @@ export function HairCareTypeCard({ data, profile }: Props) {
             <h3 className="text-sm font-semibold text-slate-700">홈케어</h3>
           </div>
           <div className="space-y-1">
-            {t.homecare.map(h => (
+            {homecare.map(h => (
               <p key={h} className="text-xs text-slate-500 leading-relaxed">• {h}</p>
             ))}
           </div>
@@ -126,7 +179,7 @@ export function HairCareTypeCard({ data, profile }: Props) {
           <h3 className="text-sm font-semibold text-slate-700">유형 맞춤 제품</h3>
         </div>
         <div className="space-y-2">
-          {t.products.map((prod, i) => (
+          {products.map((prod, i) => (
             <div key={i} className={cn('flex items-center gap-3 p-3.5 rounded-2xl border')}
               style={{ background: t.bg, borderColor: t.border }}>
               <span className="text-base">{prod.tag.split(' ')[0]}</span>

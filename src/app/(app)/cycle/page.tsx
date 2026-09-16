@@ -224,7 +224,7 @@ function getAdvice(phase: CyclePhase, answers: Answers, careTypes: string[]) {
   cautions.push(...base[phase].c)
   tips.push(...base[phase].t)
 
-  if ((careTypes.includes('period_pain') || careTypes.includes('healthy_cycle')) && phase === 'menstrual') {
+  if (careTypes.includes('hormone_female') && phase === 'menstrual') {
     if (isHighConcern(answers['period_pain_level'])) {
       cautions.push('생리통이 심할 경우 진통제는 식후 복용을 권장해요')
       tips.push('아랫배 온찜질을 15–20분씩 해주세요')
@@ -233,23 +233,29 @@ function getAdvice(phase: CyclePhase, answers: Answers, careTypes: string[]) {
       tips.push('아랫배가 차갑다면 복대나 핫팩으로 따뜻하게 유지해요')
   }
 
-  if ((careTypes.includes('stress') || isHighConcern(answers['stress_sleep'])) && phase === 'luteal') {
+  if ((careTypes.includes('mental_brain') || isHighConcern(answers['stress_sleep'])) && phase === 'luteal') {
     cautions.push('황체기는 스트레스 호르몬이 더 예민하게 반응하는 시기예요')
     tips.push('잠들기 1시간 전 핸드폰을 끄고 이완 루틴을 만들어보세요')
   }
 
-  if ((careTypes.includes('skin_acne') || isHighConcern(answers['skin_cycle_acne'])) && phase === 'luteal') {
+  if ((careTypes.includes('skin_beauty') || isHighConcern(answers['skin_cycle_acne'])) && phase === 'luteal') {
     cautions.push('황체기에 피지 분비 증가로 턱·입 주변 트러블이 생기기 쉬워요')
     tips.push('논코메도제닉(non-comedogenic) 제품을 사용해 보세요')
   }
 
-  if ((careTypes.includes('diet') || isHighConcern(answers['diet_craving'])) && phase === 'luteal') {
+  if ((careTypes.includes('weight_metabolic') || isHighConcern(answers['diet_craving'])) && phase === 'luteal') {
     cautions.push('단 음식 욕구가 강해지는 시기 — 혈당 스파이크를 주의해요')
     tips.push('달콤한 것이 당긴다면 다크초콜릿 1–2조각이 더 나은 선택이에요')
   }
 
-  if ((careTypes.includes('hair_care') || isHighConcern(answers['hair_loss'])) && phase === 'menstrual')
+  if ((careTypes.includes('hair_scalp') || isHighConcern(answers['hair_loss'])) && phase === 'menstrual')
     tips.push('생리기는 두피 혈액순환이 약해져요 — 두피 마사지가 탈모 예방에 도움이 돼요')
+
+  if ((careTypes.includes('posture_correction') || isHighConcern(answers['posture_neck'])) && phase === 'luteal')
+    tips.push('황체기엔 근육이 더 뻣뻣해지기 쉬워요 — 목·어깨 스트레칭으로 경직을 풀어주세요')
+
+  if ((careTypes.includes('gut_detox') || isHighConcern(answers['gut_bloating'])) && phase === 'luteal')
+    cautions.push('황체기엔 장운동이 느려져 더부룩함이 심해질 수 있어요 — 식이섬유와 수분 섭취를 늘려보세요')
 
   return { cautions, tips }
 }

@@ -103,31 +103,31 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'r1', nickname: '김**', ageGroup: '30대 초반',
-        careTypes: ['period_pain', 'healthy_cycle'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: '생리 시작 전 복부 마사지에 써봤는데 진짜 체감이 달라요. 평소 생리 첫날이 제일 힘들었는데 이번엔 훨씬 수월했어요. 향도 부담 없고 흡수도 빠릅니다.',
         date: '2026-04-18',
       },
       {
         id: 'r2', nickname: '박**', ageGroup: '20대 후반',
-        careTypes: ['period_pain'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: '자궁 냉증이 심해서 구매했는데 꾸준히 쓰니 손발 냉기도 줄어든 느낌이에요. 한 달 쓰고 생리통도 확실히 덜해져서 재구매 결정했어요.',
         date: '2026-04-05',
       },
       {
         id: 'r3', nickname: '이**', ageGroup: '30대 후반',
-        careTypes: ['thyroid_uterus', 'period_pain'], rating: 4,
+        careTypes: ['organ_monitoring', 'hormone_female'], rating: 4,
         body: '자궁근종 관리 차원에서 써보고 있어요. 한 달 정도 됐는데 생리 기간 불쾌감이 줄어든 것 같아요. 전반적으로 만족합니다.',
         date: '2026-03-29',
       },
       {
         id: 'r4', nickname: '최**', ageGroup: '20대 중반',
-        careTypes: ['stress', 'healthy_cycle'], rating: 5,
+        careTypes: ['mental_brain', 'hormone_female'], rating: 5,
         body: '스트레스 받을 때 호르몬 불균형으로 주기가 불규칙했는데, 이 오일 쓰면서 마사지하는 루틴 자체가 릴렉싱 돼서 좋아요.',
         date: '2026-03-15',
       },
       {
         id: 'r5', nickname: '정**', ageGroup: '40대 초반',
-        careTypes: ['thyroid_uterus', 'healthy_cycle'], rating: 4,
+        careTypes: ['organ_monitoring', 'hormone_female'], rating: 4,
         body: '갱년기 초입이라 여러 이너케어 제품 써봤는데 이게 제일 자극 없고 좋더라고요. 흡수가 빠르고 끈적임이 없어서 아침마다 편하게 쓸 수 있어요.',
         date: '2026-02-28',
       },
@@ -156,7 +156,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'rb2r1', nickname: '한**', ageGroup: '20대 후반',
-        careTypes: ['healthy_cycle', 'period_pain'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: '배란기마다 분비물 냄새로 스트레스였는데, 이거 쓰고 나서 많이 나아졌어요. 자극도 전혀 없고 순해요.',
         date: '2026-04-10',
       },
@@ -185,13 +185,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'rb3r1', nickname: '오**', ageGroup: '30대 초반',
-        careTypes: ['healthy_cycle', 'period_pain'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: '생리 전에 가슴 통증이 너무 심했는데 이거 2달 먹었더니 확실히 줄었어요. PMS도 덜하고 기분 기복도 줄어든 것 같아서 계속 먹을 것 같아요.',
         date: '2026-03-20',
       },
       {
         id: 'rb3r2', nickname: '강**', ageGroup: '20대 후반',
-        careTypes: ['healthy_cycle'], rating: 4,
+        careTypes: ['hormone_female'], rating: 4,
         body: '주기가 불규칙했는데 복용 시작하고 3개월째 규칙적으로 돌아왔어요. 개인차가 있겠지만 저는 효과 봤습니다.',
         date: '2026-02-15',
       },
@@ -222,13 +222,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'va1r1', nickname: '윤**', ageGroup: '30대 중반',
-        careTypes: ['stress'], rating: 5,
+        careTypes: ['mental_brain'], rating: 5,
         body: '루디아에서 HRV 수치가 낮다고 알림 와서 샀는데 2주 쓰고 수면 점수가 올라가는 게 체감돼요. 향도 자극 없이 은은해서 자기 전에 딱이에요.',
         date: '2026-04-22',
       },
       {
         id: 'va1r2', nickname: '서**', ageGroup: '40대 초반',
-        careTypes: ['stress', 'thyroid_uterus'], rating: 4,
+        careTypes: ['mental_brain', 'organ_monitoring'], rating: 4,
         body: '다리에 쥐가 자주 났는데 마그네슘 경피 흡수라 어떨지 반신반의했는데 꽤 효과있는 것 같아요. 수면도 조금 깊어진 느낌입니다.',
         date: '2026-04-01',
       },
@@ -257,7 +257,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'va2r1', nickname: '임**', ageGroup: '20대 후반',
-        careTypes: ['stress'], rating: 5,
+        careTypes: ['mental_brain'], rating: 5,
         body: '"스트레스 지수가 높습니다" 루디아 알림 보고 주문했어요. 회의 전에 손목에 바르면 심장 두근거림이 줄어드는 게 느껴져요. 신기해요.',
         date: '2026-04-15',
       },
@@ -286,13 +286,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'va3r1', nickname: '배**', ageGroup: '30대 후반',
-        careTypes: ['stress', 'brain_cognitive'], rating: 5,
+        careTypes: ['mental_brain'], rating: 5,
         body: '브레인 포그가 심해서 찾다가 샀어요. 2주 복용 후 루디아 앱 수면 점수가 68 → 81로 올랐어요. 아침 기상이 훨씬 가벼워졌습니다.',
         date: '2026-04-28',
       },
       {
         id: 'va3r2', nickname: '조**', ageGroup: '40대 초반',
-        careTypes: ['stress'], rating: 4,
+        careTypes: ['mental_brain'], rating: 4,
         body: '갱년기 수면 장애로 고생했는데 이거 먹고 한 번 깨더라도 다시 잠들기가 훨씬 쉬워졌어요. 만족합니다.',
         date: '2026-03-30',
       },
@@ -323,13 +323,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'dh1r1', nickname: '류**', ageGroup: '30대 후반',
-        careTypes: ['cyst_fibroid_cancer', 'period_pain'], rating: 5,
+        careTypes: ['disease_postcare', 'hormone_female'], rating: 5,
         body: '근종 진단 후 생리대부터 바꿔야겠다 생각했어요. 루디아에서 이 제품 추천해 줘서 샀는데 자극이 없고 흡수력도 충분해요. 이제 이것만 씁니다.',
         date: '2026-04-05',
       },
       {
         id: 'dh1r2', nickname: '문**', ageGroup: '20대 중반',
-        careTypes: ['cyst_fibroid_cancer'], rating: 5,
+        careTypes: ['disease_postcare'], rating: 5,
         body: '일반 생리대 쓸 때마다 Y존이 가려웠는데 이걸로 바꾸고 나서 그게 없어졌어요. 예민한 분들한테 정말 강추.',
         date: '2026-03-18',
       },
@@ -358,7 +358,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'dh2r1', nickname: '신**', ageGroup: '40대 중반',
-        careTypes: ['thyroid_uterus'], rating: 5,
+        careTypes: ['organ_monitoring'], rating: 5,
         body: '갑상선 저하로 피부가 너무 건조하고 가렵더라고요. 이거 쓰고 가려움이 확 줄었어요. 무향이라 처음엔 낯선데 적응하면 이게 맞아요.',
         date: '2026-04-12',
       },
@@ -387,13 +387,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'dh3r1', nickname: '황**', ageGroup: '40대 후반',
-        careTypes: ['cyst_fibroid_cancer', 'thyroid_uterus'], rating: 5,
+        careTypes: ['disease_postcare', 'organ_monitoring'], rating: 5,
         body: '유방암 회복 중인데 루디아 추천으로 샀어요. 염증 수치 관리 차원에서 먹기 시작했는데 피로감이 줄고 소화도 좋아진 것 같아요.',
         date: '2026-04-08',
       },
       {
         id: 'dh3r2', nickname: '안**', ageGroup: '30대 중반',
-        careTypes: ['cyst_fibroid_cancer'], rating: 4,
+        careTypes: ['disease_postcare'], rating: 4,
         body: '자궁근종 때문에 염증 케어 시작했어요. 3개월째 복용 중인데 피부가 맑아지고 월경 중 복통도 약해진 것 같아요.',
         date: '2026-03-05',
       },
@@ -424,13 +424,13 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'fp1r1', nickname: '노**', ageGroup: '30대 초반',
-        careTypes: ['fertility', 'healthy_cycle'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: '불규칙한 배란으로 임신 준비가 힘들었는데 이거 4개월 복용 후 루디아 배란일 예측이 훨씬 정확해졌어요. 호르몬 검사 수치도 개선됐다고 산부인과 선생님께서 말씀하셨어요.',
         date: '2026-04-20',
       },
       {
         id: 'fp1r2', nickname: '전**', ageGroup: '30대 후반',
-        careTypes: ['fertility'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: 'PCOS 진단 후 이노시톨 찾다가 여기서 샀어요. 생리 주기가 35일 → 29일로 짧아졌고 체중도 자연스럽게 빠졌어요.',
         date: '2026-03-10',
       },
@@ -459,7 +459,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     reviews: [
       {
         id: 'fp2r1', nickname: '손**', ageGroup: '30대 후반',
-        careTypes: ['fertility'], rating: 5,
+        careTypes: ['hormone_female'], rating: 5,
         body: '38살에 난임 치료 시작하면서 CoQ10 꼭 먹으라는 이야기를 많이 들었는데 여기 제품이 유비퀴놀 형태라서 선택했어요. 시험관 채취한 난자 퀄리티가 좋아졌다고 선생님이 말씀해 주셨어요.',
         date: '2026-04-14',
       },

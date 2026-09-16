@@ -29,9 +29,9 @@ export function askLudia(
   const careTypes = profile?.careTypes ?? []
   const a         = profile?.answers ?? {}
   // 온보딩 컨텍스트 헬퍼
-  const hasSkinCare    = careTypes.includes('skin_acne')
-  const hasStressCare  = careTypes.includes('stress')
-  const hasThyroid     = careTypes.includes('thyroid_uterus')
+  const hasSkinCare    = careTypes.includes('skin_beauty')
+  const hasStressCare  = careTypes.includes('mental_brain')
+  const hasThyroid     = careTypes.includes('organ_monitoring')
   const thyroidAlert   = a.thyroid_checkup === '네, 있어요' || a.thyroid_swelling === '자주 그래요'
   const q = question.toLowerCase()
   const phaseName    = getPhaseLabel(phase)

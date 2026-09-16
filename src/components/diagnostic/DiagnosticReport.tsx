@@ -3,8 +3,11 @@
 import { FileText, AlertTriangle, CheckCircle, Info, ShoppingBag, ArrowRight, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
-import { useOnboardingProfile, isHighConcern, hasCare } from '@/lib/onboarding-profile'
+import { useEditableOnboardingProfile, isHighConcern, hasCare } from '@/lib/onboarding-profile'
+import { CARE_CASES } from '@/data/careCases'
 import { HairCareTypeCard } from './HairCareTypeCard'
+import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
+import { DiagnosticAnswerPanel } from './DiagnosticAnswerPanel'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { OnboardingProfile } from '@/lib/onboarding-profile'
 
@@ -22,6 +25,10 @@ interface ProductRec {
   color: string
 }
 
+function careLabel(id: string) {
+  return CARE_CASES.find(c => c.id === id)?.label ?? id
+}
+
 // ── 진단 소견 동적 생성 ────────────────────────────────────────────────────────
 function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
   const findings: Finding[] = []
@@ -29,7 +36,7 @@ function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
   const lowHRV = d.biosignal.hrv < 38
   const poorSleep = d.biosignal.sleepHours < 6.5
 
-  // 부정 출혈 — 온보딩에서 신고된 경우 최우선 경고
+  // 부정 출혈 — 문진에서 신고된 경우 최우선 경고
   if (isHighConcern(a.fibroid_bleeding)) {
     findings.push({
       type: 'warning',
@@ -41,7 +48,7 @@ function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
 
   // 홍채 피부 zone
   if (d.iris.skinZone < 65) {
-    const hasSkin = hasCare(p, 'skin_acne')
+    const hasSkin = hasCare(p, 'skin_beauty')
     const cyclicAcne = isHighConcern(a.skin_cycle_acne)
     findings.push({
       type: 'warning',
@@ -109,10 +116,32 @@ function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
     type: bmiOk ? 'ok' : 'info',
     title: `BMI ${bmiOk ? '정상' : '관리 필요'} (${d.biosignal.bmi})`,
     detail: bmiOk
-      ? `BMI ${d.biosignal.bmi}로 정상 체중 범위입니다.${hasCare(p, 'diet') ? ' 다이어트 케어 중이나 현재 수치는 양호합니다.' : ''}`
+      ? `BMI ${d.biosignal.bmi}로 정상 체중 범위입니다.${hasCare(p, 'weight_metabolic') ? ' 체중·대사 케어 중이나 현재 수치는 양호합니다.' : ''}`
       : `BMI ${d.biosignal.bmi} — ${d.biosignal.bmi < 18.5 ? '저체중' : '과체중'} 범위입니다. 호르몬 균형과 생리 주기에 영향을 줄 수 있습니다.`,
     tags: bmiOk ? ['체중 관리', '정상'] : ['BMI 관리', '호르몬 영향'],
   })
+
+  // 장 건강
+  const giHigh = isHighConcern(a.gut_bloating) || isHighConcern(a.gut_bowel)
+  if (giHigh) {
+    findings.push({
+      type: 'info',
+      title: '장 건강 신호 감지',
+      detail: '문진에서 더부룩함 또는 불규칙한 배변이 자주 있다고 응답하셨어요. 장내 유익균 밸런스와 식이섬유 섭취를 점검해 보세요.',
+      tags: ['장 건강', '디톡스'],
+    })
+  }
+
+  // 체형 & 자세
+  const postureHigh = isHighConcern(a.posture_neck) || isHighConcern(a.posture_pelvis)
+  if (postureHigh) {
+    findings.push({
+      type: 'info',
+      title: '체형 · 자세 불균형 신호',
+      detail: '거북목/골반 틀어짐 관련 문진 응답이 확인됐어요. 자세 교정이 두피·전신 혈류 개선에도 도움이 될 수 있습니다.',
+      tags: ['체형 교정', '자세'],
+    })
+  }
 
   // HRV 정상인 경우 긍정 소견 추가
   if (!lowHRV) {
@@ -131,29 +160,42 @@ function buildFindings(d: MultimodalData, p: OnboardingProfile): Finding[] {
 function buildProductRecs(d: MultimodalData, p: OnboardingProfile): ProductRec[] {
   const recs: ProductRec[] = []
 
-  if (hasCare(p, 'period_pain') || hasCare(p, 'healthy_cycle')) {
+  if (hasCare(p, 'hormone_female')) {
     recs.push({ name: '온열 패드 (자궁 전용)', reason: '생리통 케어 / 순환 개선', tag: '🔥 온열', color: 'bg-orange-50 border-orange-200' })
     recs.push({ name: '마그네슘 글리시네이트 300mg', reason: '근육 이완 + 생리통 완화', tag: '💊 보충제', color: 'bg-green-50 border-green-200' })
-  }
-  if (hasCare(p, 'fertility')) {
     recs.push({ name: '이노시톨 복합 보충제', reason: '난소 기능 지원 & 호르몬 균형', tag: '💊 보충제', color: 'bg-green-50 border-green-200' })
     recs.push({ name: '엽산 + CoQ10 복합제', reason: '임신 준비 필수 영양소', tag: '🍃 임신 준비', color: 'bg-emerald-50 border-emerald-200' })
   }
-  if (hasCare(p, 'skin_acne') || d.iris.skinZone < 65) {
+  if (hasCare(p, 'skin_beauty') || d.iris.skinZone < 65) {
     recs.push({ name: '호르몬 밸런스 스킨케어', reason: `홍채 피부 zone ${d.iris.skinZone}점 저하 감지`, tag: '✨ 스킨케어', color: 'bg-rose-50 border-rose-200' })
     recs.push({ name: '아연 + 비오틴 복합제', reason: '피부 장벽·모발 강화', tag: '💊 보충제', color: 'bg-green-50 border-green-200' })
   }
-  if (hasCare(p, 'thyroid_uterus') || d.iris.thyroidZone < 70) {
+  if (hasCare(p, 'organ_monitoring') || d.iris.thyroidZone < 70) {
     recs.push({ name: '쑥 온열 패치', reason: '하복부 혈액 순환 개선', tag: '🌿 한방', color: 'bg-emerald-50 border-emerald-200' })
   }
-  if (hasCare(p, 'stress') || d.biosignal.hrv < 38) {
+  if (hasCare(p, 'mental_brain') || d.biosignal.hrv < 38) {
     recs.push({ name: '아슈와간다 + L-테아닌', reason: '코르티솔 조절 & 이완 지원', tag: '🌿 스트레스', color: 'bg-purple-50 border-purple-200' })
   }
-  if (hasCare(p, 'hair_care')) {
+  if (hasCare(p, 'hair_scalp')) {
     recs.push({ name: '바이오틴 5000mcg + 실리카', reason: '모발 강화 & 두피 개선', tag: '✂️ 모발', color: 'bg-amber-50 border-amber-200' })
   }
-  if (hasCare(p, 'osteoporosis')) {
+  if (hasCare(p, 'musculoskeletal_lymph')) {
     recs.push({ name: '칼슘 + 비타민 D3/K2', reason: '골밀도 유지 필수 영양소', tag: '🦴 골건강', color: 'bg-blue-50 border-blue-200' })
+  }
+  if (hasCare(p, 'gut_detox') || isHighConcern(p.answers.gut_bloating) || isHighConcern(p.answers.gut_bowel)) {
+    recs.push({ name: '유산균 신바이오틱스', reason: '장내 유익균 밸런스 & 체배출 지원', tag: '🌱 장건강', color: 'bg-teal-50 border-teal-200' })
+  }
+  if (hasCare(p, 'weight_metabolic')) {
+    recs.push({ name: '크롬 + 식이섬유 밸런스', reason: '혈당 스파이크 완화 & 대사 지원', tag: '⚖️ 대사', color: 'bg-orange-50 border-orange-200' })
+  }
+  if (hasCare(p, 'male_wellness')) {
+    recs.push({ name: '아연 + 마카 복합제', reason: '남성호르몬 & 활력 지원', tag: '💪 웰니스', color: 'bg-sky-50 border-sky-200' })
+  }
+  if (hasCare(p, 'posture_correction') || isHighConcern(p.answers.posture_neck)) {
+    recs.push({ name: '경추 전용 폼롤러 세트', reason: '거북목 · 승모근 긴장 완화', tag: '🧍 체형', color: 'bg-violet-50 border-violet-200' })
+  }
+  if (hasCare(p, 'disease_postcare')) {
+    recs.push({ name: '커큐민 프리미엄 영양제', reason: '항염 · 면역 회복 지원', tag: '🛡️ 회복', color: 'bg-indigo-50 border-indigo-200' })
   }
 
   // 기본 추천이 없으면 공통 추천
@@ -177,7 +219,7 @@ function buildSummary(d: MultimodalData, p: OnboardingProfile): string {
   }
 
   const careContext = p.careTypes.length > 0
-    ? ` 선택하신 관심사(${p.careTypes.slice(0, 2).join(', ')})를 반영한 맞춤 소견입니다.`
+    ? ` 선택하신 관심사(${p.careTypes.slice(0, 2).map(careLabel).join(', ')})를 반영한 맞춤 소견입니다.`
     : ''
 
   return `홍채 분석 데이터를 종합한 결과, ${issues.join('과 ')}이(가) 주요 관심 사항입니다.${careContext} 3개월 연속 데이터 수집 후 정밀 분석을 권장합니다.`
@@ -204,8 +246,8 @@ const BG = {
 }
 
 export function DiagnosticReport() {
-  const { data } = useMultimodalData()
-  const profile  = useOnboardingProfile()
+  const { data, setData } = useMultimodalData()
+  const { profile, setAnswer, resetAnswers } = useEditableOnboardingProfile()
 
   const findings    = buildFindings(data, profile)
   const productRecs = buildProductRecs(data, profile)
@@ -221,6 +263,14 @@ export function DiagnosticReport() {
 
   return (
     <div className="space-y-6">
+      {/* 기기 진단이 불가능할 때 직접 값을 입력해 리포트를 즉시 갱신할 수 있는 패널 */}
+      <MultimodalDataPanel value={data} onChange={setData} />
+      <DiagnosticAnswerPanel
+        answers={profile.answers}
+        onChange={setAnswer}
+        onReset={resetAnswers}
+      />
+
       {/* Overall summary */}
       <div className="glass-card p-5 border-l-4 border-rose-400">
         <div className="flex items-start gap-3">
@@ -244,7 +294,7 @@ export function DiagnosticReport() {
       </div>
 
       {/* 탈모 케어 유형 분류 & 맞춤 웰니스 */}
-      {hasCare(profile, 'hair_care') && (
+      {hasCare(profile, 'hair_scalp') && (
         <HairCareTypeCard data={data} profile={profile} />
       )}
 
