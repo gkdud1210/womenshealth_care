@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   try {
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-flash-lite-latest',
       systemInstruction: `당신은 LUDIA, 한국 여성 건강 AI 어시스턴트입니다.
 
 사용자 건강 컨텍스트:

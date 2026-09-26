@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   CalendarHeart, Microscope,
-  Settings, ShoppingBag, Apple, Users
+  Settings, ShoppingBag, Apple, Users, ChefHat
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,10 +12,11 @@ const NAV_ITEMS = [
   { href: '/calendar',   icon: CalendarHeart,   label: '캘린더' },
   { href: '/diagnostic', icon: Microscope,      label: '진단' },
   { href: '/nutrition',  icon: Apple,           label: '헬스피드' },
+  { href: '/ludia-call', icon: ChefHat,         label: '루디아 호출', highlight: true },
   { href: '/community',  icon: Users,           label: '모임' },
   { href: '/shop',       icon: ShoppingBag,     label: '샵' },
   { href: '/settings',   icon: Settings,        label: '설정' },
-]
+] as const
 
 export function MobileNav() {
   const pathname = usePathname()
@@ -29,9 +30,33 @@ export function MobileNav() {
         borderTop: '1px solid rgba(244,63,117,0.1)',
         boxShadow: '0 -4px 24px rgba(244,63,117,0.07)',
       }}>
-      <div className="flex items-center justify-around px-0.5 py-1">
-        {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+      <div className="flex items-end justify-around px-0.5 py-1">
+        {NAV_ITEMS.map(({ href, icon: Icon, label, ...rest }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
+          const highlight = 'highlight' in rest && rest.highlight
+
+          if (highlight) {
+            return (
+              <Link key={href} href={href}
+                className="flex flex-col items-center gap-0.5 px-1 pb-1 rounded-xl min-w-0 flex-1 -mt-5 transition-all duration-200">
+                <div className={cn(
+                  'w-12 h-12 rounded-full flex items-center justify-center transition-all duration-200',
+                  isActive && 'scale-105'
+                )}
+                  style={{
+                    background: 'linear-gradient(135deg,#f43f75,#a855f7)',
+                    boxShadow: '0 6px 18px rgba(244,63,117,0.45)',
+                    border: '3px solid #fff',
+                  }}>
+                  <Icon className="w-5 h-5 text-white" strokeWidth={2.2} />
+                </div>
+                <span className="text-[10px] font-bold truncate w-full text-center" style={{ color: '#e11d5a' }}>
+                  {label}
+                </span>
+              </Link>
+            )
+          }
+
           return (
             <Link key={href} href={href}
               className="flex flex-col items-center gap-0.5 px-1 py-1 rounded-xl min-w-0 flex-1 transition-all duration-200">

@@ -4,8 +4,10 @@ import { FileText, AlertTriangle, CheckCircle, Info, ShoppingBag, ArrowRight, Sp
 import { cn } from '@/lib/utils'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 import { useEditableOnboardingProfile, isHighConcern, hasCare } from '@/lib/onboarding-profile'
-import { CARE_CASES } from '@/data/careCases'
+import { CARE_CASES, type CareCaseId } from '@/data/careCases'
 import { HairCareTypeCard } from './HairCareTypeCard'
+import { CareTypeCard } from './CareTypeCard'
+import { SUBTYPE_CARD_IDS } from '@/data/careSubtypes'
 import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
 import { DiagnosticAnswerPanel } from './DiagnosticAnswerPanel'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
@@ -314,6 +316,13 @@ export function DiagnosticReport({ session }: Props) {
       {hasCare(profile, 'hair_scalp') && (
         <HairCareTypeCard data={data} profile={profile} />
       )}
+
+      {/* 그 외 케어카드별 세부 체질 분류 & 맞춤 웰니스 (선택한 카드마다 하나씩) */}
+      {profile.careTypes
+        .filter((id): id is CareCaseId => id !== 'hair_scalp' && SUBTYPE_CARD_IDS.has(id as CareCaseId))
+        .map(id => (
+          <CareTypeCard key={id} careCaseId={id} data={data} profile={profile} />
+        ))}
 
       {/* Findings list */}
       <div>

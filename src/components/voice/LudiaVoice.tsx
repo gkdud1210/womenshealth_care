@@ -67,6 +67,8 @@ interface Props {
   phase: CyclePhase
   cycleDay: number
   userName: string
+  /** 헤더 뒤로가기 버튼이 이동할 경로 (기본값: /calendar) */
+  backHref?: string
 }
 
 /* ─── Helpers ─────────────────────────────────────────────────────────── */
@@ -325,7 +327,7 @@ const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
 }
 
 /* ─── Component ───────────────────────────────────────────────────────── */
-export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
+export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calendar' }: Props) {
   const profile          = useOnboardingProfile()
   const { setLogs }      = usePersistedLogs()
   const { addEvents }    = useSchedule()
@@ -599,7 +601,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName }: Props) {
         {/* ── Header ───────────────────────────────────────────────── */}
         <header className="flex-none flex items-center justify-between px-5 pt-4 pb-3 border-b border-rose-50">
           <div className="flex items-center gap-2.5">
-            <Link href="/calendar"
+            <Link href={backHref}
               className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
               style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.15)' }}>
               <ChevronLeft className="w-4 h-4 text-rose-400" />

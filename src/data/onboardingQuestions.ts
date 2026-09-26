@@ -253,6 +253,24 @@ export const ALL_QUESTIONS: Question[] = [
     type: 'radio',
     options: ['자주 그래요', '가끔 그래요', '없어요'],
   },
+
+  // ── ♿ 시니어 웰니스 & 액티브 케어 ─────────────────────────────
+  {
+    id: 'senior_mobility',
+    cardIds: ['senior_wellness'],
+    emoji: '♿', category: '시니어 웰니스 & 액티브 케어',
+    text: '계단을 오르내리거나 걸을 때 무릎·허리가 쑤시거나 다리에 힘이 빠지는 느낌이 드시나요?',
+    type: 'radio',
+    options: ['자주 그래요', '가끔 그래요', '없어요'],
+  },
+  {
+    id: 'senior_memory',
+    cardIds: ['senior_wellness'],
+    emoji: '♿', category: '시니어 웰니스 & 액티브 케어',
+    text: '최근 들어 깜빡깜빡하거나 머리가 멍한 느낌이 잦아졌다고 느끼시나요?',
+    type: 'radio',
+    options: ['자주 그래요', '가끔 그래요', '없어요'],
+  },
 ]
 
 export function getQuestionsForCards(cardIds: string[]): Question[] {

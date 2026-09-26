@@ -1,11 +1,25 @@
 import {
   Scissors, Scale, Dumbbell, PersonStanding, Sprout, Brain,
-  Droplets, ShieldPlus, Sparkles, Bone, Activity,
+  Droplets, ShieldPlus, Sparkles, Bone, Activity, Accessibility,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
+export type CareCaseId =
+  | 'hair_scalp'
+  | 'weight_metabolic'
+  | 'male_wellness'
+  | 'posture_correction'
+  | 'gut_detox'
+  | 'mental_brain'
+  | 'hormone_female'
+  | 'disease_postcare'
+  | 'skin_beauty'
+  | 'musculoskeletal_lymph'
+  | 'organ_monitoring'
+  | 'senior_wellness'
+
 export interface CareCase {
-  id: string
+  id: CareCaseId
   label: string
   desc: string
   icon: LucideIcon
@@ -103,5 +117,13 @@ export const CARE_CASES: CareCase[] = [
     icon: Activity,
     gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)',
     glow: 'rgba(59,130,246,0.3)', border: 'rgba(59,130,246,0.25)', bg: 'rgba(59,130,246,0.06)',
+  },
+  {
+    id: 'senior_wellness',
+    label: '시니어 웰니스 & 액티브 케어',
+    desc: '퇴행성 관절/척추 · 복합 성인병 · 근감소증 · 체온/뇌 혈류 정체',
+    icon: Accessibility,
+    gradient: 'linear-gradient(135deg, #0d9488, #0f766e)',
+    glow: 'rgba(13,148,136,0.3)', border: 'rgba(13,148,136,0.25)', bg: 'rgba(13,148,136,0.06)',
   },
 ]

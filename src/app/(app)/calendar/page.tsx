@@ -215,7 +215,7 @@ export default function CalendarPage() {
 
       {/* ── 퀵 버튼 행 ── */}
       <div className="flex justify-end gap-2 mb-3">
-        <Link href="/"
+        <Link href="/ludia-call"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all active:scale-95"
           style={{
             background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',

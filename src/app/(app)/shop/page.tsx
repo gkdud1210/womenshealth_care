@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Star, X, ShoppingBag, Trash2, PenLine, ImagePlus, Sparkles,
   Droplets, Shield, Leaf, Wind, Heart, Zap, Search, ShieldCheck,
+  Salad, UtensilsCrossed, Flame, Soup,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -26,6 +27,10 @@ const ICON_MAP: Record<string, LucideIcon> = {
   leaf: Leaf,
   heart: Heart,
   zap: Zap,
+  salad: Salad,
+  utensils: UtensilsCrossed,
+  flame: Flame,
+  soup: Soup,
 }
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -780,6 +785,19 @@ export default function ShopPage() {
   const [query, setQuery] = useState('')
   const [showIngredientSearch, setShowIngredientSearch] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
+
+  // 다른 페이지(예: 루디아 호출 식단 분석)에서 특정 상품으로 바로 연결
+  useEffect(() => {
+    try {
+      const id = new URLSearchParams(window.location.search).get('product')
+      if (!id) return
+      const product = SHOP_PRODUCTS.find(p => p.id === id)
+      if (product) {
+        setSelected(product)
+        setActiveTab(product.category)
+      }
+    } catch {}
+  }, [])
 
   const q = query.toLowerCase().trim()
   const byCategory = activeTab === 'all'

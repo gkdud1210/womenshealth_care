@@ -5,6 +5,7 @@ export type ProductCategory =
   | 'vitality_aging'
   | 'deep_healing'
   | 'future_planning'
+  | 'meal_wellness'
 
 export const CATEGORY_META: Record<ProductCategory, {
   label: string
@@ -35,6 +36,12 @@ export const CATEGORY_META: Record<ProductCategory, {
     subtitle: 'Future Planning',
     primaryColor: '#f59e0b',
     bgColor: 'rgba(245,158,11,0.08)',
+  },
+  meal_wellness: {
+    label: '식단·구독',
+    subtitle: 'Meal & Subscription',
+    primaryColor: '#16a34a',
+    bgColor: 'rgba(22,163,74,0.08)',
   },
 }
 
@@ -462,6 +469,132 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
         careTypes: ['hormone_female'], rating: 5,
         body: '38살에 난임 치료 시작하면서 CoQ10 꼭 먹으라는 이야기를 많이 들었는데 여기 제품이 유비퀴놀 형태라서 선택했어요. 시험관 채취한 난자 퀄리티가 좋아졌다고 선생님이 말씀해 주셨어요.',
         date: '2026-04-14',
+      },
+    ],
+  },
+
+  // ── Meal & Subscription (루디아 호출 식단 분석 추천용) ────────────────────
+
+  {
+    id: 'ludia_salad_subscription',
+    name: '루디아 저칼로리 샐러드 정기구독',
+    brand: '루디아 키친',
+    tagline: '주 3회 새벽 배송 · 한 끼 320kcal 내외 · 식이섬유 듬뿍',
+    price: 89000,
+    originalPrice: 105000,
+    volume: '주 3회 × 4주 (12끼)',
+    category: 'meal_wellness',
+    placeholderIcon: 'salad',
+    placeholderGradient: { from: '#dcfce7', to: '#86efac' },
+    description:
+      '체중·대사 케어 중인 분들을 위해 루디아 AI가 매 끼 칼로리와 나트륨을 계산해 구성한 샐러드 정기구독입니다.\n\n제철 채소와 통곡물, 저지방 단백질을 조합해 한 끼 320kcal 내외로 맞췄고, 매주 메뉴가 바뀌어 질리지 않게 구성했습니다.',
+    keyBenefits: [
+      '한 끼 평균 320kcal · 나트륨 480mg 이하',
+      '식이섬유 8g 이상 · 포만감 오래 지속',
+      '루디아 AI 식단 분석 결과와 자동 연동 추천',
+      '매주 새 메뉴 · 주 3회 새벽 배송',
+    ],
+    howToUse: '냉장 보관 후 그대로 섭취하거나 드레싱만 따로 곁들이세요. 점심·저녁 대체식으로 추천드려요.',
+    ludiaTags: ['저칼로리', '체중관리', '나트륨_낮음', '식이섬유_보충', '균형식단'],
+    reviews: [
+      {
+        id: 'mw1r1', nickname: '조**', ageGroup: '30대 초반',
+        careTypes: ['weight_metabolic'], rating: 5,
+        body: '루디아로 사진 찍어서 분석받고 나서 추천받은 샐러드인데, 칼로리 계산 스트레스 없이 그냥 먹기만 하면 돼서 편해요.',
+        date: '2026-05-02',
+      },
+      {
+        id: 'mw1r2', nickname: '한**', ageGroup: '20대 후반',
+        careTypes: ['weight_metabolic', 'gut_detox'], rating: 4,
+        body: '양이 조금 적게 느껴질 때도 있지만 저녁에 먹기엔 딱 좋아요. 배송도 새벽에 꼬박꼬박 잘 와요.',
+        date: '2026-04-20',
+      },
+    ],
+  },
+  {
+    id: 'lowcal_balance_lunchbox',
+    name: '균형 저칼로리 도시락 구독',
+    brand: '루디아 키친',
+    tagline: '한 끼 450kcal 균형식 · 탄단지 밸런스 자동 계산',
+    price: 112000,
+    volume: '주 5회 × 2주 (10끼)',
+    category: 'meal_wellness',
+    placeholderIcon: 'utensils',
+    placeholderGradient: { from: '#fef9c3', to: '#fde047' },
+    description:
+      '루디아 AI가 계산한 탄수화물·단백질·지방 비율(5:3:2)에 맞춰 구성한 균형 도시락입니다. 밥·반찬·국이 모두 포함돼 한 끼를 든든하게 챙길 수 있어요.\n\n식단 분석에서 "탄수화물이 부족해요" 또는 "균형이 잘 맞아요" 평가를 받은 분들께 특히 잘 맞습니다.',
+    keyBenefits: [
+      '한 끼 450kcal · 탄단지 5:3:2 밸런스',
+      '현미밥·저염 반찬 3종·국 구성',
+      '전자레인지 3분이면 바로 식사 가능',
+      '주 5회 평일 배송, 2주 단위 구독',
+    ],
+    howToUse: '전자레인지에 3분 데운 뒤 바로 드세요. 점심 도시락으로 특히 추천해요.',
+    ludiaTags: ['균형식단', '칼로리관리', '나트륨_낮음', '혈당관리'],
+    reviews: [
+      {
+        id: 'mw2r1', nickname: '윤**', ageGroup: '30대 중반',
+        careTypes: ['mental_brain'], rating: 5,
+        body: '점심에 뭘 먹을지 고민하는 것 자체가 스트레스였는데 구독하고 나서는 그냥 데워 먹기만 하면 돼서 마음이 편해요.',
+        date: '2026-05-08',
+      },
+    ],
+  },
+  {
+    id: 'highprotein_bulkup_lunchbox',
+    name: '고단백 벌크업 도시락',
+    brand: '루디아 키친',
+    tagline: '한 끼 단백질 40g↑ · 근성장 · 남성 웰니스 맞춤',
+    price: 128000,
+    volume: '주 5회 × 2주 (10끼)',
+    category: 'meal_wellness',
+    placeholderIcon: 'flame',
+    placeholderGradient: { from: '#fee2e2', to: '#fca5a5' },
+    description:
+      '근성장과 체력 관리를 챙기는 분들을 위해 닭가슴살·연어·소고기 등을 순환 구성한 고단백 도시락입니다. 한 끼 단백질 40g 이상, 총 650kcal 내외로 벌크업 시기에도 부담 없이 챙길 수 있어요.',
+    keyBenefits: [
+      '한 끼 단백질 40g 이상 · 650kcal 내외',
+      '닭가슴살·연어·소고기 등 매일 다른 단백질원',
+      '아연·복합 탄수화물로 남성 웰니스 케어 지원',
+      '운동 후 30분 내 섭취 권장',
+    ],
+    howToUse: '운동 직후 또는 점심·저녁 식사로 섭취하세요. 전자레인지 4분이면 준비 완료예요.',
+    ludiaTags: ['고단백', '근성장_지원', '남성호르몬_케어', '칼로리관리'],
+    reviews: [
+      {
+        id: 'mw3r1', nickname: '배**', ageGroup: '20대 후반',
+        careTypes: ['male_wellness'], rating: 5,
+        body: '헬스 끝나고 바로 먹기 좋게 단백질량이 넉넉해서 좋아요. 루디아 식단 분석에서 단백질 부족하다고 나온 뒤로 계속 구독 중이에요.',
+        date: '2026-04-29',
+      },
+    ],
+  },
+  {
+    id: 'gentle_recovery_meal_subscription',
+    name: '회복기 저자극 유동식 구독',
+    brand: '루디아 키친',
+    tagline: '소화 편한 죽·스프 구성 · 자극적이지 않은 맛',
+    price: 96000,
+    volume: '주 4회 × 2주 (8끼)',
+    category: 'meal_wellness',
+    placeholderIcon: 'soup',
+    placeholderGradient: { from: '#e0e7ff', to: '#a5b4fc' },
+    description:
+      '치료·회복기, 소화기가 예민한 시기를 위한 저자극 유동식 구독입니다. 자극적인 양념 없이 부드럽게 조리한 죽·스프 위주로 구성해 소화 부담을 줄였습니다.',
+    keyBenefits: [
+      '자극적인 양념 없이 순한 맛으로 조리',
+      '죽·스프 위주 · 소화 편한 조리법',
+      '비타민·단백질을 부드러운 형태로 보충',
+      '냉장 배송, 데우기만 하면 바로 섭취',
+    ],
+    howToUse: '전자레인지 또는 중탕으로 데운 뒤 천천히 드세요. 하루 한 끼 대체식으로 추천해요.',
+    ludiaTags: ['소화편함', '저자극', '면역_지원'],
+    reviews: [
+      {
+        id: 'mw4r1', nickname: '문**', ageGroup: '40대 초반',
+        careTypes: ['disease_postcare'], rating: 5,
+        body: '치료 후 입맛이 없을 때 이거 하나로 든든하게 챙겼어요. 맵거나 짜지 않아서 속이 편했습니다.',
+        date: '2026-04-11',
       },
     ],
   },
