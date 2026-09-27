@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-export const maxDuration = 30  // Next.js route timeout (seconds)
+export const maxDuration = 60  // Next.js route timeout (seconds)
 
 const IRIS_SERVICE = process.env.IRIS_SERVICE_URL ?? 'http://localhost:8001'
 
@@ -15,16 +15,18 @@ export async function POST(req: NextRequest) {
   const fileBuffer = await file.arrayBuffer()
   const fileName   = file.name || 'iris.jpg'
   const fileType   = file.type || 'image/jpeg'
+  const eye        = formData.get('eye') === 'left' ? 'left' : 'right'
 
   for (const endpoint of ['/analyze/detailed', '/analyze']) {
     try {
       const fd = new FormData()
       fd.append('file', new Blob([fileBuffer], { type: fileType }), fileName)
+      fd.append('eye', eye)
 
       const res = await fetch(`${IRIS_SERVICE}${endpoint}`, {
         method: 'POST',
         body: fd,
-        signal: AbortSignal.timeout(28_000),
+        signal: AbortSignal.timeout(55_000),
       })
 
       if (!res.ok) continue
@@ -33,7 +35,8 @@ export async function POST(req: NextRequest) {
       if (!text) continue
 
       const data = JSON.parse(text)
-      if (data.error) continue
+      // 모델 미설치 등 서비스가 명시한 오류는 그대로 전달 (다른 엔드포인트로 재시도해도 같음)
+      if (data.error) return NextResponse.json({ error: data.error }, { status: 503 })
 
       return NextResponse.json({
         ...data,

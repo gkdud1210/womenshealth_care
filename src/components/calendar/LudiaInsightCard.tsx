@@ -6,8 +6,38 @@ import { cn } from '@/lib/utils'
 import { getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
 import type { CyclePhase } from '@/types/health'
 
+// 홍채 분석 서비스(LUDIA LAB 병소 모델)가 한쪽 눈에서 검출한 결과 — 리포트에 그대로 보여주기 위해 저장
+export interface IrisLesion {
+  id: number
+  key: string
+  label: string
+  confidence: number
+  organs: { name: string; pct: number }[]
+  position: { rel: number; clock: number } | null
+  shape?: 'polygon' | 'polyline'
+  points?: [number, number][]   // 원본 사진 픽셀 좌표
+  labelAt?: [number, number]    // 번호를 찍을 위치 (도형 안)
+}
+
+export interface IrisEyeDetection {
+  score: number
+  annotatedImg: string | null   // 저장 용량을 위해 축소한 주석 이미지 (data URL) — baseImg가 없을 때만 사용
+  baseImg?: string | null       // 병소 없이 홍채/동공 원만 그린 축소 이미지 — 병소는 points로 겹쳐 그림
+  imageSize?: { w: number; h: number }
+  // 동공 안·눈꺼풀 위·홍채 밖이라 병소에서 제외한 검출 수
+  excluded?: { pupil: number; eyelid: number; outside: number }
+  lesions: IrisLesion[]
+  lesionSummary: { key: string; label: string; count: number; color: string }[]
+  model?: { runId: number; valMiou: number | null; trainImages: number | null; reliable: boolean }
+  disclaimer?: string
+}
+
 export interface MultimodalData {
-  iris:      { leftScore: number; rightScore: number; skinZone: number; thyroidZone: number }
+  iris: {
+    leftScore: number; rightScore: number; skinZone: number; thyroidZone: number
+    // 실제 서비스로 분석한 눈만 채워진다 (데모/직접 입력이면 없음)
+    detection?: { right?: IrisEyeDetection; left?: IrisEyeDetection }
+  }
   eda:       { conductance: number; stressIndex: number; tensionLevel: number; relaxationScore: number; ansBalance: number }
   biosignal: { hrv: number; sleepHours: number; heartRate: number; weight: number; bmi: number }
 }

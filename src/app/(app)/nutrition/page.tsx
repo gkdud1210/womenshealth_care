@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
-import type { HealthMode } from '@/data/nutritionData'
+import { CARE_CASES } from '@/data/careCases'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -30,7 +30,7 @@ interface SnsPost {
   images?: string[] // 다중 이미지
   coverEmoji?: string
   coverGradient?: string
-  tags: HealthMode[]
+  tags: string[]   // CareCase id 배열 (src/data/careCases.ts)
   likes: number
   saved?: boolean
   comments: SnsComment[]
@@ -38,9 +38,9 @@ interface SnsPost {
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
-const POSTS_KEY  = 'ludia_sns_v4'
-const LIKES_KEY  = 'ludia_sns_likes_v4'
-const SAVES_KEY  = 'ludia_sns_saves_v4'
+const POSTS_KEY  = 'ludia_sns_v5'
+const LIKES_KEY  = 'ludia_sns_likes_v5'
+const SAVES_KEY  = 'ludia_sns_saves_v5'
 
 const SEED: SnsPost[] = [
   {
@@ -49,7 +49,7 @@ const SEED: SnsPost[] = [
     type: 'recipe', title: '연어 아보카도 덮밥',
     content: '임신 중 DHA 보충에 딱 맞는 한 그릇 레시피예요 🐟\n\n재료 (1인분)\n• 훈제연어 80g\n• 아보카도 1/2개\n• 시금치 한 줌\n• 현미밥 150g\n• 레몬즙 1작은술, 간장 1작은술\n\n만드는 법\n① 시금치를 30초 데쳐 참기름·소금으로 무쳐요\n② 아보카도를 얇게 슬라이스\n③ 밥 위에 재료를 색깔별로 올리고\n④ 레몬즙+간장 소스를 뿌리면 완성!\n\n🔥 520kcal · DHA 1,800mg',
     coverEmoji: '🍱', coverGradient: 'linear-gradient(135deg,#d1fae5,#6ee7b7)',
-    tags: ['임신'], likes: 147,
+    tags: ['hormone_female'], likes: 147,
     comments: [
       { id: 'c1', authorName: '예비맘 🌸', authorEmoji: '🌸', text: '입덧 중에도 먹을 수 있어서 너무 좋아요!', createdAt: new Date(Date.now() - 1800000).toISOString() },
       { id: 'c2', authorName: '민지맘', authorEmoji: '🍀', text: '현미밥 대신 잡곡밥으로 만들었는데 더 맛있었어요 😊', createdAt: new Date(Date.now() - 900000).toISOString() },
@@ -61,7 +61,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '치료 후 입맛 없을 때 먹기 좋은 것들',
     content: '항암 치료 후 며칠간 아무것도 못 먹다가 찾은 조합들 공유해요 🙏\n\n• 차가운 수박 주스 (속 시원하고 수분 보충)\n• 미지근한 녹차 두유 (비린내 없이 단백질)\n• 냉동 바나나 스무디 (달콤하고 칼로리 있음)\n• 구운 고구마 (짜지 않고 소화 편함)\n\n맛을 느끼기 어려울 때는 신맛(레몬, 식초) 살짝 추가하면 입맛이 살아나요. 모두 힘내세요 💪',
     coverEmoji: '🫐', coverGradient: 'linear-gradient(135deg,#ede9fe,#c4b5fd)',
-    tags: ['항암'], likes: 203,
+    tags: ['disease_postcare'], likes: 203,
     comments: [
       { id: 'c3', authorName: '함께해요', authorEmoji: '🌻', text: '수박 주스 진짜 효과 있었어요! 감사합니다', createdAt: new Date(Date.now() - 3000000).toISOString() },
     ],
@@ -72,7 +72,7 @@ const SEED: SnsPost[] = [
     type: 'recipe', title: '닭가슴살 채소 볶음',
     content: '다이어트 중에도 맛있게 먹을 수 있는 고단백 한 끼 🥘\n\n재료 (1인분)\n• 닭가슴살 150g\n• 브로콜리 100g\n• 파프리카 1/2개\n• 양파 1/4개\n• 간장 2작은술, 올리브오일 1작은술\n• 마늘 2쪽, 후추\n\n만드는 법\n① 닭가슴살을 간장·마늘·후추로 10분 재우기\n② 채소를 한 입 크기로 자르기\n③ 강불에 닭가슴살 먼저 볶다가\n④ 채소 넣고 3-4분 더 볶으면 완성!\n\n💡 Tip: 재워두면 훨씬 부드러워요\n🔥 310kcal · 단백질 31g',
     coverEmoji: '🥘', coverGradient: 'linear-gradient(135deg,#dbeafe,#93c5fd)',
-    tags: ['다이어트'], likes: 312,
+    tags: ['weight_metabolic'], likes: 312,
     comments: [
       { id: 'c4', authorName: '헬스중', authorEmoji: '💪', text: '매주 만들어 먹고 있어요! 진짜 다이어트 필수 레시피', createdAt: new Date(Date.now() - 5400000).toISOString() },
       { id: 'c5', authorName: '건강덕후', authorEmoji: '🌿', text: '두부 추가해서 만들면 포만감이 더 좋아요', createdAt: new Date(Date.now() - 3600000).toISOString() },
@@ -84,7 +84,7 @@ const SEED: SnsPost[] = [
     type: 'recipe', title: '안면홍조에 효과 봤던 두유 스무디',
     content: '갱년기 3년차, 이 레시피로 진짜 효과 봤어요 🌸\n\n두유 200ml + 냉동 아마씨 1큰술 + 바나나 반 개 + 계피가루 약간 + 얼음 한 줌\n\n블렌더에 30초만 갈면 끝!\n\n이소플라본 + 리그난 조합으로 3주 꾸준히 마셨더니 안면홍조 횟수가 눈에 띄게 줄었어요. 의사 선생님도 계속 드셔도 된다고 하셨어요 😊\n\n아마씨는 냉동 보관하면 오래가요!',
     coverEmoji: '🥤', coverGradient: 'linear-gradient(135deg,#fef3c7,#fde68a)',
-    tags: ['갱년기'], likes: 178,
+    tags: ['hormone_female'], likes: 178,
     comments: [
       { id: 'c6', authorName: '갱년기공부중', authorEmoji: '📚', text: '오늘부터 시작해볼게요! 아마씨는 어디서 사세요?', createdAt: new Date(Date.now() - 7200000).toISOString() },
     ],
@@ -95,7 +95,7 @@ const SEED: SnsPost[] = [
     type: 'recipe', title: '강황 두부 수프',
     content: '항산화+단백질 두 마리 토끼를 잡는 항암 수프 🍵\n\n재료 (2인분)\n• 두부 200g\n• 당근 1/2개, 양파 1/2개\n• 강황가루 1작은술\n• 생강 1쪽\n• 채소 육수 400ml\n• 코코넛밀크 100ml\n• 올리브오일\n\n만드는 법\n① 양파·당근을 볶다가 강황+생강 넣어 향 내기\n② 육수 붓고 12분 끓이기\n③ 두부·코코넛밀크 넣고 5분 더\n\n💡 흑후추 한 꼬집 추가하면 커큐민 흡수율 20배↑\n🔥 185kcal (1인분)',
     coverEmoji: '🍲', coverGradient: 'linear-gradient(135deg,#fce7f3,#fbcfe8)',
-    tags: ['항암'], likes: 94,
+    tags: ['disease_postcare'], likes: 94,
     comments: [],
   },
   {
@@ -104,7 +104,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '고단백 아침 식사 루틴 공유',
     content: '다이어트 6개월째, 아침 루틴 공유해요!\n\n그릭요거트 100g + 블루베리 50g + 아몬드 10g + 꿀 1작은술\n\n이게 다예요 😂 10분도 안 걸리는데 단백질 10g + 항산화 챙기기 완료!\n\n포인트는 그릭요거트를 플레인으로 사는 것 (가당 피하기). 달콤함은 꿀로 조절하면 훨씬 건강해요.\n\n1kg 빠지는 데 이게 제일 도움 됐어요. 저처럼 아침에 귀찮으신 분들께 강추 🙌',
     coverEmoji: '🫙', coverGradient: 'linear-gradient(135deg,#f0fdf4,#bbf7d0)',
-    tags: ['다이어트', '일반'], likes: 267,
+    tags: ['weight_metabolic'], likes: 267,
     comments: [
       { id: 'c7', authorName: '다이어터', authorEmoji: '🏃', text: '저도 따라해볼게요! 그릭요거트 브랜드 추천해주실 수 있어요?', createdAt: new Date(Date.now() - 28800000).toISOString() },
     ],
@@ -115,7 +115,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '여성을 위한 홈트 루틴 — 30분',
     content: '기구 없이 집에서 할 수 있는 전신 운동 루틴이에요 🏠\n\n🔥 워밍업 5분\n• 제자리 걷기 → 팔 돌리기 → 고관절 원 그리기\n\n💪 본운동 20분 (2세트)\n① 스쿼트 15회 — 허벅지·엉덩이 강화\n② 런지 10회 (양쪽) — 하체 균형 잡기\n③ 힙 브릿지 20회 — 골반저근·코어\n④ 플랭크 30초 — 복부·허리\n⑤ 버피 10회 — 전신 유산소\n\n🧘 쿨다운 5분\n• 햄스트링·고관절 스트레칭\n\n💡 생리 중에는 강도를 낮추고 요가 위주로 바꿔요\n주 3회 꾸준히 하면 4주 후 달라진 몸을 느낄 수 있어요!',
     coverEmoji: '🏃‍♀️', coverGradient: 'linear-gradient(135deg,#fce7f3,#fbcfe8)',
-    tags: ['다이어트', '일반'], likes: 421,
+    tags: ['weight_metabolic'], likes: 421,
     comments: [
       { id: 'c8', authorName: '운동초보', authorEmoji: '🌱', text: '버피가 너무 힘든데 대체 동작이 있을까요?', createdAt: new Date(Date.now() - 43200000).toISOString() },
       { id: 'c9', authorName: '루디아', authorEmoji: '💜', text: '마운틴 클라이머나 점프 없는 스텝업으로 대체 가능해요 😊', createdAt: new Date(Date.now() - 40000000).toISOString() },
@@ -127,7 +127,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '생리통에 진짜 효과 있는 요가 5가지',
     content: '생리 첫날 정말 못 움직일 때 이 5가지로 버텨요 🩸\n\n① 아이 자세 (Child\'s Pose)\n엎드려 이마를 바닥에 대고 팔을 앞으로 뻗기. 2분 유지. 자궁 압박 완화.\n\n② 누운 나비 자세\n발바닥을 맞대고 무릎을 옆으로 펼치기. 복식호흡 3분. 골반 이완.\n\n③ 고양이-소 자세\n네 발 자세에서 등을 위아래로 천천히. 1분. 허리 통증 완화.\n\n④ 옆으로 누운 태아 자세\n왼쪽 옆으로 누워 무릎 당기기. 핫팩과 함께하면 최고.\n\n⑤ 다리 벽에 올리기\n등을 바닥에 대고 다리를 벽에 기대기. 5분. 혈액순환+부종 완화.\n\n생리통 심할수록 움직이기 싫지만 이것만큼은 진짜 도움 돼요 💜',
     coverEmoji: '🧘‍♀️', coverGradient: 'linear-gradient(135deg,#ede9fe,#ddd6fe)',
-    tags: ['일반'], likes: 534,
+    tags: ['hormone_female'], likes: 534,
     comments: [
       { id: 'c10', authorName: '생리통괴로워', authorEmoji: '😖', text: '오늘 당장 해봤는데 진짜 좀 나아진 것 같아요 감사해요!!', createdAt: new Date(Date.now() - 50000000).toISOString() },
       { id: 'c11', authorName: '요가입문', authorEmoji: '🌸', text: '저장해뒀다가 매달 꺼내 볼게요 🙏', createdAt: new Date(Date.now() - 48000000).toISOString() },
@@ -139,7 +139,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '간헐적 단식 16:8 시작 가이드',
     content: '가장 쉽게 시작할 수 있는 다이어트 방법이에요 ⏰\n\n📌 16:8 이란?\n하루 16시간 공복 + 8시간 식사 창\n예) 오전 12시~오후 8시만 식사\n\n✅ 시작 전 알아야 할 것\n• 처음엔 14:10으로 시작해서 서서히 늘리기\n• 공복 중엔 물, 블랙커피, 녹차 OK\n• 식사 창에서도 폭식 금지 (칼로리 관리 필수)\n\n🍽️ 첫 끼 추천 — 닭가슴살 + 샐러드 + 현미밥\n마지막 끼 추천 — 단백질 위주 (두부·계란)\n\n⚠️ 주의: 생리 중에는 혈당 변동이 크므로 일시 중단 권장\n임신·수유 중이거나 저혈당 이력 있으면 전문가 상담 먼저!\n\n3주면 결과 보여요. 꾸준히 함께해요 💪',
     coverEmoji: '⏰', coverGradient: 'linear-gradient(135deg,#dbeafe,#bfdbfe)',
-    tags: ['다이어트'], likes: 389,
+    tags: ['weight_metabolic'], likes: 389,
     comments: [
       { id: 'c12', authorName: '간헐적단식중', authorEmoji: '⏱️', text: '2개월째 하고 있는데 -4kg 성공했어요!', createdAt: new Date(Date.now() - 65000000).toISOString() },
       { id: 'c13', authorName: '다이어트도전', authorEmoji: '🔥', text: '생리 중 쉬어도 된다는 거 몰랐어요. 꼭 기억할게요', createdAt: new Date(Date.now() - 60000000).toISOString() },
@@ -151,7 +151,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '헬스 초보 여성을 위한 웨이트 입문 팁',
     content: '헬스장 처음 등록하고 뭘 해야 할지 몰라서 헤맸던 분들께 🏋️‍♀️\n\n❌ 흔한 실수\n• 유산소만 1시간씩 하기 → 근손실 + 정체기\n• 남성 루틴 따라하기 → 여성 호르몬 주기와 안 맞음\n• 무거운 거 들면 몸이 커진다는 오해 → 절대 아니에요!\n\n✅ 초보 여성 추천 루틴\n월·목: 하체 (스쿼트, 레그프레스, 힙어브덕션)\n화·금: 상체 (랫풀다운, 시티드로우, 덤벨숄더프레스)\n수: 유산소 30분 or 휴식\n토: 전신 가볍게\n\n💡 여성 호르몬 사이클 맞춤 운동\n• 난포기(생리 후~배란): 고강도 가능\n• 황체기(배란~생리 전): 유연성·가벼운 운동 추천\n\n3개월만 꾸준히 하면 완전히 달라져요! 질문 환영 😊',
     coverEmoji: '🏋️', coverGradient: 'linear-gradient(135deg,#fef9c3,#fef08a)',
-    tags: ['다이어트', '일반'], likes: 298,
+    tags: ['weight_metabolic'], likes: 298,
     comments: [
       { id: 'c14', authorName: '헬스입문자', authorEmoji: '🌱', text: '유산소만 했는데 이제 웨이트 시작해볼게요!', createdAt: new Date(Date.now() - 80000000).toISOString() },
     ],
@@ -162,7 +162,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '임산부도 할 수 있는 안전한 운동 3가지',
     content: '임신 중 운동, 해도 될까요? → 오히려 꼭 해야 해요! 🤰\n\n단, 안전한 운동만 선택하는 게 중요해요.\n\n✅ 임신 중 추천 운동\n\n① 걷기\n• 언제부터: 임신 전 기간 가능\n• 강도: 대화 가능한 속도 (숨 차지 않게)\n• 시간: 30분, 주 5회\n• 효과: 부종 완화, 혈당 조절, 기분 개선\n\n② 수중 걷기·수영\n• 관절 부담 없이 전신 운동 가능\n• 부종·요통에 특히 효과적\n• 수영장 수온 38°C 이하 확인\n\n③ 임산부 요가·필라테스\n• 골반저근 강화 → 출산 준비\n• 호흡법 훈련 → 분만 도움\n• 전문 임산부 클래스 선택 권장\n\n❌ 피해야 할 운동\n• 누운 자세 복근 운동 (20주 이후)\n• 점프·충격이 강한 운동\n• 숨이 심하게 차는 고강도 운동\n\n가벼운 운동이 태아에게도 좋은 영향을 줘요 🌿',
     coverEmoji: '🤸‍♀️', coverGradient: 'linear-gradient(135deg,#d1fae5,#a7f3d0)',
-    tags: ['임신'], likes: 445,
+    tags: ['hormone_female'], likes: 445,
     comments: [
       { id: 'c15', authorName: '임신32주', authorEmoji: '🌸', text: '수중 걷기 시작했는데 부종이 정말 줄었어요!', createdAt: new Date(Date.now() - 90000000).toISOString() },
       { id: 'c16', authorName: '예비맘', authorEmoji: '🍀', text: '골반저근 운동이 출산에 도움된다는 게 진짜인가요?', createdAt: new Date(Date.now() - 86000000).toISOString() },
@@ -174,7 +174,7 @@ const SEED: SnsPost[] = [
     type: 'tip', title: '항암 치료 중 운동, 이렇게 하세요',
     content: '치료 중 운동이 오히려 도움이 된다는 연구 결과들이 늘고 있어요 💜\n\n✅ 항암 중 운동의 효과\n• 피로감 30% 감소\n• 우울·불안 완화\n• 면역 기능 지원\n• 근육량 유지 → 치료 완료 후 회복 빠름\n\n🚶‍♀️ 추천: 가벼운 걷기\n• 하루 10~20분부터 시작\n• 피곤하면 5분도 OK, 꾸준함이 핵심\n• 야외 햇빛 아래 걷기 = 비타민D + 기분 개선\n\n🧘 추천: 부드러운 요가·스트레칭\n• 관절 가동범위 유지\n• 림프 순환 도움\n• 통증 관리\n\n⚠️ 주의사항\n• 백혈구 수치 낮을 때는 공공 헬스장 피하기\n• 발열·심한 피로 시 즉시 중단\n• 주치의와 운동 계획 상의\n\n무리하지 않는 선에서 몸을 움직이는 것,\n그 자체가 이미 용감한 일이에요 🌟',
     coverEmoji: '🌟', coverGradient: 'linear-gradient(135deg,#ede9fe,#c4b5fd)',
-    tags: ['항암'], likes: 167,
+    tags: ['disease_postcare'], likes: 167,
     comments: [
       { id: 'c17', authorName: '투병중', authorEmoji: '💪', text: '치료 중에도 걷기 운동 꾸준히 하고 있어요. 정말 도움돼요', createdAt: new Date(Date.now() - 100000000).toISOString() },
     ],
@@ -189,10 +189,90 @@ const SEED: SnsPost[] = [
       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MDAnIGhlaWdodD0nNDAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJyB5MT0nMCcgeDI9JzEnIHkyPScxJz48c3RvcCBvZmZzZXQ9JzAlJyBzdG9wLWNvbG9yPScjZDFmYWU1Jy8+PHN0b3Agb2Zmc2V0PScxMDAlJyBzdG9wLWNvbG9yPScjNmVlN2I3Jy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzQwMCcgaGVpZ2h0PSc0MDAnIGZpbGw9J3VybCgjZyknLz48dGV4dCB4PScyMDAnIHk9JzE3MCcgZm9udC1zaXplPScxMTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPvCfjbM8L3RleHQ+PHRleHQgeD0nMjAwJyB5PSczMDAnIGZvbnQtc2l6ZT0nMjYnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyMwNjVmNDYnIGZvbnQtZmFtaWx5PSdzeXN0ZW0tdWknIGZvbnQtd2VpZ2h0PSc3MDAnPlN0ZXAgMiDCtyDrs7bquLA8L3RleHQ+PC9zdmc+',
       'data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPSc0MDAnIGhlaWdodD0nNDAwJz48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9J2cnIHgxPScwJyB5MT0nMCcgeDI9JzEnIHkyPScxJz48c3RvcCBvZmZzZXQ9JzAlJyBzdG9wLWNvbG9yPScjZmNlN2YzJy8+PHN0b3Agb2Zmc2V0PScxMDAlJyBzdG9wLWNvbG9yPScjZjlhOGQ0Jy8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9JzQwMCcgaGVpZ2h0PSc0MDAnIGZpbGw9J3VybCgjZyknLz48dGV4dCB4PScyMDAnIHk9JzE3MCcgZm9udC1zaXplPScxMTAnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGRvbWluYW50LWJhc2VsaW5lPSdtaWRkbGUnPvCfjbE8L3RleHQ+PHRleHQgeD0nMjAwJyB5PSczMDAnIGZvbnQtc2l6ZT0nMjYnIHRleHQtYW5jaG9yPSdtaWRkbGUnIGZpbGw9JyM5ZDE3NGQnIGZvbnQtZmFtaWx5PSdzeXN0ZW0tdWknIGZvbnQtd2VpZ2h0PSc3MDAnPuyZhOyEsSEg66eb7J6I6rKMIOuTnOyEuOyalCDwn46JPC90ZXh0Pjwvc3ZnPg==',
     ],
-    tags: ['다이어트', '일반'], likes: 58,
+    tags: ['weight_metabolic'], likes: 58,
     comments: [
       { id: 'cm1', authorName: '다이어터', authorEmoji: '🏃', text: '사진으로 보니까 훨씬 쉬워 보여요! 도전해볼게요 🙌', createdAt: new Date(Date.now() - 1800000).toISOString() },
     ],
+  },
+  {
+    id: 'official-7', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+    type: 'tip', title: '두피 열 내리는 저녁 루틴 3가지',
+    content: '퇴근 후 5분이면 충분해요, 두피 상열 내리는 루틴이에요 💇\n\n① 정수리 지압 30초\n엄지로 백회혈을 천천히 눌러 순환 촉진\n\n② 미온수→찬물 순서로 두피 마무리 세정\n마지막에 찬물로 헹구면 모세혈관 수축이 완화돼요\n\n③ 목 뒤 온찜질 10분\n상열하한 체질일수록 목·어깨가 뭉쳐 두피 혈류가 막혀요\n\n💡 두피가 유난히 뜨겁고 정수리가 가렵다면 상열 체질일 가능성이 높아요. 4주만 꾸준히 해보세요!',
+    coverEmoji: '💇', coverGradient: 'linear-gradient(135deg,#fce7f3,#f9a8d4)',
+    tags: ['hair_scalp'], likes: 121,
+    comments: [
+      { id: 'c18', authorName: '탈모고민', authorEmoji: '😥', text: '찬물 마무리 진짜 효과 있네요, 감사해요!', createdAt: new Date(Date.now() - 5000000).toISOString() },
+    ],
+  },
+  {
+    id: 'official-8', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 15).toISOString(),
+    type: 'recipe', title: '테스토스테론 챙기는 아연 듬뿍 덮밥',
+    content: '벌크업할 때 단백질만큼 중요한 게 아연이에요 💪\n\n재료 (1인분)\n• 훈제굴 또는 새우 100g\n• 현미밥 200g\n• 달걀노른자 1개\n• 아보카도 1/2개\n• 마늘 1쪽, 참기름·소금 약간\n\n만드는 법\n① 굴·새우를 마늘과 함께 살짝 볶기\n② 현미밥 위에 아보카도, 달걀노른자 올리기\n③ 참기름·소금으로 간하면 완성\n\n💡 아연은 남성호르몬 합성의 필수 미네랄이에요. 좋은 지방(아보카도)과 함께 먹으면 흡수율이 더 올라가요.\n🔥 560kcal · 아연 8.2mg',
+    coverEmoji: '🦪', coverGradient: 'linear-gradient(135deg,#dbeafe,#7dd3fc)',
+    tags: ['male_wellness'], likes: 96,
+    comments: [],
+  },
+  {
+    id: 'official-9', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 20).toISOString(),
+    type: 'tip', title: '거북목·굽은등 펴는 데스크 스트레칭',
+    content: '하루 종일 앉아있다 보면 나도 모르게 C커브가 무너져요 🧍\n\n① 턱 당기기 (더블친 스트레칭)\n턱을 뒤로 천천히 당겨 5초 유지, 10회\n\n② 가슴 열기\n양손을 등 뒤에서 깍지 끼고 어깨를 뒤로, 가슴 펴기 15초 x 3회\n\n③ 승모근 스트레칭\n한쪽 귀를 어깨 쪽으로 기울이고 반대손으로 지그시 눌러주기 20초씩\n\n④ 벽에 등 붙이고 서기\n뒤통수·어깨·엉덩이·발꿈치가 벽에 닿게 1분\n\n💡 매시간 1분씩만 해도 골반·척추 틀어짐 예방에 큰 도움이 돼요!',
+    coverEmoji: '🧍', coverGradient: 'linear-gradient(135deg,#ede9fe,#c4b5fd)',
+    tags: ['posture_correction'], likes: 214,
+    comments: [
+      { id: 'c19', authorName: '거북목직장인', authorEmoji: '💻', text: '벽에 등붙이기 해보니까 자세가 얼마나 틀어졌는지 알겠어요 ㅠㅠ', createdAt: new Date(Date.now() - 9000000).toISOString() },
+    ],
+  },
+  {
+    id: 'official-10', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 28).toISOString(),
+    type: 'recipe', title: '장 청소 식이섬유 오버나이트 오트밀',
+    content: '아침이 편해지는 장 디톡스 한 그릇이에요 🌱\n\n재료 (1인분)\n• 귀리 50g\n• 무가당 두유 150ml\n• 치아씨드 1큰술\n• 냉동 베리류 한 줌\n• 사과 1/4개\n\n만드는 법\n① 귀리·두유·치아씨드를 유리병에 넣고 잘 섞기\n② 냉장고에서 8시간 이상 불리기(전날 밤 준비)\n③ 아침에 베리·사과 올려 완성\n\n💡 치아씨드는 물을 흡수하며 장 속 노폐물을 함께 배출시켜줘요. SIBO나 가스가 잦다면 소량부터 시작하세요.\n🔥 320kcal · 식이섬유 11g',
+    coverEmoji: '🥣', coverGradient: 'linear-gradient(135deg,#ccfbf1,#5eead4)',
+    tags: ['gut_detox'], likes: 143,
+    comments: [],
+  },
+  {
+    id: 'official-11', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 33).toISOString(),
+    type: 'tip', title: '번아웃 왔을 때 부신 회복시키는 습관',
+    content: '계속 피곤하고 예민하다면 부신이 지쳐있는 신호일 수 있어요 🧠\n\n✅ 지금 바로 시작할 수 있는 것들\n• 기상 후 15분 이내 햇빛 보기 — 코르티솔 리듬 정상화\n• 오후 2시 이후 카페인 끊기 — 야간 코르티솔 급등 방지\n• 4-7-8 호흡법 하루 3세트 — 4초 들이쉬고, 7초 참고, 8초 내쉬기\n• 자기 전 스마트폰 대신 종이책 10분\n\n⚠️ 이유 없이 어지럽거나 브레인 포그가 2주 이상 지속되면 전문가 상담을 권해요.\n\n작은 루틴이 쌓이면 자율신경이 서서히 안정돼요 🌙',
+    coverEmoji: '🧠', coverGradient: 'linear-gradient(135deg,#ede9fe,#ddd6fe)',
+    tags: ['mental_brain'], likes: 187,
+    comments: [
+      { id: 'c20', authorName: '번아웃중', authorEmoji: '😮‍💨', text: '오후 카페인 끊었더니 진짜 잠이 잘 와요', createdAt: new Date(Date.now() - 12000000).toISOString() },
+    ],
+  },
+  {
+    id: 'official-12', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 40).toISOString(),
+    type: 'tip', title: '장-피부 축 관리로 속건조 잡는 법',
+    content: '겉만 촉촉하게 바르는 걸로는 한계가 있어요, 피부는 장에서 시작돼요 ✨\n\n✅ 장-피부 축을 살리는 습관\n• 발효식품(요거트, 김치) 매일 조금씩\n• 정제당·밀가루 줄이기 — 인슐린 스파이크가 여드름·홍조를 유발해요\n• 오메가3(등푸른생선, 아마씨유)로 염증 반응 낮추기\n• 물 하루 1.5L 이상, 특히 기상 직후 한 잔\n\n💧 속건조 홍조가 있다면 장 염증부터 의심해보세요. 2~3주만 식단을 바꿔도 피부 결이 달라지는 걸 느낄 수 있어요.',
+    coverEmoji: '✨', coverGradient: 'linear-gradient(135deg,#fef3c7,#fcd34d)',
+    tags: ['skin_beauty'], likes: 176,
+    comments: [],
+  },
+  {
+    id: 'official-13', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 55).toISOString(),
+    type: 'tip', title: '하체 부종 빼는 림프 마사지 루틴',
+    content: '퇴근 후 붓기 심한 다리, 이렇게 풀어보세요 🦴\n\n① 종아리 쓸어올리기\n발목→무릎 방향으로 손바닥 전체로 10회씩\n\n② 무릎 뒤 림프절 자극\n무릎 뒤를 가볍게 원 그리며 20초 눌러주기\n\n③ 벽에 다리 올리고 5분 눕기\n골반 정맥 울혈이 풀리고 순환이 촉진돼요\n\n④ 폼롤러로 허벅지 바깥쪽 풀기\n좌우 각 1분씩\n\n💡 오래 서있거나 앉아있는 직업이라면 2시간마다 종아리 펌프 운동(까치발 20회)만 해줘도 부종이 확 줄어요!',
+    coverEmoji: '🦴', coverGradient: 'linear-gradient(135deg,#cffafe,#67e8f9)',
+    tags: ['musculoskeletal_lymph'], likes: 165,
+    comments: [
+      { id: 'c21', authorName: '하체부종러', authorEmoji: '🦵', text: '벽에 다리 올리기 매일 하는데 진짜 효과 좋아요', createdAt: new Date(Date.now() - 30000000).toISOString() },
+    ],
+  },
+  {
+    id: 'official-14', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - 3600000 * 70).toISOString(),
+    type: 'tip', title: '갑상선·자궁 건강, 셀프로 체크하는 법',
+    content: '병원 가기 전, 집에서 미리 살펴볼 수 있는 신호들이에요 🩺\n\n✅ 갑상선 이상 신호\n• 이유 없이 추위를 많이 타거나 반대로 열감이 심함\n• 목 앞쪽이 부어 보이거나 삼킬 때 이물감\n• 급격한 체중 변화 (원인 불명)\n\n✅ 자궁·난소 이상 신호\n• 기초체온이 2주 이상 고온기를 유지하지 못함\n• 생리 주기가 두 달 연속 21일 미만 또는 40일 초과\n• 생리량이 갑자기 2배 이상 늘거나 줄어듦\n\n⚠️ 위 신호가 2개 이상 겹치면 정기 검진을 앞당기는 걸 권해요. 조기에 발견하면 관리가 훨씬 쉬워요.',
+    coverEmoji: '🩺', coverGradient: 'linear-gradient(135deg,#dbeafe,#93c5fd)',
+    tags: ['organ_monitoring'], likes: 209,
+    comments: [],
   },
 ]
 
@@ -251,14 +331,25 @@ function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
 }
 
-const TAG_META: Record<HealthMode, { color: string; bg: string; emoji: string }> = {
-  임신:    { color: '#16a34a', bg: 'rgba(22,163,74,0.1)',  emoji: '🤰' },
-  다이어트: { color: '#2563eb', bg: 'rgba(37,99,235,0.1)',  emoji: '🥗' },
-  항암:    { color: '#7c3aed', bg: 'rgba(124,58,237,0.1)', emoji: '💜' },
-  갱년기:  { color: '#d97706', bg: 'rgba(217,119,6,0.1)',  emoji: '🌸' },
-  일반:    { color: '#e11d5a', bg: 'rgba(225,29,90,0.1)',  emoji: '✨' },
+// 케어카드(src/data/careCases.ts) 11종 기준으로 피드 카테고리를 구성
+const CARE_BY_ID = Object.fromEntries(CARE_CASES.map(c => [c.id, c]))
+
+const CARE_SHORT: Record<string, string> = {
+  hair_scalp: '탈모', weight_metabolic: '체중', male_wellness: '남성웰니스',
+  posture_correction: '체형교정', gut_detox: '장건강', mental_brain: '멘탈',
+  hormone_female: '호르몬', disease_postcare: '질환관리', skin_beauty: '피부',
+  musculoskeletal_lymph: '근골격', organ_monitoring: '모니터링',
 }
-const ALL_MODES = Object.keys(TAG_META) as HealthMode[]
+
+function careAccent(gradient: string) {
+  return gradient.match(/#[0-9a-fA-F]{6}/)?.[0] ?? '#f43f75'
+}
+
+function careMeta(id: string) {
+  const c = CARE_BY_ID[id]
+  if (!c) return { label: id, Icon: undefined, color: '#94a3b8', bg: 'rgba(148,163,184,0.12)' }
+  return { label: CARE_SHORT[id] ?? c.label, Icon: c.icon, color: careAccent(c.gradient), bg: c.bg }
+}
 
 const AUTHOR_EMOJIS = ['🌸','🌿','💪','✨','🦋','🌻','🍀','💜','🌺','🌙','⭐','🔥','🎯','🌈']
 
@@ -325,12 +416,15 @@ function PostCard({
             <span className="text-[11px] text-slate-400">{timeAgo(post.createdAt)}</span>
             <span className="text-slate-300">·</span>
             <span className="text-[11px]">🌐</span>
-            {post.tags.map(t => (
-              <span key={t} className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                style={{ background: TAG_META[t].bg, color: TAG_META[t].color }}>
-                {TAG_META[t].emoji} {t}
-              </span>
-            ))}
+            {post.tags.map(t => {
+              const meta = careMeta(t)
+              return (
+                <span key={t} className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                  style={{ background: meta.bg, color: meta.color }}>
+                  {meta.Icon && <meta.Icon className="w-2.5 h-2.5" />} {meta.label}
+                </span>
+              )
+            })}
           </div>
         </div>
         <div className="relative">
@@ -521,19 +615,11 @@ function WriteModal({
   const [images,    setImages]    = useState<string[]>([])
   const [content,   setContent]   = useState('')
   const [type,      setType]      = useState<'recipe' | 'tip'>('recipe')
-  const [tags,      setTags]      = useState<HealthMode[]>([])
+  const [tags,      setTags]      = useState<string[]>([])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const MAX_IMAGES = 10
-
-  const coverGradients: Record<HealthMode, string> = {
-    임신: 'linear-gradient(135deg,#d1fae5,#6ee7b7)',
-    다이어트: 'linear-gradient(135deg,#dbeafe,#93c5fd)',
-    항암: 'linear-gradient(135deg,#ede9fe,#c4b5fd)',
-    갱년기: 'linear-gradient(135deg,#fef3c7,#fde68a)',
-    일반: 'linear-gradient(135deg,#ffe4e6,#fecdd3)',
-  }
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -562,7 +648,7 @@ function WriteModal({
       type, title: firstLine, content: content.trim(),
       images: images.length > 0 ? images : undefined,
       coverEmoji: type === 'recipe' ? '🍽️' : '💡',
-      coverGradient: tags[0] ? coverGradients[tags[0]] : 'linear-gradient(135deg,#fce7f3,#ede9fe)',
+      coverGradient: tags[0] ? CARE_BY_ID[tags[0]]?.gradient : 'linear-gradient(135deg,#fce7f3,#ede9fe)',
       tags,
     })
   }
@@ -662,19 +748,20 @@ function WriteModal({
 
           {/* Tags */}
           <div>
-            <p className="text-xs font-bold text-slate-500 mb-2">카테고리 <span className="font-normal text-slate-400">(복수 선택)</span></p>
+            <p className="text-xs font-bold text-slate-500 mb-2">케어카드 <span className="font-normal text-slate-400">(복수 선택)</span></p>
             <div className="flex flex-wrap gap-2">
-              {ALL_MODES.map(m => {
-                const on = tags.includes(m)
-                const meta = TAG_META[m]
+              {CARE_CASES.map(c => {
+                const on = tags.includes(c.id)
+                const meta = careMeta(c.id)
+                const Icon = meta.Icon
                 return (
-                  <button key={m} onClick={() => setTags(prev => on ? prev.filter(t => t !== m) : [...prev, m])}
-                    className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
+                  <button key={c.id} onClick={() => setTags(prev => on ? prev.filter(t => t !== c.id) : [...prev, c.id])}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border"
                     style={on
                       ? { background: meta.bg, borderColor: meta.color, color: meta.color }
                       : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }
                     }>
-                    {meta.emoji} {m}
+                    {Icon && <Icon className="w-3 h-3" />} {meta.label}
                   </button>
                 )
               })}
@@ -693,7 +780,7 @@ export default function NutritionPage() {
   const [posts,     setPosts]      = useState<SnsPost[]>([])
   const [liked,     setLiked]      = useState<Set<string>>(new Set())
   const [saved,     setSaved]      = useState<Set<string>>(new Set())
-  const [filter,    setFilter]     = useState<HealthMode | 'all'>('all')
+  const [filter,    setFilter]     = useState<string>('all')
   const [query,     setQuery]      = useState('')
   const [showWrite, setShowWrite]  = useState(false)
 
@@ -713,17 +800,17 @@ export default function NutritionPage() {
     .filter(p => {
       if (!query.trim()) return true
       const q = query.trim().toLowerCase()
-      // 해시태그 검색: #임신 → tags에서 검색
+      // 해시태그 검색: #탈모 → 케어카드 라벨에서 검색
       if (q.startsWith('#')) {
         const tag = q.slice(1)
-        return p.tags.some(t => t.toLowerCase().includes(tag)) ||
+        return p.tags.some(t => careMeta(t).label.toLowerCase().includes(tag)) ||
                p.type.toLowerCase().includes(tag)
       }
       // 일반 검색: 제목·내용·작성자·태그 전체
       return p.title.toLowerCase().includes(q) ||
              p.content.toLowerCase().includes(q) ||
              p.authorName.toLowerCase().includes(q) ||
-             p.tags.some(t => t.toLowerCase().includes(q))
+             p.tags.some(t => careMeta(t).label.toLowerCase().includes(q))
     })
 
   const handleLike = useCallback((id: string) => {
@@ -809,21 +896,25 @@ export default function NutritionPage() {
           )}
         </div>
 
-        {/* Category filter — stories style */}
+        {/* Category filter — 케어카드별 피드, stories style */}
         <div className="flex gap-0 overflow-x-auto scrollbar-hide px-4 pt-2 pb-3 max-w-lg mx-auto">
-          {([{ key: 'all', emoji: '🏠', label: '전체' }, ...ALL_MODES.map(m => ({ key: m, emoji: TAG_META[m].emoji, label: m }))]).map(({ key, emoji, label }) => {
-            const on = filter === key
+          {(['all', ...CARE_CASES.map(c => c.id)]).map(id => {
+            const on = filter === id
+            const isAll = id === 'all'
+            const c = isAll ? undefined : CARE_BY_ID[id]
+            const gradient = isAll ? 'linear-gradient(135deg,#fce7f3,#ede9fe)' : c!.gradient
+            const Icon = c?.icon
             return (
-              <button key={key}
-                onClick={() => setFilter(key as HealthMode | 'all')}
+              <button key={id}
+                onClick={() => setFilter(id)}
                 className="flex flex-col items-center gap-1 mr-4 flex-shrink-0 transition-all">
-                <div className={cn('w-14 h-14 rounded-full flex items-center justify-center text-2xl transition-all',
+                <div className={cn('w-14 h-14 rounded-full flex items-center justify-center transition-all',
                   on ? 'ring-2 ring-offset-2 ring-rose-400' : 'ring-1 ring-slate-200')}
-                  style={{ background: on ? 'linear-gradient(135deg,#fce7f3,#ede9fe)' : '#f8fafc' }}>
-                  {emoji}
+                  style={{ background: on ? gradient : '#f8fafc' }}>
+                  {isAll ? <span className="text-2xl">🏠</span> : Icon && <Icon className="w-5 h-5" style={{ color: on ? '#fff' : careAccent(gradient) }} />}
                 </div>
-                <span className={cn('text-[10px] font-semibold', on ? 'text-rose-500' : 'text-slate-500')}>
-                  {label}
+                <span className={cn('text-[10px] font-semibold whitespace-nowrap', on ? 'text-rose-500' : 'text-slate-500')}>
+                  {isAll ? '전체' : CARE_SHORT[id] ?? c!.label}
                 </span>
               </button>
             )

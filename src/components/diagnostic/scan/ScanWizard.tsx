@@ -9,10 +9,13 @@ import {
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
+import type { MultimodalData, IrisLesion, IrisEyeDetection } from '@/components/calendar/LudiaInsightCard'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 import { useOnboardingProfile } from '@/lib/onboarding-profile'
 import { useDiagnosticHistory } from '@/lib/diagnosticHistory'
+import {
+  LesionChips, LesionList, LesionOverlay, LesionResetButton, canSelectLesions, useLesionSelection,
+} from '@/components/diagnostic/IrisLesionViewer'
 
 /* ── utils ──────────────────────────────────────────────────────── */
 const rng  = (a: number, b: number) => Math.floor(a + Math.random() * (b - a))
@@ -37,7 +40,48 @@ interface EyeData {
   skinZone: number
   thyroidZone: number
   annotatedImg: string | null
+  baseImg?: string | null
+  imageSize?: IrisEyeDetection['imageSize']
+  excluded?: IrisEyeDetection['excluded']
   isReal: boolean
+  lesions?: IrisLesion[]
+  lesionSummary?: IrisEyeDetection['lesionSummary']
+  disclaimer?: string
+  model?: IrisEyeDetection['model']
+}
+
+/* 주석 이미지를 리포트 기록(localStorage)에 넣을 수 있도록 축소 — 실패하면 원본 그대로 */
+function shrinkDataUrl(src: string, maxDim = 480, quality = 0.75): Promise<string> {
+  return new Promise(resolve => {
+    const img = new Image()
+    img.onload = () => {
+      const s = Math.min(maxDim / Math.max(img.width, img.height), 1)
+      const c = document.createElement('canvas')
+      c.width = Math.round(img.width * s); c.height = Math.round(img.height * s)
+      const ctx = c.getContext('2d')
+      if (!ctx) { resolve(src); return }
+      ctx.drawImage(img, 0, 0, c.width, c.height)
+      resolve(c.toDataURL('image/jpeg', quality))
+    }
+    img.onerror = () => resolve(src)
+    img.src = src
+  })
+}
+
+async function toDetection(d: EyeData): Promise<IrisEyeDetection | undefined> {
+  if (!d.isReal) return undefined
+  return {
+    score:         d.score,
+    // 원본 이미지를 기준으로 병소를 다시 그릴 수 있으면 주석 이미지는 저장하지 않는다
+    annotatedImg:  !d.baseImg && d.annotatedImg ? await shrinkDataUrl(d.annotatedImg) : null,
+    baseImg:       d.baseImg ? await shrinkDataUrl(d.baseImg) : null,
+    imageSize:     d.imageSize,
+    excluded:      d.excluded,
+    lesions:       d.lesions ?? [],
+    lesionSummary: d.lesionSummary ?? [],
+    model:         d.model,
+    disclaimer:    d.disclaimer,
+  }
 }
 
 function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
@@ -57,6 +101,9 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
   const [uploadErr, setUploadErr] = useState<string | null>(null)
 
   const currentData = eyeStep === 'right' ? rightData : leftData
+  const lesionSel   = useLesionSelection(eyeStep)
+  const selectable  = !!currentData?.lesions && canSelectLesions(currentData)
+  const resultImg   = selectable ? currentData!.baseImg! : currentData?.annotatedImg ?? null
 
   /* cleanup on unmount */
   useEffect(() => {
@@ -85,15 +132,14 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
     }
   }
 
-  /* image upload handler */
-  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+  /* 사진(업로드 파일 또는 카메라 프레임) → LUDIA LAB 병소 모델 분석 */
+  async function analyzeImage(blob: Blob, name: string) {
     setUploadErr(null)
     setPhase('uploading')
     try {
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', blob, name)
+      fd.append('eye', eyeStep)
       const irisServiceUrl = process.env.NEXT_PUBLIC_IRIS_SERVICE_URL
       const endpoint = irisServiceUrl
         ? `${irisServiceUrl}/analyze/detailed`
@@ -102,16 +148,21 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       let data: Record<string, unknown> | null = null
       try {
         const resp = await fetch(endpoint, { method: 'POST', body: fd })
-        if (resp.ok) {
-          const text = await resp.text()
-          if (text) data = JSON.parse(text)
-        }
+        const text = await resp.text()
+        if (text) data = JSON.parse(text)
       } catch {
         // 서비스 미연결 — 시뮬레이션 폴백
       }
 
-      // 서비스 응답이 없거나 에러면 시뮬레이션 데이터 사용
-      if (!data || data.error) {
+      // 서비스가 오류를 알려준 경우(모델 미설치·홍채 인식 실패 등)는 가짜 결과로 덮지 않고 그대로 보여준다
+      if (data?.error) {
+        setUploadErr(String(data.error))
+        setPhase('idle')
+        return
+      }
+
+      // 서비스 자체에 연결되지 않으면 데모 데이터
+      if (!data) {
         const eyeData: EyeData = {
           score:        rng(58, 88),
           skinZone:     rng(42, 78),
@@ -126,11 +177,18 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       }
 
       const eyeData: EyeData = {
-        score:        eyeStep === 'right' ? (data.rightScore as number) : (data.leftScore as number),
-        skinZone:     data.skinZone as number,
-        thyroidZone:  data.thyroidZone as number,
-        annotatedImg: (data.annotatedImage as string) ?? null,
-        isReal:       true,
+        score:         eyeStep === 'right' ? (data.rightScore as number) : (data.leftScore as number),
+        skinZone:      data.skinZone as number,
+        thyroidZone:   data.thyroidZone as number,
+        annotatedImg:  (data.annotatedImage as string) ?? null,
+        baseImg:       (data.baseImage as string) ?? null,
+        imageSize:     data.imageSize as EyeData['imageSize'],
+        excluded:      data.excluded as EyeData['excluded'],
+        isReal:        true,
+        lesions:       (data.lesions as IrisLesion[]) ?? [],
+        lesionSummary: (data.lesionSummary as EyeData['lesionSummary']) ?? [],
+        disclaimer:    data.disclaimer as string | undefined,
+        model:         data.model as EyeData['model'],
       }
       if (eyeStep === 'right') setRightData(eyeData)
       else                     setLeftData(eyeData)
@@ -138,9 +196,28 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
     } catch (err) {
       setUploadErr(err instanceof Error ? err.message : '분석 실패')
       setPhase('idle')
+    }
+  }
+
+  /* image upload handler */
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      await analyzeImage(file, file.name || 'iris.jpg')
     } finally {
       if (fileRef.current) fileRef.current.value = ''
     }
+  }
+
+  /* 카메라 현재 프레임을 원본 해상도(좌우반전 없이)로 캡처 */
+  function captureFrame(): Promise<Blob | null> {
+    const v = videoRef.current
+    if (!v || !v.videoWidth) return Promise.resolve(null)
+    const c = document.createElement('canvas')
+    c.width = v.videoWidth; c.height = v.videoHeight
+    c.getContext('2d')!.drawImage(v, 0, 0)
+    return new Promise(res => c.toBlob(res, 'image/jpeg', 0.92))
   }
 
   /* go to left eye */
@@ -152,14 +229,16 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
   }
 
   /* finish — combine both eye results */
-  function finish() {
+  async function finish() {
     const r = rightData!
     const l = leftData!
+    const [right, left] = await Promise.all([toDetection(r), toDetection(l)])
     onDone({
       rightScore:  r.score,
       leftScore:   l.score,
       skinZone:    Math.round((r.skinZone  + l.skinZone)  / 2),
       thyroidZone: Math.round((r.thyroidZone + l.thyroidZone) / 2),
+      ...(right || left ? { detection: { right, left } } : {}),
     })
   }
 
@@ -288,24 +367,29 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       p+=1.8; setPct(Math.min(100,Math.floor(p)))
       if (p>=100) {
         clearInterval(iv); setPhase('captured')
-        setTimeout(()=>{
-          setPhase('analyzing')
+        captureFrame().then(blob => {
+          if (blob) { analyzeImage(blob, `iris-${eyeStep}.jpg`); return }
+          // 카메라 프레임이 없으면(시뮬레이션 화면) 데모 결과
           setTimeout(()=>{
-            const eyeData: EyeData = {
-              score:        rng(58, 88),
-              skinZone:     rng(42, 78),
-              thyroidZone:  rng(62, 88),
-              annotatedImg: null,
-              isReal:       false,
-            }
-            if (eyeStep === 'right') setRightData(eyeData)
-            else                     setLeftData(eyeData)
-            setPhase('done')
-          },1800)
-        },900)
+            setPhase('analyzing')
+            setTimeout(()=>{
+              const eyeData: EyeData = {
+                score:        rng(58, 88),
+                skinZone:     rng(42, 78),
+                thyroidZone:  rng(62, 88),
+                annotatedImg: null,
+                isReal:       false,
+              }
+              if (eyeStep === 'right') setRightData(eyeData)
+              else                     setLeftData(eyeData)
+              setPhase('done')
+            },1800)
+          },900)
+        })
       }
     },55)
     return ()=>clearInterval(iv)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[phase, eyeStep])
 
   const eyeLabel = eyeStep === 'right' ? '오른쪽 눈' : '왼쪽 눈'
@@ -351,9 +435,15 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
           style={{transform:'scaleX(-1)'}} />
 
         {/* 결과 이미지 */}
-        {phase==='done' && currentData?.annotatedImg && (
+        {phase==='done' && currentData && resultImg && (
           <>
-            <img src={currentData.annotatedImg} alt={`${eyeLabel} 홍채 인식 결과`} className="absolute inset-0 w-full h-full object-contain" />
+            <img src={resultImg} alt={`${eyeLabel} 홍채 인식 결과`} className="absolute inset-0 w-full h-full object-contain" />
+            {selectable && (
+              <>
+                <LesionOverlay d={{ imageSize: currentData.imageSize, lesions: currentData.lesions!, lesionSummary: currentData.lesionSummary ?? [] }} sel={lesionSel.sel} />
+                <LesionResetButton d={{ lesions: currentData.lesions! }} sel={lesionSel.sel} onClear={lesionSel.clear} />
+              </>
+            )}
             <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
               <Eye className="w-3 h-3 text-green-400"/>
               <span className="text-[10px] text-white">{eyeLabel} 인식 완료</span>
@@ -361,17 +451,18 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
             <div className="absolute bottom-3 right-3 flex items-center gap-3 px-2.5 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-[9px] text-white">
               <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#1edc5a'}}/> 홍채</span>
               <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#00c8ff'}}/> 동공</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2.5 h-0.5 rounded" style={{background:'#ff50ff'}}/> 눈꺼풀</span>
             </div>
           </>
         )}
 
         {/* 시뮬레이션 캔버스 (카메라 미연결 상태) */}
-        {cam !== 'live' && !(phase==='done' && currentData?.annotatedImg) && (
+        {cam !== 'live' && !(phase==='done' && resultImg) && (
           <canvas ref={simRef} width={420} height={320} className="w-full h-full" />
         )}
 
         {/* 상태 배지 */}
-        {!(phase==='done' && currentData?.annotatedImg) && (
+        {!(phase==='done' && resultImg) && (
           <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-sm">
             {cam==='live'
               ? <><Camera className="w-3 h-3 text-green-400"/><span className="text-[10px] text-white">카메라 연결됨</span></>
@@ -418,7 +509,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
               <div className={cn('text-2xl font-bold font-display', currentData.score>=70?'text-green-600':'text-amber-600')}>
                 {currentData.score}
               </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{eyeLabel} 밀도</div>
+              <div className="text-[10px] text-slate-500 mt-0.5">{eyeLabel} 점수</div>
             </div>
             <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
               <div className={cn('text-2xl font-bold font-display', currentData.skinZone>=70?'text-green-600':'text-amber-600')}>
@@ -433,9 +524,27 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
               <div className="text-[10px] text-slate-500 mt-0.5">갑상선 Zone</div>
             </div>
           </div>
+          {currentData.isReal && currentData.lesions && (
+            <div className="rounded-xl p-3 space-y-2" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
+              <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">
+                감지된 홍채 병소 {currentData.lesions.length}개
+              </p>
+              {currentData.model && !currentData.model.reliable && (
+                <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">
+                  ⚠ 병소 모델이 아직 학습 초기 단계입니다
+                  {currentData.model.trainImages != null && ` (학습 사진 ${currentData.model.trainImages}장`}
+                  {currentData.model.valMiou != null && `, 검증 정확도 mIoU ${currentData.model.valMiou.toFixed(2)}`}
+                  {currentData.model.trainImages != null && ')'} — 아래 결과는 참고용으로도 신뢰하기 어렵습니다.
+                </p>
+              )}
+              <LesionChips d={{ lesionSummary: currentData.lesionSummary ?? [] }} sel={lesionSel.sel} onToggle={lesionSel.toggle} interactive={selectable} />
+              <LesionList d={{ lesions: currentData.lesions, excluded: currentData.excluded }} sel={lesionSel.sel} onToggle={lesionSel.toggle} interactive={selectable} />
+              {currentData.disclaimer && <p className="text-[10px] text-slate-400">* {currentData.disclaimer}</p>}
+            </div>
+          )}
           {!currentData.isReal && (
             <p className="text-[10px] text-center text-slate-400">
-              * 데모 모드 — 로컬 실행 시 실제 AI 홍채 분석 결과가 표시됩니다
+              * 데모 모드 — 홍채 분석 서비스에 연결되지 않아 예시 값이 표시됩니다
             </p>
           )}
         </>

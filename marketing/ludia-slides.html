@@ -1,0 +1,1561 @@
+<title>LUDIA 슬라이드</title>
+<style>
+
+  :root{
+    --wine-900:#3E0A20;
+    --wine-700:#7A1740;
+    --wine-500:#9C1F52;
+    --gold:#C9A45C;
+    --gold-soft:#E3CFA0;
+    --cream:#FBF6EC;
+    --cream-panel:#FFFFFF;
+    --ink:#241512;
+    --ink-soft:#5A4A45;
+    --muted:#8A7972;
+    --blush:#F5DCE6;
+    --blush-line:#E9BCD1;
+    --line-onlight:#E7DCCE;
+    --line-ondark:rgba(255,255,255,0.16);
+    --display:'Noto Sans KR','Archivo Black',sans-serif;
+    --latin-display:'Archivo Black','Noto Sans KR',sans-serif;
+    --sans:'IBM Plex Sans KR','IBM Plex Sans',system-ui,-apple-system,sans-serif;
+    --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',monospace;
+  }
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  *{box-sizing:border-box;}
+  h1,h2,h3{font-family:var(--display); font-weight:900; color:var(--ink); text-wrap:balance; margin:0;}
+  p{margin:0;}
+  a{color:inherit;}
+  .wrap{max-width:900px; margin:0 auto; padding-inline:22px;}
+  .eyebrow{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+    font-weight:500;
+  }
+  .eyebrow.on-light{ color:var(--wine-500); }
+  .eyebrow.on-dark{ color:var(--gold); }
+  .rule{ width:38px; height:2px; margin-top:10px; }
+  .rule.on-light{ background:var(--wine-500); }
+  .rule.on-dark{ background:var(--gold); }
+
+  /* ---------- nav ---------- */
+  .nav{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:40;
+    background:rgba(251,246,236,0.9);
+    backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--line-onlight);
+  }
+  .nav-inner{
+    max-width:900px; margin:0 auto; padding:12px 22px;
+    display:flex; align-items:center; gap:16px; overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .nav-inner::-webkit-scrollbar{display:none;}
+  .nav-brand{ display:flex; align-items:center; gap:8px; padding-right:8px; border-right:1px solid var(--line-onlight); white-space:nowrap; }
+  .nav-brand img{ width:20px; height:20px; border-radius:6px; }
+  .nav-brand span{ font-family:var(--latin-display); font-size:13px; color:var(--wine-700); letter-spacing:.02em; }
+  .nav-links{display:flex; gap:16px; white-space:nowrap;}
+  .nav-links a{ font-size:12px; color:var(--muted); text-decoration:none; font-weight:600; padding:4px 2px; border-bottom:1px solid transparent; }
+  .nav-links a:hover{ color:var(--wine-500); border-bottom-color:var(--wine-500); }
+
+  /* ---------- hero ---------- */
+  .hero{
+    position:relative; overflow:hidden; color:#fff;
+    background:
+      radial-gradient(ellipse 640px 480px at 88% -6%, #B23A67, transparent 60%),
+      linear-gradient(160deg, var(--wine-500), var(--wine-900) 75%);
+  }
+  .hero-inner{ max-width:900px; margin:0 auto; padding:64px 22px 52px; position:relative; }
+  .ring{ position:absolute; right:-100px; top:-80px; width:360px; height:360px; opacity:.35; pointer-events:none; }
+  .hero-badge{ display:flex; align-items:center; gap:12px; margin-bottom:30px; }
+  .hero-badge img{ width:44px; height:44px; border-radius:12px; box-shadow:0 6px 20px rgba(0,0,0,0.35); }
+  .hero-badge .name{ font-family:var(--latin-display); font-size:15px; letter-spacing:.05em; color:#fff; }
+  .hero h1{
+    font-family:var(--latin-display); color:#F7EFE3; font-weight:400;
+    font-size:clamp(52px,12vw,104px); line-height:.92; letter-spacing:-.01em;
+  }
+  .hero .kr-sub{
+    font-family:var(--display); font-weight:900; font-size:clamp(19px,3vw,24px);
+    color:#fff; margin-top:16px;
+  }
+  .hero .greek{ font-family:var(--mono); font-size:12px; letter-spacing:.1em; color:var(--gold-soft); margin-top:6px; }
+  .hero .quote{
+    margin-top:30px; max-width:34ch; font-family:var(--display); font-weight:700;
+    font-size:clamp(19px,3.4vw,25px); line-height:1.5; color:#fff;
+    border-left:2px solid var(--gold); padding-left:16px;
+  }
+  .hero .tagline{ margin-top:22px; font-size:13.5px; color:rgba(255,255,255,0.72); max-width:48ch; }
+
+  /* ---------- sections ---------- */
+  section{ padding:60px 0; }
+  .on-light{ background:var(--cream); color:var(--ink); }
+  .on-dark{ background:linear-gradient(175deg, var(--wine-700), var(--wine-900)); color:#fff; }
+  .sec-head{ margin-bottom:30px; }
+  .sec-head h2{ font-size:clamp(23px,3.6vw,32px); margin-top:10px; }
+  .on-dark .sec-head h2{ color:#fff; }
+  .lede{ font-size:15px; max-width:64ch; margin-bottom:8px; }
+  .on-light .lede{ color:var(--ink-soft); }
+  .on-dark .lede{ color:rgba(255,255,255,0.82); }
+
+  .story-body{ display:flex; flex-direction:column; gap:16px; max-width:62ch; font-size:15px; }
+  .on-light .story-body{ color:var(--ink-soft); }
+  .on-dark .story-body{ color:rgba(255,255,255,0.85); }
+
+  .pullquote{
+    margin-top:26px; padding:18px 20px; border-radius:2px;
+    font-family:var(--display); font-weight:900; font-size:17px; line-height:1.5;
+  }
+  .on-light .pullquote{ background:var(--blush); color:var(--wine-700); border-left:3px solid var(--wine-500); }
+  .on-dark .pullquote{ background:rgba(255,255,255,0.08); color:var(--gold-soft); border-left:3px solid var(--gold); }
+
+  /* promise cards */
+  .axis-list{ display:flex; flex-direction:column; margin-top:20px; border-top:1px solid var(--line-ondark); }
+  .axis-row{
+    display:grid; grid-template-columns:36px 190px 1fr; gap:14px; align-items:baseline;
+    padding:10px 0; border-bottom:1px solid var(--line-ondark);
+  }
+  .axis-num{ font-family:var(--mono); color:var(--gold); font-size:13px; font-weight:700; }
+  .axis-row b{ font-family:var(--display); font-weight:800; font-size:14.5px; color:#fff; }
+  .axis-row span{ font-size:13px; color:rgba(255,255,255,0.75); }
+  .axis-note{ margin-top:14px; font-size:13px; font-weight:600; color:var(--gold-soft); }
+
+  .promise-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:30px; }
+  .promise-card{ background:#fff; border-radius:2px; padding:22px 20px; border-top:3px solid var(--gold); }
+  .promise-num{ font-family:var(--mono); font-size:24px; font-weight:600; color:var(--blush-line); }
+  .promise-card .k{ font-family:var(--mono); font-size:10.5px; letter-spacing:.12em; color:var(--gold); font-weight:600; margin-top:10px; display:block; }
+  .promise-card h3{ font-family:var(--display); font-weight:900; font-size:16px; color:var(--wine-700); margin-top:6px; }
+  .promise-card p{ font-size:13px; color:var(--ink-soft); margin-top:8px; line-height:1.55; }
+
+  .iris-note{
+    margin-top:36px; display:grid; grid-template-columns:240px 1fr; gap:20px; align-items:start;
+    background:rgba(255,255,255,0.06); padding:20px; border-radius:2px; border:1px solid var(--line-ondark);
+  }
+  .iris-note svg{ width:52px; height:52px; flex-shrink:0; }
+  .iris-note p{ font-size:13.5px; color:rgba(255,255,255,0.8); }
+  .iris-photo{ border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.14); }
+  .iris-photo img{ width:100%; display:block; aspect-ratio:4/3; object-fit:cover; }
+  .iris-photo-cap{ display:block; font-family:var(--mono); font-size:9.5px; color:rgba(255,255,255,0.55); margin-top:7px; line-height:1.4; }
+  .iris-strip{ margin-top:12px; }
+  .iris-strip img{ width:100%; display:block; border-radius:4px; border:1px solid rgba(255,255,255,0.14); }
+  .iris-strip-cap{ display:block; font-family:var(--mono); font-size:9.5px; color:rgba(255,255,255,0.5); margin-top:5px; }
+
+  .epi-title{ font-family:var(--display); font-weight:900; font-size:22px; color:#fff; margin-bottom:16px; }
+  .epi-qa{
+    background:rgba(255,255,255,0.07); border-left:2px solid var(--gold); padding:14px 18px;
+    border-radius:2px; margin-bottom:16px;
+  }
+  .epi-qa .q{ font-size:13.5px; color:rgba(255,255,255,0.6); }
+  .epi-qa .a{ font-family:var(--display); font-weight:700; font-size:16px; color:var(--gold-soft); margin-top:5px; }
+  .epi-desc{ font-size:14px; color:rgba(255,255,255,0.82); line-height:1.6; margin-bottom:18px; max-width:none; }
+  .epi-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .epi-card{ padding:16px 18px; border-radius:4px; }
+  .epi-card.on{ background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.32); }
+  .epi-card.off{ background:rgba(34,197,94,0.12); border:1px solid rgba(34,197,94,0.32); }
+  .epi-card .tag{ font-family:var(--display); font-weight:800; font-size:13.5px; display:block; }
+  .epi-card.on .tag{ color:#fca5a5; }
+  .epi-card.off .tag{ color:#86efac; }
+  .epi-card p{ font-size:12.5px; color:rgba(255,255,255,0.78); margin-top:9px; line-height:1.5; }
+  .epi-card .arrow{ font-weight:600; margin-top:7px; }
+  .epi-card.on .arrow{ color:#fca5a5; }
+  .epi-card.off .arrow{ color:#86efac; }
+  .epi-closing{ margin-top:16px; font-size:14px; font-weight:600; color:var(--gold-soft); line-height:1.55; }
+
+  .epi-sub{ font-family:var(--display); font-weight:800; font-size:16px; color:#fff; margin-top:22px; margin-bottom:12px; }
+  .epi-en{ font-family:var(--mono); font-size:10px; color:var(--gold); font-weight:500; letter-spacing:.02em; }
+  .axis-row .epi-en{ display:inline-block; margin-top:2px; }
+
+  .cond-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .cond-card{
+    background:rgba(255,255,255,0.06); border:1px solid var(--line-ondark); border-radius:4px;
+    padding:14px 16px;
+  }
+  .cond-card b{ font-family:var(--display); font-weight:800; font-size:13.5px; color:#fff; display:block; }
+  .cond-card .epi-en{ display:block; margin-top:2px; margin-bottom:8px; }
+  .cond-mech{ font-size:11.5px; color:rgba(255,255,255,0.78); line-height:1.5; margin-bottom:8px; }
+  .sw-on, .sw-off{ font-size:11px; line-height:1.45; margin-top:5px; }
+  .sw-on{ color:#fca5a5; }
+  .sw-off{ color:#86efac; }
+
+  .epi-summary-quote{
+    margin-top:6px; padding:26px 30px; background:rgba(255,255,255,0.06);
+    border-left:2px solid var(--gold); border-radius:2px;
+  }
+  .epi-summary-quote > p{ font-family:var(--display); font-weight:700; font-size:17px; color:#fff; line-height:1.6; }
+  .epi-summary-quote ul{ list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .epi-summary-quote li{ font-size:14px; color:rgba(255,255,255,0.82); }
+  .epi-summary-quote li b{ color:var(--gold-soft); font-weight:700; }
+  .epi-summary-close{ margin-top:18px; font-size:14.5px; font-weight:600; color:var(--gold-soft); }
+  .iris-note .k{ font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; color:var(--gold); font-weight:600; display:block; margin-bottom:6px; }
+
+  /* flow */
+  .flow{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:6px; }
+  .flow-card{ background:#fff; border:1px solid var(--line-onlight); border-radius:2px; padding:18px 16px; position:relative; }
+  .flow-card .step{ font-family:var(--mono); font-size:10.5px; color:var(--wine-500); letter-spacing:.08em; font-weight:600; }
+  .flow-card h3{ font-family:var(--display); font-weight:800; font-size:14px; margin-top:8px; color:var(--ink); }
+  .flow-card p{ font-size:12.5px; color:var(--muted); margin-top:8px; line-height:1.5; }
+
+  /* care card grid */
+  .care-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line-onlight); border:1px solid var(--line-onlight); margin-top:16px; }
+  .care-cell{ background:#fff; padding:14px 15px; }
+  .care-cell .n{ font-family:var(--mono); font-size:10px; color:var(--gold); font-weight:700; }
+  .care-cell b{ display:block; font-family:var(--display); font-weight:800; font-size:13px; color:var(--ink); margin-top:4px; }
+  .care-cell span{ font-size:11.5px; color:var(--muted); display:block; margin-top:4px; line-height:1.5; }
+
+  /* hair type deep-dive */
+  .deepdive{ margin-top:44px; background:#fff; border:1px solid var(--line-onlight); border-radius:2px; padding:26px; }
+  .deepdive-head{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:18px; }
+  .deepdive-head h3{ font-family:var(--display); font-weight:900; font-size:18px; color:var(--wine-700); }
+  .deepdive-head span{ font-family:var(--mono); font-size:11px; color:var(--muted); }
+  .type-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .type-card{ border:1px solid var(--line-onlight); border-radius:2px; padding:14px; }
+  .type-dot{ width:9px; height:9px; border-radius:50%; margin-bottom:8px; }
+  .type-card b{ display:block; font-family:var(--display); font-weight:800; font-size:12.5px; color:var(--ink); line-height:1.4; }
+  .type-card .sub{ font-size:10.5px; color:var(--gold); font-family:var(--mono); margin-top:4px; display:block; }
+  .type-card p{ font-size:11.5px; color:var(--muted); margin-top:8px; line-height:1.55; }
+
+  .extra-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:36px; }
+  .extra-cell{ border-left:2px solid var(--wine-500); padding-left:14px; }
+  .extra-cell b{ display:block; font-family:var(--display); font-weight:800; font-size:14px; color:var(--ink); }
+  .extra-cell span{ font-size:12.5px; color:var(--muted); display:block; margin-top:5px; line-height:1.55; }
+
+  .commit-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:28px; }
+  .commit-chip{
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.03em; color:var(--gold);
+    border:1px solid rgba(201,164,92,0.45); padding:7px 14px; border-radius:100px;
+  }
+
+  /* footer */
+  footer.hero{ padding-bottom:calc(52px + env(safe-area-inset-bottom,0px)); }
+  .foot-inner{ max-width:900px; margin:0 auto; padding:56px 22px 0; text-align:center; position:relative; }
+  .foot-inner img{ width:64px; height:64px; border-radius:16px; margin-bottom:18px; box-shadow:0 10px 30px rgba(0,0,0,0.35); }
+  .foot-word{ font-family:var(--latin-display); font-weight:400; font-size:clamp(34px,7vw,52px); color:#F7EFE3; }
+  .foot-inner .kr{ font-family:var(--display); font-weight:900; font-size:13px; letter-spacing:.2em; color:rgba(255,255,255,0.7); margin-top:10px; }
+  .foot-line{ width:44px; height:1px; background:var(--gold); margin:22px auto; }
+  .foot-inner .closing{ font-family:var(--display); font-weight:700; font-size:15px; color:var(--gold-soft); }
+  .foot-inner .sub{ font-size:12px; color:rgba(255,255,255,0.5); margin-top:10px; }
+
+  /* ---------- full care guide ---------- */
+  .guide-intro{ margin-bottom:8px; }
+  .cat-acc{ border:1px solid var(--line-onlight); background:#fff; margin-top:14px; border-radius:2px; overflow:hidden; }
+  .cat-acc summary{
+    list-style:none; cursor:pointer; display:flex; align-items:center; gap:14px; padding:18px 20px;
+  }
+  .cat-acc summary::-webkit-details-marker{ display:none; }
+  .cat-num-badge{
+    font-family:var(--mono); font-size:11px; font-weight:700; color:#fff; background:var(--wine-700);
+    width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .cat-title{ font-family:var(--display); font-weight:800; font-size:15px; color:var(--ink); flex:1; }
+  .cat-count{ font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; }
+  .cat-caret{ font-family:var(--mono); font-size:20px; color:var(--wine-500); transition:transform .2s; flex-shrink:0; }
+  .cat-acc[open] .cat-caret{ transform:rotate(45deg); }
+  .cat-body{ padding:0 20px 26px; border-top:1px solid var(--line-onlight); }
+  .cat-intro{ font-size:13px; color:var(--ink-soft); padding-top:18px; margin:0 0 6px; line-height:1.65; }
+
+  .deep-type{ padding:22px 0; border-top:1px solid var(--line-onlight); }
+  .deep-type:first-of-type{ border-top:none; }
+  .deep-type-head{ display:flex; align-items:baseline; gap:12px; margin-bottom:12px; }
+  .dt-num{ font-family:var(--mono); font-size:20px; color:var(--blush-line); font-weight:700; }
+  .deep-type-head b{ font-family:var(--display); font-weight:800; font-size:14.5px; color:var(--wine-700); line-height:1.4; }
+  .dt-sub{ font-family:var(--mono); font-size:10.5px; color:var(--muted); display:block; margin-top:3px; }
+  .deep-type-grid{ display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .dt-label{ font-family:var(--mono); font-size:10px; letter-spacing:.1em; color:var(--gold); text-transform:uppercase; font-weight:700; }
+  .dt-col p{ font-size:12.5px; color:var(--ink-soft); line-height:1.62; margin-top:9px; }
+  .dt-col p b{ font-family:var(--sans); font-weight:700; color:var(--ink); }
+  .dt-mech{ background:var(--blush); padding:11px 13px; border-left:2px solid var(--wine-500); margin-top:11px !important; color:var(--wine-700) !important; font-weight:500; }
+  .dt-mech b{ color:var(--wine-700) !important; }
+
+  .service-example{ margin-top:22px; background:var(--wine-900); color:#fff; padding:18px 20px; border-radius:2px; }
+  .service-example .dt-label{ color:var(--gold); }
+  .service-example p{ font-size:12.5px; color:rgba(255,255,255,0.85); margin-top:9px; line-height:1.62; }
+  .service-example p b{ color:#fff; }
+  .service-example p i{ font-style:normal; color:var(--gold-soft); }
+
+  @media (max-width:760px){
+    .promise-grid, .flow, .care-grid, .type-grid, .extra-row, .deep-type-grid{ grid-template-columns:1fr; }
+    .ring{ width:220px; height:220px; right:-60px; top:-40px; }
+  }
+  @media (min-width:761px) and (max-width:900px){
+    .care-grid{ grid-template-columns:repeat(2,1fr); }
+  }
+
+  /* ================= SLIDE DECK ================= */
+  body{ background:#2A1220; }
+  .deck-toolbar{
+    position:sticky; top:0; z-index:50; display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding:12px 20px; background:rgba(20,10,15,0.92); backdrop-filter:blur(8px);
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .deck-toolbar .brand{ display:flex; align-items:center; gap:8px; color:#F7EFE3; font-family:var(--latin-display); font-size:14px; }
+  .deck-toolbar .brand img{ width:22px; height:22px; border-radius:6px; }
+  .deck-toolbar .hint{ font-size:11.5px; color:rgba(255,255,255,0.55); }
+  .pdf-btn{
+    font-family:var(--mono); font-size:12.5px; font-weight:600; letter-spacing:.02em;
+    background:var(--gold); color:var(--wine-900); border:none; padding:10px 18px; border-radius:100px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .pdf-btn:hover{ background:var(--gold-soft); }
+
+  .deck{ padding:32px 20px 80px; display:flex; flex-direction:column; align-items:center; gap:28px; counter-reset: slidenum 0 totalslides 28; }
+
+  .slide{
+    position:relative; width:100%; max-width:1180px; aspect-ratio:16/9; height:auto;
+    box-sizing:border-box; padding:5.5% 7%;
+    display:flex; flex-direction:column; justify-content:center;
+    border-radius:6px; box-shadow:0 20px 50px rgba(0,0,0,0.35);
+    overflow:visible;
+  }
+  .slide.on-light{ background:var(--cream); color:var(--ink); }
+  .slide.on-dark{ background:linear-gradient(160deg, var(--wine-500), var(--wine-900) 78%); color:#fff; }
+  .slide.on-dark h2{ color:#fff; }
+  .slide h2{ font-size:clamp(20px,3vw,30px); margin-top:10px; margin-bottom:14px; }
+  .slide .lede{ font-size:13.5px; max-width:70ch; margin-bottom:14px; }
+  .slide.on-light .lede{ color:var(--ink-soft); }
+  .slide.on-dark .lede{ color:rgba(255,255,255,0.82); }
+  .slide::after{
+    counter-increment: slidenum; content: counter(slidenum) " / " counter(totalslides,decimal);
+    position:absolute; bottom:5%; right:7%; font-family:var(--mono); font-size:10.5px;
+  }
+  .slide.on-light::after{ color:var(--muted); }
+  .slide.on-dark::after{ color:rgba(255,255,255,0.55); }
+
+  .slide-body p{ font-size:13px; margin-top:0; }
+  .slide-body{ display:flex; flex-direction:column; gap:10px; max-width:80ch; }
+  .slide .pullquote{ margin-top:18px; font-size:15px; }
+
+  .cover-slide{ align-items:center; text-align:center; }
+  .cover-slide .ring{ position:absolute; right:6%; top:4%; width:220px; height:220px; opacity:.35; }
+  .cover-slide .hero-badge{ display:flex; align-items:center; gap:14px; margin-bottom:22px; }
+  .cover-slide .hero-badge img{ width:54px; height:54px; border-radius:13px; }
+  .cover-slide .hero-badge .name{ font-family:var(--latin-display); font-size:18px; color:#fff; }
+  .cover-word{ font-family:var(--latin-display); font-weight:400; font-size:clamp(56px,9vw,104px); color:#F7EFE3; margin:6px 0; }
+  .cover-slide .quote{
+    font-family:var(--display); font-weight:700; font-size:clamp(14px,2vw,23px); line-height:1.5; color:#fff;
+    max-width:44ch; margin:14px auto 0;
+  }
+  .cover-slide .tagline{ margin-top:18px; font-size:12.5px; color:rgba(255,255,255,0.72); max-width:56ch; }
+  .cover-slide .foot-logo{ width:56px; height:56px; border-radius:14px; margin:0 auto 16px; box-shadow:0 10px 28px rgba(0,0,0,0.35); }
+  .cover-slide .foot-word{ font-family:var(--latin-display); font-weight:400; font-size:clamp(30px,5vw,46px); color:#F7EFE3; }
+  .cover-slide .foot-kr{ font-family:var(--display); font-weight:900; font-size:12px; letter-spacing:.2em; color:rgba(255,255,255,0.7); margin-top:8px; }
+  .cover-slide .foot-line{ width:40px; height:1px; background:var(--gold); margin:18px auto; }
+  .cover-slide .foot-closing{ font-family:var(--display); font-weight:700; font-size:14px; color:var(--gold-soft); }
+  .cover-slide .foot-sub{ font-size:11px; color:rgba(255,255,255,0.5); margin-top:8px; }
+
+  .cat-cover{ align-items:flex-start; }
+  .cat-cover-badge{
+    font-family:var(--mono); font-weight:700; font-size:15px; color:var(--wine-900);
+    background:var(--gold); width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+  }
+  .cat-cover-count{ font-family:var(--mono); font-size:11px; color:var(--gold); margin-top:3px; }
+  .cat-cover-intro{ max-width:78ch; }
+
+  /* merged category slide: header + intro + grid all on one page */
+  .cat-merged-slide{ align-items:stretch; padding:4% 5.5%; }
+  .cat-merged-head{ display:flex; align-items:center; gap:16px; }
+  .cat-merged-title{ font-size:clamp(21px,2.9vw,29px); margin:0; }
+  .slide .cat-merged-intro{ font-size:13.5px; font-weight:500; margin-top:10px; margin-bottom:0; max-width:none; }
+
+  .mini-slide{ align-items:stretch; }
+  .mini-grid{ display:grid; gap:10px; margin-top:14px; flex:1; }
+  .mini-card{
+    background:var(--bg-panel,#fff); border:1px solid var(--line-onlight); border-radius:6px;
+    padding:14px 16px; display:flex; flex-direction:column; gap:5px; min-height:0;
+  }
+  .mini-head{ display:flex; align-items:baseline; gap:8px; }
+  .mini-num{ font-family:var(--mono); font-size:10.5px; color:var(--blush-line); font-weight:800; }
+  .mini-head b{ font-family:var(--display); font-weight:900; font-size:14px; color:var(--wine-700); line-height:1.3; }
+  .mini-sub{ font-family:var(--mono); font-size:10px; font-weight:700; color:var(--gold); letter-spacing:.02em; }
+  .mini-mech{ font-size:11.5px; font-weight:500; color:var(--ink-soft); line-height:1.46; margin:3px 0 0; flex:1; }
+  .mini-routine{
+    font-family:var(--mono); font-size:9.5px; font-weight:700; color:var(--wine-500); background:var(--blush);
+    padding:4px 9px; border-radius:100px; align-self:flex-start; margin-top:2px;
+  }
+
+  .slide-caregrid{ margin-top:8px; }
+  .slide-caregrid .care-cell b{ font-size:12.5px; }
+  .slide-caregrid .care-cell span{ font-size:10.8px; }
+
+  .slide-deepdive{ margin-top:0; }
+  .slide-deepdive .deepdive{ background:transparent; border:none; padding:0; }
+
+  .slide-extrarow{ margin-top:10px; }
+
+  .app-overview{ display:grid; grid-template-columns:1fr auto; gap:28px; align-items:start; margin-top:16px; }
+  .flow-col{ display:flex; flex-direction:column; gap:10px; }
+  .flow-col .flow-card{ padding:13px 15px; }
+  .flow-col .flow-card h3{ font-size:14px; margin-top:4px; }
+  .flow-col .flow-card p{ font-size:12px; margin-top:4px; }
+
+  .app-shots{ display:flex; justify-content:center; align-items:flex-start; gap:20px; flex-wrap:wrap; }
+  .app-shot{ width:200px; flex:0 0 auto; }
+  .app-shot .frame{
+    width:200px; aspect-ratio:9/16; border-radius:16px; overflow:hidden;
+    border:1px solid var(--line-onlight); box-shadow:0 12px 28px rgba(0,0,0,0.14);
+  }
+  .app-shot img{ width:100%; height:100%; object-fit:cover; object-position:top; display:block; }
+  .app-shot span{ display:block; text-align:center; margin-top:8px; font-family:var(--mono); font-size:11px; font-weight:600; color:var(--muted); }
+
+  .community-slide .lede{ margin-bottom:6px; }
+  .meetup-grid{
+    display:grid; grid-template-columns:repeat(5,1fr); gap:1px;
+    background:var(--line-onlight); border:1px solid var(--line-onlight); border-radius:10px; overflow:hidden; margin-top:14px;
+  }
+  .meetup-cell{ background:#fff; padding:12px 8px; text-align:center; }
+  .meetup-cell .emoji{ font-size:18px; display:block; margin-bottom:4px; }
+  .meetup-cell b{ display:block; font-family:var(--display); font-weight:800; font-size:11px; color:var(--ink); }
+  .meetup-cell span{ display:block; font-size:9px; color:var(--gold); font-family:var(--mono); margin-top:3px; line-height:1.4; }
+  .community-note{
+    margin-top:12px; font-size:11.5px; font-weight:500; color:var(--ink-soft); background:var(--blush);
+    padding:9px 13px; border-left:2px solid var(--wine-500); line-height:1.5;
+  }
+
+  .hobby-groups{ column-count:2; column-gap:28px; margin-top:12px; }
+  .hobby-group{ break-inside:avoid; margin-bottom:12px; }
+  .hobby-group h4{ font-family:var(--display); font-weight:800; font-size:12.5px; color:var(--ink); margin:0 0 6px; }
+  .hobby-group h4 .en{ font-family:var(--mono); font-size:9px; font-weight:500; color:var(--gold); letter-spacing:.02em; margin-left:5px; }
+  .hobby-chips{ display:flex; flex-wrap:wrap; gap:5px; }
+  .hobby-chips .chip{
+    font-family:var(--sans); font-size:10.5px; font-weight:500; color:var(--ink-soft);
+    background:#fff; border:1px solid var(--line-onlight); padding:4px 10px; border-radius:100px;
+    white-space:nowrap;
+  }
+
+  /* ===== readability pass: tighter margins + bigger/bolder text on every other slide ===== */
+  .slide{ padding:4.2% 5.8%; }
+  .slide h2{ margin-top:6px; margin-bottom:10px; }
+  .slide .lede{ font-size:14.5px; font-weight:500; margin-bottom:10px; }
+  .slide-body{ gap:8px; }
+  .slide-body p{ font-size:14.5px; font-weight:450; line-height:1.6; }
+  .slide .pullquote{ margin-top:12px; font-size:16.5px; padding:14px 18px; }
+
+  .cover-slide .hero-badge{ margin-bottom:14px; }
+  .cover-slide .quote{ margin-top:10px; font-size:clamp(14px,2vw,25px); }
+  .cover-slide .tagline{ margin-top:12px; font-size:14px; font-weight:500; }
+  .cover-slide .foot-line{ margin:14px auto; }
+  .cover-slide .foot-closing{ font-size:16px; }
+  .cover-slide .foot-sub{ font-size:12px; }
+
+  .flow{ gap:10px; }
+  .flow-card{ padding:16px 15px; }
+  .flow-card .step{ font-size:11px; font-weight:700; }
+  .flow-card h3{ font-size:16px; font-weight:900; margin-top:7px; }
+  .flow-card p{ font-size:13.5px; font-weight:500; margin-top:6px; color:var(--ink-soft); }
+
+  .care-grid{ margin-top:6px; }
+  .slide-caregrid .care-cell{ padding:12px 13px; }
+  .slide-caregrid .care-cell b{ font-size:14px; font-weight:900; margin-top:3px; }
+  .slide-caregrid .care-cell span{ font-size:12px; font-weight:500; margin-top:3px; }
+  .slide-caregrid .care-cell .n{ font-size:11px; font-weight:800; }
+
+  .promise-grid{ margin-top:14px; gap:12px; }
+  .promise-card{ padding:18px 18px; }
+  .promise-card .k{ font-size:11px; font-weight:700; margin-top:6px; }
+  .promise-card h3{ font-size:19px; font-weight:900; margin-top:5px; }
+  .promise-card p{ font-size:14px; font-weight:500; margin-top:7px; line-height:1.58; }
+  .promise-num{ font-size:28px; }
+
+  .iris-note{ margin-top:14px; padding:22px; gap:20px; }
+  .iris-note .k{ font-size:11px; font-weight:700; margin-bottom:6px; }
+  .iris-note p{ font-size:15px; font-weight:500; line-height:1.6; }
+  .iris-note svg{ width:58px; height:58px; }
+
+  .deepdive{ margin-top:0; }
+  .deepdive-head{ margin-bottom:12px; }
+  .deepdive-head h3{ font-size:21px; font-weight:900; }
+  .deepdive-head span{ font-size:12px; font-weight:600; }
+  .type-grid{ gap:10px; }
+  .type-card{ padding:13px 14px; }
+  .type-card b{ font-size:14px; font-weight:900; }
+  .type-card .sub{ font-size:11.5px; font-weight:700; margin-top:5px; }
+  .type-card p{ font-size:12.5px; font-weight:500; margin-top:7px; line-height:1.55; }
+
+  .extra-row{ margin-top:8px; gap:16px; }
+  .extra-cell{ border-left-width:3px; padding-left:16px; }
+  .extra-cell b{ font-size:16px; font-weight:900; }
+  .extra-cell span{ font-size:13.5px; font-weight:500; margin-top:6px; }
+
+  .meetup-grid{ margin-top:12px; }
+  .meetup-cell{ padding:13px 8px; }
+  .meetup-cell .emoji{ font-size:20px; margin-bottom:5px; }
+  .meetup-cell b{ font-size:12.5px; font-weight:900; }
+  .meetup-cell span{ font-size:10px; font-weight:700; margin-top:4px; }
+
+  .commit-row{ margin-top:16px; gap:10px; }
+  .commit-chip{ font-size:12.5px; font-weight:700; padding:8px 16px; }
+
+  .foot-word{ }
+  .cat-cover-intro{ font-size:14px; font-weight:500; }
+  .cat-cover-count{ font-size:12px; font-weight:700; }
+
+  @media (max-width:760px){
+    .deck-toolbar{ flex-wrap:wrap; }
+    .slide{ padding:7% 8%; }
+    .mini-grid{ grid-template-columns:1fr !important; }
+    .axis-row{ grid-template-columns:1fr; gap:4px; }
+    .iris-note{ grid-template-columns:1fr; }
+    .epi-grid{ grid-template-columns:1fr; }
+    .cond-grid{ grid-template-columns:1fr; }
+    .app-overview{ grid-template-columns:1fr; }
+    .app-shot{ width:150px; }
+    .app-shot .frame{ width:150px; }
+    .meetup-grid{ grid-template-columns:repeat(2,1fr); }
+    .hobby-groups{ column-count:1; }
+  }
+
+  @media print{
+    @page{ size:13.333in 7.5in; margin:0; }
+    body{ background:#fff; }
+    .deck-toolbar, .no-print{ display:none !important; }
+    .deck{ padding:0; gap:0; display:block; }
+    .slide{
+      max-width:none; width:13.333in; min-height:7.5in; height:auto; aspect-ratio:auto;
+      box-shadow:none; border-radius:0; margin:0; page-break-after:always; break-after:page;
+      padding:0.55in 0.85in;
+    }
+    .slide:last-child{ page-break-after:auto; }
+  }
+
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Noto+Serif+KR:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700;900&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div class="deck-toolbar no-print">
+  <div class="brand"><img src="ludia-logo.png" alt="">LUDIA &middot; 슬라이드</div>
+  <span class="hint">인쇄 대화상자에서 &ldquo;PDF로 저장&rdquo;을 선택하면 파일로 받을 수 있어요</span>
+  <button class="pdf-btn" onclick="window.print()">PDF로 저장 / 인쇄</button>
+</div>
+
+<div class="deck">
+<section class="slide on-dark cover-slide">
+  <svg class="ring" viewBox="0 0 200 200" aria-hidden="true">
+    <circle cx="100" cy="100" r="96" fill="none" stroke="#E3CFA0" stroke-opacity="0.35" stroke-width="1"/>
+    <circle cx="100" cy="100" r="74" fill="none" stroke="#E3CFA0" stroke-opacity="0.3" stroke-width="1"/>
+    <circle cx="100" cy="100" r="50" fill="none" stroke="#E3CFA0" stroke-opacity="0.28" stroke-width="1"/>
+    <circle cx="100" cy="100" r="24" fill="#E3CFA0" fill-opacity="0.12"/>
+  </svg>
+  <div class="hero-badge"><img src="ludia-logo.png" alt="LUDIA 로고"><span class="name">LUDIA INTEGRATIVE HEALTH</span></div>
+  <span class="eyebrow on-dark">LUDIA STORY · 브랜드 이야기</span>
+  <h1 class="cover-word">LUDIA</h1>
+  <p class="quote">&ldquo;몸은 증상의 합이 아니라, 하나의 살아있는 회로입니다.&rdquo;</p>
+  <p class="tagline">제가 왜 LUDIA를 만들게 되었는지, 어떤 생각으로 이 서비스를 설계했는지,
+  그리고 지금 앱에서 무엇을 할 수 있는지를 이 문서에 담았습니다.</p>
+</section>
+
+<section class="slide on-light">
+  <span class="eyebrow on-light">01 · WHY I STARTED</span>
+  <h2>&ldquo;건강 관리의 시작은, 내 몸을 제대로 이해하는 것입니다&rdquo;</h2>
+  <div class="story-body slide-body">
+        <p>
+          의학을 전공하며 사람의 생리 메커니즘과 자율신경, 대사 과정을 연구하면서 수많은 신체 데이터를
+          접했습니다. 그리고 한 가지 안타까운 반복을 목격했습니다. 수많은 사람들이 건강을 위해 노력하지만,
+          정작 자신의 몸이 보내는 신호와 진짜 원인은 모른 채 무작정 몸을 맞추려 한다는 것이었습니다.
+        </p>
+        <p>
+          이유 없이 머리가 빠지거나 피부 질환이 생기고, 원인을 알 수 없는 소화불량이나 생리통, 만성 피로에
+          시달릴 때 우리는 당장 눈앞의 증상만 끄기 쉬운 솔루션을 찾습니다. 하지만 자율신경, 장내 환경,
+          호르몬 등 사람마다 불균형이 시작된 지점은 전부 다릅니다. 남들이 다 하는 식단이나 운동 기법이
+          나에게는 오답이 될 수 있는 이유입니다. 나에게 맞지 않는 케어는 결코 지속될 수 없습니다.
+        </p>
+        <p>
+          저는 사람들이 막연한 오답 노트를 반복하지 않도록 돕고 싶었습니다. 나에게 찾아온 증상의 원인을
+          먼저 다각도로 이해하고, 그에 맞춰 나만의 식단과 운동, 일상 케어를 스마트하게 해나갈 수 있는
+          <b>&lsquo;내 몸 이해의 길잡이&rsquo;</b>가 되어주고 싶었습니다.
+        </p>
+        <p>
+          LUDIA는 이 마음에서 출발했습니다. 실질적인 도움을 주는 도구를 만들기 위해 직접 개발 환경을
+          구축하고 프로토타입 앱을 하나씩 완성해 가고 있습니다.
+        </p>
+      </div>
+  <div class="pullquote">&ldquo;진짜 변화는 내 몸을 바르게 이해하는 것에서 시작됩니다. 이제 나에게 딱 맞는 방법으로 제대로 된 케어를 시작해보세요.&rdquo;</div>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · WHAT LUDIA BELIEVES</span>
+  <h2>몸은 증상의 합이 아니라, 하나의 회로입니다</h2>
+  <div class="story-body slide-body">
+        <p>
+          LUDIA는 그리스어로 재생(Regeneration), 치유(Healing), 빛나는 통찰(Luminous Insight)을
+          뜻합니다. 저는 몸을 따로따로 고쳐야 할 증상의 목록이 아니라, 하나의 축이 무너지면 전체가
+          연쇄적으로 흔들리는 유기적인 회로라고 생각합니다. 그래서 LUDIA는 겉으로 드러난 증상 하나하나를
+          쫓기보다, 그 증상들을 연결하는 첫 번째 원인을 함께 찾아가려 합니다.
+        </p>
+      </div>
+
+      <div class="axis-list">
+        <div class="axis-row"><span class="axis-num">01</span><b>신경계 & 자율조절 축</b><span>무너지면 불안·불면·브레인 포그로 이어져요.</span></div>
+        <div class="axis-row"><span class="axis-num">02</span><b>에너지 & 대사 축</b><span>무너지면 만성 피로·체중 증가·대사 저하로 이어져요.</span></div>
+        <div class="axis-row"><span class="axis-num">03</span><b>순환 & 혈류 축</b><span>무너지면 부종·냉증·두피와 피부 트러블로 이어져요.</span></div>
+        <div class="axis-row"><span class="axis-num">04</span><b>점막 & 장 환경 축</b><span>무너지면 소화불량·장누수·만성 염증으로 이어져요.</span></div>
+        <div class="axis-row"><span class="axis-num">05</span><b>해독 & 배출 축</b><span>무너지면 피부 트러블·호르몬 불균형·염증 반응으로 이어져요.</span></div>
+      </div>
+      <p class="axis-note">
+        LUDIA의 12개 케어 카테고리는 결국 이 다섯 가지 축 중 어디서, 어떻게 불균형이 시작됐는지를
+        각자의 방식으로 풀어낸 것입니다.
+      </p>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · THREE PROMISES</span>
+  <h2>세 가지 약속</h2>
+  <div class="promise-grid">
+        <div class="promise-card">
+          <div class="promise-num">01</div>
+          <span class="k">WHOLENESS</span>
+          <h3>전인적 치유</h3>
+          <p>하나의 증상만 보지 않고 신체 신호, 자율신경, 생활습관을 함께 읽어요.</p>
+        </div>
+        <div class="promise-card">
+          <div class="promise-num">02</div>
+          <span class="k">PREDICTABILITY</span>
+          <h3>예측 가능한 관리</h3>
+          <p>비침습 측정으로 병원에 가기 전, 내 몸이 보내는 신호를 먼저 확인해요.</p>
+        </div>
+        <div class="promise-card">
+          <div class="promise-num">03</div>
+          <span class="k">PRECISION</span>
+          <h3>정밀한 맞춤</h3>
+          <p>같은 탈모, 같은 다이어트도 사람마다 다른 원인으로 나누어 접근해요.</p>
+        </div>
+      </div>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · WHY THE IRIS</span>
+  <h2>왜 홍채인가</h2>
+  <div class="iris-note">
+        <div class="iris-photo">
+          <img src="iris-annotated.png" alt="실제 홍채 스캔에서 동공(노란 원)과 홍채(초록 원) 경계를 자동으로 감지한 화면">
+          <span class="iris-photo-cap">실제 스캔 화면 &mdash; 동공·홍채 경계를 자동으로 감지해요.</span>
+        </div>
+        <div>
+          <span class="k">WHY THE IRIS</span>
+          <p>
+            홍채는 자율신경계가 말초 조직과 가장 가깝게 맞닿는 신체 부위입니다. LUDIA는 이 홍채의
+            표현형 데이터에 문진·생활습관 데이터는 물론, 현재 복용 중인 약, 과거 진단명, 과거 수술 이력까지
+            함께 읽어 들여요. 이 모든 지표가 종합적으로 작용해, 지금 몸 안에서 일어나고 있는 변화를
+            하나의 원인으로 좁혀주는 결과값이 만들어집니다.
+          </p>
+          <div class="iris-strip">
+            <img src="iris-normalized.png" alt="원형 홍채 조직을 펼쳐 분석하는 전개 이미지">
+            <span class="iris-strip-cap">감지된 홍채를 펼쳐 조직의 결과 패턴을 분석해요.</span>
+          </div>
+        </div>
+      </div>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · EPIGENETICS &middot; THE SCIENCE</span>
+  <h2>DNA 배열을 넘어선 생물학적 스위치</h2>
+  <p class="lede" style="color:rgba(255,255,255,0.82);">유전체(Genome)는 악보일 뿐, 연주(Epigenome)는 환경이 결정합니다.</p>
+  <div class="story-body slide-body">
+    <p>
+      인간의 DNA 순서(Genomic Sequence)는 태어날 때 결정되며 쉽게 변하지 않습니다. 하지만 DNA 위에는
+      유전자 발현을 조절하는 &lsquo;후성유전학적 표지(Epigenetic Marks)&rsquo;가 존재합니다. 식단,
+      자율신경계 밸런스, 대사 산물, 만성 스트레스 같은 외부 환경 자극은 Cell-signaling 경로를 통해 DNA
+      및 히스톤 단백질에 화학적 변형을 일으켜, 동일한 DNA를 가졌더라도 특정 유전자가 활성화(On)되거나
+      침묵(Off)하게 만듭니다.
+    </p>
+  </div>
+  <h3 class="epi-sub">유전자 발현을 조절하는 3가지 핵심 메커니즘</h3>
+  <div class="axis-list">
+    <div class="axis-row">
+      <span class="axis-num">01</span><b>DNA 메틸화<br/><span class="epi-en">DNA Methylation</span></b>
+      <span>프로모터 부위에 메틸기(&ndash;CH&#8323;)가 결합하면 RNA 합성효소의 접근이 차단되어 유전자
+      발현이 억제(OFF)돼요. 올바른 영양·대사 케어는 질병 관련 유전자의 메틸화를 유도해 스위치를 꺼요.</span>
+    </div>
+    <div class="axis-row">
+      <span class="axis-num">02</span><b>히스톤 변형<br/><span class="epi-en">Histone Modification</span></b>
+      <span>히스톤 단백질이 아세틸화되면 응축 구조가 풀리며 유전자 발현이 촉진(ON)돼요. 수면, 스트레스,
+      장내 미생물 대사산물(SCFA)이 히스톤 구조 변화에 직접 영향을 미쳐요.</span>
+    </div>
+    <div class="axis-row">
+      <span class="axis-num">03</span><b>비번역 RNA 조절<br/><span class="epi-en">Non-coding RNA / microRNA</span></b>
+      <span>microRNA는 전사 후 단계에서 타깃 mRNA의 분해를 유도해 염증 반응이나 신진대사 유전자 발현을
+      미세 조정해요.</span>
+    </div>
+  </div>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · EPIGENETICS &middot; REVERSIBILITY</span>
+  <h2>후성유전학적 가역성과 맞춤형 케어의 필요성</h2>
+  <div class="epi-qa">
+    <p class="a" style="margin-top:0;">&ldquo;유전자 변이는 되돌릴 수 없지만, 후성유전학적 변형은 가역적(Reversible)입니다.&rdquo;</p>
+  </div>
+  <div class="epi-grid">
+    <div class="epi-card on">
+      <span class="tag">&#128308; 질병 스위치의 켜짐 (Pathological ON)</span>
+      <p>가족력이 없더라도, 나에게 맞지 않는 식단과 만성 자율신경 불균형이 지속되면 대사·염증 관련
+      유전자 스위치가 켜져 이유 없는 탈모, 대사증후군, 만성 피부 질환으로 이어져요.</p>
+    </div>
+    <div class="epi-card off">
+      <span class="tag">&#128994; 질병 스위치의 꺼짐 (Epigenetic OFF)</span>
+      <p>고위험 유전인자를 보유했더라도, 내 신체 메커니즘에 최적화된 맞춤형 식단·운동·라이프스타일
+      Intervention을 제공하면 켜져 있던 질병 유전자 스위치를 다시 끌(OFF) 수 있어요.</p>
+    </div>
+  </div>
+  <p class="epi-closing">
+    LUDIA는 단편적인 증상 완화를 넘어, 후성유전학적 스위치를 긍정적인 방향으로 조절(Epigenetic
+    Modulation)할 수 있도록 개인의 신체 메커니즘을 다각도로 분석합니다. 나에게 딱 맞는 케어를 만날 때,
+    타고난 유전적 한계를 넘어 지속 가능한 건강을 만들어갈 수 있습니다.
+  </p>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · EPIGENETICS &middot; 4 EXAMPLES</span>
+  <h2>몸 곳곳에서 일어나는 스위치 작용</h2>
+  <div class="cond-grid">
+    <div class="cond-card">
+      <b>비만 및 대사증후군</b><span class="epi-en">Obesity & Metabolic Syndrome</span>
+      <p class="cond-mech">비만 유전자(FTO, LEP 등)는 식탐·지방 축적을 유도하지만, 식단·수면·자율신경
+      밸런스에 따라 지방 소모 유전자(UCP1)의 아세틸화 수준이 달라져요.</p>
+      <p class="sw-on">&#128308; ON &mdash; 정제당·만성 수면 부족 &rarr; FTO 스위치 켜짐, 포만감 신호 차단.</p>
+      <p class="sw-off">&#128994; OFF &mdash; 맞춤 영양(단쇄지방산 등) &rarr; 지방 분해 유전자 스위치 활성화.</p>
+    </div>
+    <div class="cond-card">
+      <b>만성 피부 질환</b><span class="epi-en">Skin Disorders</span>
+      <p class="cond-mech">피부 장벽 유전자(Filaggrin)와 면역 염증 유전자(TNF-&alpha;, IL-17)는 장내
+      미생물 대사산물과 자율신경 균형에 민감하게 반응해요.</p>
+      <p class="sw-on">&#128308; ON &mdash; 장내 환경 악화 &rarr; 염증성 사이토카인 유전자 과도하게 켜짐.</p>
+      <p class="sw-off">&#128994; OFF &mdash; 장&ndash;피부 축 개선 &rarr; 염증 유전자 억제, 재생·장벽 유전자 작동.</p>
+    </div>
+    <div class="cond-card">
+      <b>만성 피로 · 자율신경 불균형</b><span class="epi-en">Chronic Fatigue & Autonomic Dysfunction</span>
+      <p class="cond-mech">미토콘드리아 에너지 생성 유전자와 코르티솔 수용체 유전자(NR3C1)의 후성유전학적
+      변형에 의해 결정돼요.</p>
+      <p class="sw-on">&#128308; ON &mdash; 만성 스트레스 &rarr; 피로 회복 유전자 스위치 꺼짐, 쉬어도 안 풀림.</p>
+      <p class="sw-off">&#128994; OFF &mdash; 자율신경 밸런스 케어 &rarr; 미토콘드리아 활성화 유전자 재점화.</p>
+    </div>
+    <div class="cond-card">
+      <b>생리통 · PCOS · 여성 질환</b><span class="epi-en">Gynecological Health</span>
+      <p class="cond-mech">에스트로겐 수용체(ESR1/ESR2) 유전자의 메틸화 비율에 따라 호르몬 민감도와
+      자궁 내막 염증 반응이 달라져요.</p>
+      <p class="sw-on">&#128308; ON &mdash; 내분비 교란·영양 불균형 &rarr; 극심한 생리통, 자궁 내막 염증.</p>
+      <p class="sw-off">&#128994; OFF &mdash; 호르몬 대사 경로 교정 &rarr; 규칙적이고 통증 없는 생리 주기.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · EPIGENETICS &middot; HAIR LOSS</span>
+  <h2>탈모 유전자, 후성유전학으로 다시 보기</h2>
+  <p class="lede" style="color:rgba(255,255,255,0.82);">
+    탈모 유전자를 가졌다고 해서 모두가 머리가 빠지는 것은 아닙니다. 안드로겐 수용체(AR) 유전자와
+    모낭 축소 신호 물질(TGF-&beta;1)은 대표적인 후성유전학적 조절 대상이에요.
+  </p>
+  <div class="axis-list">
+    <div class="axis-row">
+      <span class="axis-num">01</span><b>안드로겐 수용체(AR) 메틸화<br/><span class="epi-en">DNA Methylation</span></b>
+      <span>AR 프로모터가 메틸화되면 수용체 발현이 억제(OFF)되어 DHT에 대한 모낭의 민감도가 떨어져요.
+      탈모 유전자가 있어도 반응성이 줄어 모낭 축소가 둔화돼요.</span>
+    </div>
+    <div class="axis-row">
+      <span class="axis-num">02</span><b>microRNA 전사 후 조절<br/><span class="epi-en">Post-Transcriptional Regulation</span></b>
+      <span>microRNA가 모낭 성장 신호(Wnt/&beta;-catenin)를 켜거나 탈모 유도 인자(TGF-&beta;1, DKK-1)의
+      합성을 차단해요. 영양 불균형·염증이 심해지면 Wnt 억제 microRNA가 활성화(ON)돼요.</span>
+    </div>
+    <div class="axis-row">
+      <span class="axis-num">03</span><b>두피 미세혈류와 산화 스트레스<br/><span class="epi-en">Epigenetic Trigger</span></b>
+      <span>만성 스트레스·자율신경 불균형·염증·영양 결핍이 모낭 세포 내 산화 스트레스(ROS)를 유발,
+      히스톤 구조를 바꿔 탈모 관련 유전자 스위치를 직접 켜는(ON) 트리거가 돼요.</span>
+    </div>
+  </div>
+  <p class="epi-closing">
+    맞춤형 영양 케어, 자율신경 밸런스, 두피 대사 환경 개선을 제공하면 AR 발현이 억제(메틸화)되고 모낭
+    재생 신호(Wnt 경로)가 정상화돼요. 탈모 역시 &lsquo;유전의 운명&rsquo;이 아니라 &lsquo;두피와 신체
+    환경의 조절&rsquo; 영역에 속합니다.
+  </p>
+</section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">02 · EPIGENETICS</span>
+  <p class="epi-title">&#129516; 유전자는 운명이 아닌 &lsquo;스위치&rsquo;입니다</p>
+  <div class="epi-qa">
+    <p class="q">Q. 가족력이 있으면 무조건 그 병에 걸릴까요?</p>
+    <p class="a">A. 아니요, 유전자의 스위치를 끄면 됩니다.</p>
+  </div>
+  <p class="epi-desc">
+    최신 후성유전학(Epigenetics) 연구에 따르면, 유전자는 고정된 결과가 아니라 생활 환경에 따라
+    켜지고 꺼지는 스위치와 같습니다. 타고난 DNA 자체는 바꿀 수 없지만, 그 유전자가 작동하는
+    스위치는 우리의 환경과 관리 방법에 따라 얼마든지 달라집니다.
+  </p>
+  <div class="epi-grid">
+    <div class="epi-card on">
+      <span class="tag">&#128308; 스위치가 켜지는(ON) 이유</span>
+      <p>내 몸에 맞지 않는 식단, 만성 스트레스, 수면 부족, 원인 모를 장내 환경 불균형.</p>
+      <p class="arrow">&rarr; 건강하게 태어났어도 탈모, 비만, 성인병 발생 가능성이 급증해요.</p>
+    </div>
+    <div class="epi-card off">
+      <span class="tag">&#128994; 스위치를 끄는(OFF) 방법</span>
+      <p>내 신체 메커니즘 이해, 나에게 맞는 식단과 운동, 자율신경 밸런스 케어.</p>
+      <p class="arrow">&rarr; 안 좋은 가족력이 있어도 질병의 발현을 효과적으로 예방해요.</p>
+    </div>
+  </div>
+  <p class="epi-closing">
+    LUDIA는 여러분의 몸에 맞는 정확한 관리법을 찾아, 안 좋은 유전자 스위치는 끄고 건강함의
+    스위치를 켤 수 있도록 돕습니다.
+  </p>
+</section>
+
+<section class="slide on-light">
+  <span class="eyebrow on-light">03 · WHAT LUDIA DOES</span>
+  <h2>LUDIA 앱에서는 이런 것들을 할 수 있어요</h2>
+  <p class="lede">생체 데이터를 읽는 진단부터, 원인에 맞는 케어와 커뮤니티 연결까지 &mdash; 하나의 흐름으로 이어집니다.</p>
+  <div class="app-overview">
+    <div class="flow flow-col">
+        <div class="flow-card">
+          <span class="step">STEP 1 · 측정</span>
+          <h3>4가지 생체 신호 스캔</h3>
+          <p>홍채 3D · EDA · HRV · BMI를 기기로 스캔하거나, 기기 없이 직접 문진으로 입력할 수 있어요.</p>
+        </div>
+        <div class="flow-card">
+          <span class="step">STEP 2 · 진단</span>
+          <h3>진단 리포트 & 기록</h3>
+          <p>멀티모달 데이터를 종합한 리포트를 받고, 날짜·연도별로 나의 진단 기록을 쌓아가요.</p>
+        </div>
+        <div class="flow-card">
+          <span class="step">STEP 3 · 케어</span>
+          <h3>12종 케어카드</h3>
+          <p>탈모, 체중, 호르몬 등 나에게 필요한 영역의 원인별 맞춤 가이드를 확인해요.</p>
+        </div>
+        <div class="flow-card">
+          <span class="step">STEP 4 · 연결</span>
+          <h3>커뮤니티 & 제품 연계</h3>
+          <p>같은 원인 유형의 웰니스 모임에 연결되고, 맞춤 제품도 함께 추천받아요.</p>
+        </div>
+    </div>
+
+    <div class="app-shots">
+      <div class="app-shot"><div class="frame"><img src="app-diagnostic.png" alt="AI 종합 소견이 담긴 진단 리포트 실제 화면"></div><span>진단 리포트</span></div>
+      <div class="app-shot"><div class="frame"><img src="app-community.png" alt="루디아 모임 실제 화면"></div><span>모임</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="slide on-light">
+  <span class="eyebrow on-light">03 · 12 CARE CASES</span>
+  <h2>12종 케어카드</h2>
+  <div class="care-grid slide-caregrid">
+        <div class="care-cell"><span class="n">01</span><b>탈모 & 두피 케어</b><span>두피 열 · 모세혈관 수축 · 피지 대사 정체</span></div>
+        <div class="care-cell"><span class="n">02</span><b>체중 & 대사 케어</b><span>인슐린 저항성 · 부종 체증 · 대사 저하형 다이어트</span></div>
+        <div class="care-cell"><span class="n">03</span><b>남성 웰니스 & 벌크업</b><span>남성호르몬 · 린매스업 · 전립선 림프 순환</span></div>
+        <div class="care-cell"><span class="n">04</span><b>체형 & 자세 교정</b><span>C커브 파괴 · 골반 틀어짐 · 승모근 체증</span></div>
+        <div class="care-cell"><span class="n">05</span><b>장 건강 & 디톡스</b><span>장관 독소 · 과민성 장 · 위산 결핍</span></div>
+        <div class="care-cell"><span class="n">06</span><b>멘탈 & 뇌 건강</b><span>자율신경 불균형 · 부신 피로 · 브레인 포그</span></div>
+        <div class="care-cell"><span class="n">07</span><b>호르몬 & 여성 케어</b><span>하초 냉증 · 생리통/PMS · 호르몬 불균형</span></div>
+        <div class="care-cell"><span class="n">08</span><b>질환 관리 & 포스트 케어</b><span>자궁근종 케어 · 회복기 면역 · 간 건강</span></div>
+        <div class="care-cell"><span class="n">09</span><b>피부 & 호르몬 뷰티</b><span>장&ndash;피부 축 독소 · 속건조 홍조 · 트러블</span></div>
+        <div class="care-cell"><span class="n">10</span><b>근골격 & 림프 순환</b><span>하체 부종 · 근육 경직 · 정맥 울혈</span></div>
+        <div class="care-cell"><span class="n">11</span><b>기관 징후 & 정기 모니터링</b><span>갑상선·자궁·난소 신호 모니터링 · 검진 가이드</span></div>
+        <div class="care-cell"><span class="n">12</span><b>시니어 웰니스 & 액티브 케어</b><span>관절·근감소 · 낙상 위험 · 노년 우울</span></div>
+      </div>
+</section>
+
+<section class="slide on-light">
+  <span class="eyebrow on-light">03 · HAIR & SCALP</span>
+  <div class="deepdive slide-deepdive">
+        <div class="deepdive-head">
+          <h3>가장 정교하게 구현한 여정 &mdash; 탈모 케어 6유형</h3>
+          <span>같은 &lsquo;탈모&rsquo;도 원인별로 나누어 복합 진단해요</span>
+        </div>
+        <div class="type-grid">
+          <div class="type-card"><div class="type-dot" style="background:#ef4444;"></div><b>상열하한 & 자율신경 수축형</b><span class="sub">스트레스 · 혈류 장애</span><p>교감신경 과활성화로 두피 혈류가 저하되는 타입</p></div>
+          <div class="type-card"><div class="type-dot" style="background:#f59e0b;"></div><b>지루성 습열 & 대사 정체형</b><span class="sub">피지 과다 · 인슐린 스파이크</span><p>혈당 스파이크로 피지 분비가 과도해지는 타입</p></div>
+          <div class="type-card"><div class="type-dot" style="background:#64748b;"></div><b>기혈 수척 & 영양 전달 저하형</b><span class="sub">모근 단백질 결핍</span><p>흡수력 저하로 모근 단백질 합성이 어려운 타입</p></div>
+          <div class="type-card"><div class="type-dot" style="background:#8b5cf6;"></div><b>내분비 & DHT 호르몬 감수성형</b><span class="sub">유전성 · 생체리듬 파괴</span><p>DHT 민감도와 불규칙한 습관이 겹치는 타입</p></div>
+          <div class="type-card"><div class="type-dot" style="background:#14b8a6;"></div><b>장내 독소 & 만성 염증형</b><span class="sub">장&ndash;두피 축</span><p>장내 불균형 독소가 두피 염증을 유발하는 타입</p></div>
+          <div class="type-card"><div class="type-dot" style="background:#7c3aed;"></div><b>경추 변형 & 모세혈관 압착형</b><span class="sub">거북목 · 승모근 체증</span><p>목 혈관 압박으로 모근 산소 공급이 정체되는 타입</p></div>
+        </div>
+      </div>
+</section>
+
+<section class="slide on-light">
+  <span class="eyebrow on-light">03 · MORE</span>
+  <h2>그 밖에도</h2>
+  <div class="extra-row slide-extrarow">
+        <div class="extra-cell"><b>LUDIA 보이스</b><span>대시보드에서 바로 음성으로 묻고 답하는 AI 1:1 어시스턴트</span></div>
+        <div class="extra-cell"><b>캘린더 & 사이클</b><span>일정 관리와 생리주기 단계를 함께 트래킹</span></div>
+        <div class="extra-cell"><b>웰니스 샵</b><span>진단 결과에 맞는 제품을 바로 연결</span></div>
+      </div>
+</section>
+
+<section class="slide on-light community-slide">
+  <span class="eyebrow on-light">03 · COMMUNITY</span>
+  <h2>혼자가 아니라, 함께 만드는 웰니스 커뮤니티</h2>
+  <p class="lede">LUDIA 안에서는 누구나 원하는 주제로 직접 모임을 만들 수 있어요. 운동부터 악기, 스포츠, 웰니스
+          취미까지 &mdash; 나와 같은 목표를 가진 사람들과 오프라인에서 직접 만나는 것이 LUDIA 커뮤니티의
+          핵심이에요. 모임 활동을 사진으로 인증하면 서로 좋아요와 댓글로 응원해요.</p>
+  <div class="hobby-groups">
+    <div class="hobby-group">
+      <h4>&#127939; 운동 & 피트니스 <span class="en">Sports & Fitness</span></h4>
+      <div class="hobby-chips">
+        <span class="chip">&#127992; 배드민턴</span>
+        <span class="chip">&#128170; 헬스</span>
+        <span class="chip">&#129496; 요가·필라테스</span>
+        <span class="chip">&#127939; 러닝</span>
+        <span class="chip">&#127859; 쿠킹</span>
+        <span class="chip">&#127934; 테니스</span>
+        <span class="chip">&#127946; 수영</span>
+        <span class="chip">&#9968;&#65039; 등산</span>
+        <span class="chip">&#128692; 자전거</span>
+        <span class="chip">&#10024; 기타 모임</span>
+      </div>
+    </div>
+    <div class="hobby-group">
+      <h4>&#127925; 악기 & 음악 <span class="en">Music</span></h4>
+      <div class="hobby-chips">
+        <span class="chip">&#127908; 밴드·기타</span>
+        <span class="chip">&#127929; 피아노·키보드</span>
+        <span class="chip">&#127931; 클래식 악기</span>
+        <span class="chip">&#129345; 드럼·타악기</span>
+      </div>
+    </div>
+    <div class="hobby-group">
+      <h4>&#9917; 팀 스포츠 <span class="en">Team Sports</span></h4>
+      <div class="hobby-chips">
+        <span class="chip">&#9917; 축구·풋살</span>
+        <span class="chip">&#127936; 농구</span>
+        <span class="chip">&#9918; 야구·캐치볼</span>
+        <span class="chip">&#127952; 배구</span>
+      </div>
+    </div>
+    <div class="hobby-group">
+      <h4>&#127807; 액티브 & 레저 <span class="en">Active & Outdoor</span></h4>
+      <div class="hobby-chips">
+        <span class="chip">&#129497; 클라이밍</span>
+        <span class="chip">&#128698; 보드(스케이트/롱보드)</span>
+        <span class="chip">&#127923; 볼링</span>
+        <span class="chip">&#127955; 탁구</span>
+        <span class="chip">&#9971; 골프</span>
+      </div>
+    </div>
+    <div class="hobby-group">
+      <h4>&#127912; 웰니스 & 크리에이티브 취미 <span class="en">Wellness & Creative</span></h4>
+      <div class="hobby-chips">
+        <span class="chip">&#127912; 미술·드로잉</span>
+        <span class="chip">&#128214; 독서·글쓰기</span>
+        <span class="chip">&#128248; 사진·출사</span>
+        <span class="chip">&#127796; 가드닝·플라워</span>
+        <span class="chip">&#127861; 다도·티클래스</span>
+      </div>
+    </div>
+  </div>
+  <p class="community-note">같은 원인 유형으로 진단된 사람들에게는 그 유형에 꼭 맞는 모임 카테고리가 자동으로 추천돼요 &mdash;
+          예를 들어 상열하한 자율신경형에게는 이완 요가·수영 모임을, 인슐린 저항형에게는 근력 운동 모임을
+          연결하는 식이에요. 직접 모임을 새로 만들 수도, 이미 열려 있는 모임에 참여할 수도 있어요.</p>
+</section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">02</div>
+        <div>
+          <h2 class="cat-merged-title">체중 & 대사 케어</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">&ldquo;무조건 덜 먹고 더 뛰어라&rdquo;는 일편단심형 다이어트에서 벗어나, 살이 찌고 대사가 막히는
+            6가지 근본 원인 메커니즘별로 커뮤니티·식습관·운동·홈케어를 결합한 패키지예요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>대사 저하 & 수체(水滯) 부종형</b></div>
+            <span class="mini-sub">순환 장애 · 음인 체질</span>
+            <p class="mini-mech">기초대사량이 낮고 림프/혈액 순환 정체로 노폐물과 수분이 배출되지 못해 붓기가 체지방으로 고착화되는 타입.</p>
+            <span class="mini-routine">체온 1도 올리기 & 림프 족욕 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>인슐린 저항성 & 식탐 스파이크형</b></div>
+            <span class="mini-sub">혈당 불균형 · 양인 체질</span>
+            <p class="mini-mech">빈번한 혈당 스파이크로 인슐린이 과다 분비되어 체지방 합성을 가속화하고 지방 분해를 방지하는 타입.</p>
+            <span class="mini-routine">혈당 방어 & 정제당 컷 챌린지</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>코르티솔 호르몬 & 스트레스 폭식형</b></div>
+            <span class="mini-sub">자율신경 불균형</span>
+            <p class="mini-mech">만성 스트레스로 코르티솔이 과다 분비되어 내장 지방 저장을 촉진하고 감정적 폭식을 유도.</p>
+            <span class="mini-routine">감정 식사 차단 & 마인드풀 다이어트 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>기혈 허약 & 마른 비만형</b></div>
+            <span class="mini-sub">기초대사량 저하 · 근육 부족</span>
+            <p class="mini-mech">소화 흡수력이 떨어져 영양 섭취가 부실하고, 기초대사를 이끌 근육 자원이 부족해 적게 먹어도 체지방으로 저장되는 타입.</p>
+            <span class="mini-routine">근육 득근 & 삼시 세끼 밸런스 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>장내 독소 & 세균 불균형형</b></div>
+            <span class="mini-sub">장&ndash;뇌 축 · 소화기 정체</span>
+            <p class="mini-mech">장내 유해균 비율이 높아 &ldquo;뚱보균(퍼미큐테스)&rdquo;이 늘어나고, 장내 염증이 대사 증후군 및 식욕 조절 실패를 유발하는 타입.</p>
+            <span class="mini-routine">장 클린 디톡스 & 유산균 루틴 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>갑상선 대사 지연 & 갑작스런 체중 증가형</b></div>
+            <span class="mini-sub">내분비 신진대사 저하</span>
+            <p class="mini-mech">갑상선 호르몬 및 내분비계 신진대사 신호가 저하되어 신체가 에너지를 소비하지 않고 계속 저장 모드로 전환되는 타입.</p>
+            <span class="mini-routine">내분비 웰니스 리셋 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">03</div>
+        <div>
+          <h2 class="cat-merged-title">남성 웰니스 & 벌크업</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">근성장 부진이나 활력 저하는 단순히 &ldquo;운동량이 부족해서&rdquo;가 아니에요. 테스토스테론 합성 저하,
+            코르티솔에 의한 근손실, 인슐린 저항성, 소화 흡수 장애, 하초 림프 순환 정체, 서카디언 리듬 파괴 등
+            메커니즘에 따라 완전히 다른 솔루션이 들어가요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>부신 피로 & 코르티솔 이카보디형</b></div>
+            <span class="mini-sub">스트레스성 근손실 · 마른 체형</span>
+            <p class="mini-mech">만성 스트레스로 코르티솔이 과다 분비되어 테스토스테론을 억제하고, 단백질 분해(이화 작용)를 가속화해 운동을 해도 근손실이 일어나는 타입.</p>
+            <span class="mini-routine">노 카페인 & 바이오 득근 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>인슐린 저항성 & 내장지방형 린매스업형</b></div>
+            <span class="mini-sub">마른 비만 · 뱃살 집중 남성</span>
+            <p class="mini-mech">혈당 스파이크로 인한 인슐린 저항성 때문에 섭취한 탄수화물이 근육 글리코겐으로 저장되지 못하고 내장지방으로만 축적되는 타입.</p>
+            <span class="mini-routine">혈당 방어 & 린매스 챌린지</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>소화 흡수 저하 & 기혈 약화형</b></div>
+            <span class="mini-sub">마른 체질의 벌크업 난항</span>
+            <p class="mini-mech">위산 분비 및 췌장 소화 효소 생성이 약해 고단백·고칼로리 식단을 소화하지 못하고 그대로 배출되어 근육 단백질 합성 자원이 결핍되는 타입.</p>
+            <span class="mini-routine">소화 밸런스 & 삼시 세끼 득근 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>골반강 림프 체증 & 하초 활력 저하형</b></div>
+            <span class="mini-sub">전립선·발력·하체 순환 저하</span>
+            <p class="mini-mech">장시간 좌식 생활로 골반저근과 서해부 림프관이 압박받아 골반강 혈류가 정체되고, 남성 하초 활력 및 테스토스테론 공급이 차단되는 타입.</p>
+            <span class="mini-routine">골반 웜업 & 아침 활력 리셋 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>간 대사 과부하 & 독소 체증형</b></div>
+            <span class="mini-sub">보충제 부작용 · 만성 피로 남성</span>
+            <p class="mini-mech">과도한 단백질 섭취와 보충제, 음주로 간의 암모니아 해독 및 지질 대사 경로에 과부하가 걸려 체내 독소 수치가 상승한 상태.</p>
+            <span class="mini-routine">간 디톡스 & 클린 웰니스 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>서카디언 바이오리듬 파괴 & 멜라토닌 저하형</b></div>
+            <span class="mini-sub">야간 활성 · 야간 근손실</span>
+            <p class="mini-mech">야간 수면 중 분비되는 성장 호르몬(GH)과 테스토스테론의 분비 골든 타임(밤 11시~새벽 2시)을 놓쳐 세포 재생과 근성장이 멈춘 타입.</p>
+            <span class="mini-routine">생체리듬 리셋 & 11시 굿나잇 득근 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">04</div>
+        <div>
+          <h2 class="cat-merged-title">체형 & 자세 교정</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">체형 불균형과 통증은 &ldquo;자세를 똑바로 하라&rdquo;는 지적만으로는 해결되지 않아요. C커브 파괴로 인한
+            신경 압박, 장요근 경직과 골반 전만, 골반 비대칭으로 인한 정맥 체증, 교감신경 과항진 전신 경직,
+            인슐린 염증 관절 부담, 코어 근육 고갈 등 메커니즘에 따라 다른 케어가 필요해요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>경추 C커브 파괴 & 안면 림프 체증형</b></div>
+            <span class="mini-sub">거북목·일자목·승모근 통증</span>
+            <p class="mini-mech">경추 C커브 곡선이 평평해지며 머리 무게(약 5~6kg)를 견디기 위해 승모근이 상시 긴장하고, 액와 림프절로 빠져나가는 안면/두부 림프관이 압박받는 타입.</p>
+            <span class="mini-routine">C커브 리셋 & 흉추 열기 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>골반 스웨이백 & 척추 후만형</b></div>
+            <span class="mini-sub">굽은 등·스웨이백·복압 저하</span>
+            <p class="mini-mech">장요근 경직과 둔근/코어 약화로 척추 S커브가 왜곡되어 체중 분산에 실패하고, 복압이 떨어져 내장 장기가 아래로 쏠리는 타입.</p>
+            <span class="mini-routine">코어 리프팅 & 둔근 득근 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>골반 변형 & 하체 정맥 정체형</b></div>
+            <span class="mini-sub">짝다리·골반 비대칭·한쪽 다리 부종</span>
+            <p class="mini-mech">골반 좌우 균형 상실로 하체로 내려가는 정맥과 림프관이 물리적으로 눌려 한쪽 다리로 체액이 갇히는 골반 울혈(Pelvic Congestion) 발생.</p>
+            <span class="mini-routine">골반 밸런스 & 힙 교정 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>교감신경 과항진 & 전신 근막 경직형</b></div>
+            <span class="mini-sub">전신 몸살·가동성 상실·만성 담</span>
+            <p class="mini-mech">교감신경이 늘 활성화되어 있어 전신 근막(Fascia)이 지속적으로 수축 상태를 유지하며, 노폐물이 림프관으로 배출되지 못하고 고이는 상태.</p>
+            <span class="mini-routine">부교감 리프팅 & 전신 근막 이완 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>인슐린 저항성 & 내장지방 복압 붕괴형</b></div>
+            <span class="mini-sub">복부 비만·요추 전만·허리 통증</span>
+            <p class="mini-mech">내장지방 과다로 복부 무게가 앞으로 쏠리면서 요추가 과도하게 앞으로 꺾이고(요추 전만), 혈당 스파이크에 의한 전신 만성 염증이 관절 통증을 가속화.</p>
+            <span class="mini-routine">혈당 방어 & 허리 보호 린매스 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>기혈 허약 & 근육 자원 고갈형</b></div>
+            <span class="mini-sub">마른 체형·자세 유지 불능·골격근 부족</span>
+            <p class="mini-mech">소화 흡수력 저하로 뼈와 근육을 지탱할 단백질/미네랄 섭취가 부진하여, 척추를 바로 세워주는 기립근과 코어 근육 자원이 고갈된 타입.</p>
+            <span class="mini-routine">기립근 득근 & 삼시 세끼 식단 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">05</div>
+        <div>
+          <h2 class="cat-merged-title">장 건강 & 디톡스</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">소화기 문제는 &ldquo;유산균 먹기&rdquo;만으로 해결되지 않아요. 소화액 부족, 장관 독소 고착, 자율신경 마비,
+            장누수 염증, 수분 정체, 가스 팽만 등 근본 메커니즘에 따라 다른 케어가 들어가요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>장관 독소 & 고착형</b></div>
+            <span class="mini-sub">만성 변비 · 장내 유해균 과다</span>
+            <p class="mini-mech">장 연동 운동이 저하되어 대변이 오래 머물며 독소를 배출하고, 장내 유해균 비율이 극도로 높아진 상태.</p>
+            <span class="mini-routine">장 클린 디톡스 & 배변 일기 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>자율신경 마비 & 쾌속 과민형</b></div>
+            <span class="mini-sub">스트레스성 신경성 장증후군</span>
+            <p class="mini-mech">뇌-장 축(Brain-Gut Axis)의 교감신경 과활성화로 장 평활근이 과도하게 수축하거나 제어를 잃은 타입.</p>
+            <span class="mini-routine">마인드풀 장 케어 & 11시 수면 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>위산 결핍 & 소화 불량형</b></div>
+            <span class="mini-sub">상복부 정체 · 흡수 장애</span>
+            <p class="mini-mech">위산 분비 및 소화 효소 생성이 부진하여 음식물이 십이지장으로 넘어가지 못하고 상복부에서 부패 및 정체.</p>
+            <span class="mini-routine">삼시 세끼 소화 밸런스 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>장누수 & 만성 염증형</b></div>
+            <span class="mini-sub">장 장벽 약화 · 면역 저하</span>
+            <p class="mini-mech">장 상피세포 결합(Tight Junction)이 느슨해져 미소화 단백질과 독소가 혈류로 침투하여 전신 미세 염증을 유발.</p>
+            <span class="mini-routine">지연성 알레르기 차단 & 장 장벽 재건 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>수체(水滯) & 복부 림프 정체형</b></div>
+            <span class="mini-sub">하복부 냉증 · 부종</span>
+            <p class="mini-mech">하복부 체온 저하로 장 주변 림프 순환이 체증되어 배출되어야 할 수분과 노폐물이 장 주변에 갇히는 타입.</p>
+            <span class="mini-routine">복부 웜업 & 림프 족욕 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>장내 가스 & SIBO(소장 세균 과다 증식)형</b></div>
+            <span class="mini-sub">복부 팽만 · 더부룩함</span>
+            <p class="mini-mech">대장에 있어야 할 균들이 소장으로 넘어와 발효되며 대량의 가스(수소/메탄)를 만들어내는 타입.</p>
+            <span class="mini-routine">Low-FODMAP(저포드맵) 3주 리셋 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">06</div>
+        <div>
+          <h2 class="cat-merged-title">멘탈 & 뇌 건강</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">우울, 무기력, 집중력 저하, 수면 장애는 &ldquo;마음의 의지&rdquo; 문제에 그치지 않아요. 교감신경 과항진,
+            코르티솔 고갈, 뇌 혈류 정체, 장-뇌 축 독소, 신경전달물질 원료 결핍, 바이오리듬 파괴 등 메커니즘에
+            따라 다른 케어가 필요해요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>교감신경 과항진 & 만성 긴장형</b></div>
+            <span class="mini-sub">초조·불안·입면 장애</span>
+            <p class="mini-mech">교감신경이 과도하게 활성화되어 이완 신호인 부교감신경으로 전환되지 못해 자율신경 균형이 무너진 상태.</p>
+            <span class="mini-routine">부교감 리프팅 & 4-7-8 호흡 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>부신 피로 & 코르티솔 고갈형</b></div>
+            <span class="mini-sub">만성 번아웃·아침 무기력</span>
+            <p class="mini-mech">장기간의 스트레스로 스트레스 호르몬을 분비하는 부신(Adrenal Gland) 기능이 고갈되어 에너지 생성이 중단된 상태.</p>
+            <span class="mini-routine">노 카페인 & 바이오리듬 리셋 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>경추 체증 & 뇌 혈류 정체형</b></div>
+            <span class="mini-sub">브레인 포그·집중력 저하</span>
+            <p class="mini-mech">경추 C커브 파괴 및 목/어깨 근육 경직으로 뇌로 올라가는 굵은 경동맥과 혈관이 압박받아 산소와 영양 공급이 정체.</p>
+            <span class="mini-routine">경추 C커브 리셋 & 뇌 깨우기 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>장-뇌 축(Brain-Gut) 독소형</b></div>
+            <span class="mini-sub">장내 염증성 우울·브레인 둔화</span>
+            <p class="mini-mech">장내 유해균이 생성한 미세 염증 물질이 느슨해진 장 장벽을 통해 뇌-혈관 장벽(BBB)을 자극하여 뇌 신경 염증을 유발.</p>
+            <span class="mini-routine">장 디톡스 & 클린 마인드 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>행복 호르몬(세로토닌) 원료 결핍형</b></div>
+            <span class="mini-sub">계절성 우울·선천적 기력 약화</span>
+            <p class="mini-mech">단백질 소화 흡수력 저하로 신경전달물질(세로토닌, 도파민)의 원료인 트립토판/아미노산 생성이 부족해 유발되는 우울감.</p>
+            <span class="mini-routine">트립토판 득근 & 삼시 세끼 식단 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>서카디언 바이오리듬 파괴형</b></div>
+            <span class="mini-sub">수면 멜라토닌 불균형·야간 활성</span>
+            <p class="mini-mech">야간 생체 시계 파괴로 인해 수면 호르몬인 멜라토닌(Melatonin) 분비 타이밍이 어긋나 뇌의 휴식과 세포 재생이 중단된 상태.</p>
+            <span class="mini-routine">생체리듬 리셋 & 11시 굿나잇 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">07</div>
+        <div>
+          <h2 class="cat-merged-title">호르몬 & 여성 케어</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">생리통, 생리 불순, 난임 환경, PMS는 성호르몬만의 문제가 아니에요. 하초 냉증 및 혈류 체증, 자율신경
+            불균형, 에스트로겐 우세증, 자궁 근육 경직, 내분비 신진대사 저하 등 메커니즘에 따라 다른 케어
+            플랜이 필요해요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>하초(下焦) 냉증 & 자궁 어혈(瘀血) 정체형</b></div>
+            <span class="mini-sub">만성 생리통·난임 환경</span>
+            <p class="mini-mech">하복부 체온 저하로 자궁 주변 혈관이 수축하여 혈류가 정체(어혈)되고, 생리 시 자궁 수축 호르몬(프로스타글란딘)이 과다 분비되어 통증 유발.</p>
+            <span class="mini-routine">자궁 웜업 & 림프 족욕 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>자율신경 불균형 & PMS(월경전 증후군) 폭발형</b></div>
+            <span class="mini-sub">자극·감정 기복·생리전 감기몸살</span>
+            <p class="mini-mech">배란 후 프로게스테론 변화에 교감신경 및 뇌 신경전달물질(세로토닌)이 과도하게 반응하여 자율신경 균형이 붕괴.</p>
+            <span class="mini-routine">PMS 멘탈 케어 & 11시 수면 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>에스트로겐 우세증 & 내분비 교란형</b></div>
+            <span class="mini-sub">다낭성 양상·생리 불순</span>
+            <p class="mini-mech">인슐린 저항성과 장내 독소로 인해 프로게스테론 대비 에스트로겐 호르몬 비율이 높아져 정상 배란 체계가 방해받는 타입.</p>
+            <span class="mini-routine">혈당 방어 & 호르몬 리셋 챌린지</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>기혈 허약 & 착상 환경 미약형</b></div>
+            <span class="mini-sub">난임 케어·황체기 기능 부전</span>
+            <p class="mini-mech">자궁 내막을 두껍게 형성할 아미노산 및 혈액 자원이 부족하고, 황체 형성 호르몬 분비가 약해 착상 유지 환경이 미흡한 타입.</p>
+            <span class="mini-routine">내막 강화 & 고단백 식단 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>장-자궁 축(Gut-Uterus) 염증형</b></div>
+            <span class="mini-sub">배란통·골반통·만성 질염</span>
+            <p class="mini-mech">장내 유해균과 장누수로 발생한 미세 염증 물질이 골반강으로 이동하여 자궁·난소 주변 조직에 만성 면역 염증 반응을 유발.</p>
+            <span class="mini-routine">장-자궁 클린 디톡스 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>경추/요추 불균형 & 골반 변형형</b></div>
+            <span class="mini-sub">골반 울혈 증후군</span>
+            <p class="mini-mech">요추 및 골반 구조 변형으로 골반 내부 정맥 혈관이 눌려 혈액이 빠져나가지 못하고 갇히는 골반 울혈(Pelvic Congestion) 발생.</p>
+            <span class="mini-routine">골반 교정 & 골반강 혈류 리셋 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">08</div>
+        <div>
+          <h2 class="cat-merged-title">질환 관리 & 포스트 케어</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">이 카테고리는 병원의 의학적 치료(수술/약물)를 대체하지 않아요. 치료 후 재발 방지, 체력 및 면역력
+            회복, 만성 질환의 생활습관 개선을 돕는 통합 웰니스 보조 라이프케어 영역이에요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>하초 냉증 & 어혈 정체형</b></div>
+            <span class="mini-sub">자궁근종·난소물혹 보유자 및 수술 후 케어</span>
+            <p class="mini-mech">하복부 체온 저하로 골반강 혈류가 체증(어혈)되어 병원 치료 후에도 하초 환경이 개선되지 않아 재발 리스크가 남아있는 타입.</p>
+            <span class="mini-routine">자궁 온열 & 하초 웜업 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>부신 피로 & 면역 체온 저하형</b></div>
+            <span class="mini-sub">암 수술/항암 치료 후 회복기</span>
+            <p class="mini-mech">큰 치료 후 부신 호르몬 고갈과 전신 미세 체온 저하로 면역 세포(NK세포 등)의 감시 활동이 위축된 타입.</p>
+            <span class="mini-routine">면역 체온 36.5도 유지 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>장관 독소 & 간 대사 과부하형</b></div>
+            <span class="mini-sub">지방간·간수치 이상 보유자</span>
+            <p class="mini-mech">장내 유해균 독소가 간문맥으로 유입되고 영양 과다로 간세포에 지방이 고착화되어 간 해독 기능이 저하된 상태.</p>
+            <span class="mini-routine">간 디톡스 & 금주 챌린지</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>인슐린 혹사 & 혈관 염증형</b></div>
+            <span class="mini-sub">당뇨 전 단계 & 고지혈증 관리자</span>
+            <p class="mini-mech">지속적인 혈당 스파이크로 혈관 내벽에 염증이 생기고 췌장이 혹사당해 대사 증후군으로 진행되는 단계.</p>
+            <span class="mini-routine">식순 다이어트 & 혈당 방어 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>교감신경 과항진 & 혈류 저항형</b></div>
+            <span class="mini-sub">고혈압 예방 & 혈관 이완 케어</span>
+            <p class="mini-mech">스트레스로 교감신경이 지속 항진되어 혈관이 수축하고, 혈액 순환 저항이 증가해 심혈관 부담이 커진 상태.</p>
+            <span class="mini-routine">부교감 리프팅 & 혈압 안정 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>경추/요추 체증 & 수술 후 재발 방지형</b></div>
+            <span class="mini-sub">디스크 수술/시술 후 포스트 케어</span>
+            <p class="mini-mech">수술 후 척추 주변 세열근과 코어 근육의 지지력이 떨어져 다시 특정 마디로 체중이 쏠리고 신경관을 자극하는 타입.</p>
+            <span class="mini-routine">척추 코어 보호 & 바른 자세 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">09</div>
+        <div>
+          <h2 class="cat-merged-title">피부 & 호르몬 뷰티</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">피부 트러블이나 건조함은 화장품 같은 외적 케어만으로 해결되지 않아요. 장내 독소 유출, 인슐린/남성
+            호르몬 스파이크, 교감신경 수축, 진피층 영양 결핍, 여성호르몬 불균형, 혈액순환 체증 등 속 원인에
+            따라 케어 플랜이 달라져요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>장-피부 축(Gut-Skin) 독소 유출형</b></div>
+            <span class="mini-sub">만성 턱/입가 뾰루지·장내 유해균</span>
+            <p class="mini-mech">장내 유해균 증식과 느슨해진 장 장벽으로 침투한 독소가 혈류를 타고 이동하여 하안면(턱/입가) 피지선에 만성 면역 염증 유발.</p>
+            <span class="mini-routine">장 디톡스 & 클린 스킨 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>인슐린 & 피지 스파이크형</b></div>
+            <span class="mini-sub">화농성 여드름·모공 팽창</span>
+            <p class="mini-mech">혈당 스파이크로 인한 인슐린과 IGF-1(인슐린유사성장인자) 과다 분비가 피지선 호르몬을 자극해 모공을 막고 여드름균 증식.</p>
+            <span class="mini-routine">혈당 방어 & 정제당 컷 뷰티 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>교감신경 수축 & 장벽 붕괴형</b></div>
+            <span class="mini-sub">극심한 속건조·홍조·민감성</span>
+            <p class="mini-mech">교감신경 과활성화로 안면 모세혈관이 수축해 진피층으로 수분/영양 공급이 차단되고, 세라마이드 장벽이 파괴된 상태.</p>
+            <span class="mini-routine">부교감 리프팅 & 피부 장벽 챌린지</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>에스트로겐 저하 & 탄력 저하형</b></div>
+            <span class="mini-sub">생리 전 칙칙함·기미/잡티·주름</span>
+            <p class="mini-mech">황체기(생리 전) 또는 내분비 저하로 에스트로겐 수치가 감소하면서 콜라겐 합성이 급감하고 멜라닌 색소가 과다 활성화.</p>
+            <span class="mini-routine">생체리듬 & 콜라겐 리셋 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>하초 냉증 & 안면 상열(上熱)형</b></div>
+            <span class="mini-sub">성인성 여드름·두피/얼굴 열감</span>
+            <p class="mini-mech">하복부 냉증으로 기혈 순환이 막혀 열이 위로 치솟는 상열하한(上熱下寒) 현상으로 안면 피부 온도가 상승해 염증 가속화.</p>
+            <span class="mini-routine">아랫배 따뜻 & 얼굴 쿨다운 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>기혈 허약 & 진피 영양 결핍형</b></div>
+            <span class="mini-sub">마른 피부·창백함·피부 안색 저하</span>
+            <p class="mini-mech">소화 흡수력 저하로 피부 진피층의 바탕 물질인 아미노산, 철분, 미네랄 흡수가 부진하여 피부 재생 세포 활동 중단.</p>
+            <span class="mini-routine">삼시 세끼 영양 뷰티 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">10</div>
+        <div>
+          <h2 class="cat-merged-title">근골격 & 림프 순환</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">체액 정체나 관절·근육 통증은 마사지나 폼롤러 같은 일회성 관리로 해결되지 않아요. 하초 체온 저하로
+            인한 림프 체증, C커브 파괴로 인한 신경 압박, 대사성 인슐린 염증, 자율신경 경직, 기혈 허약 및 근육
+            자원 고갈 등 메커니즘에 따라 다른 케어가 필요해요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>하초 냉증 & 하체 림프 체증형</b></div>
+            <span class="mini-sub">만성 하체 부종·코끼리 다리</span>
+            <p class="mini-mech">하복부 체온 저하로 골반강 림프절과 서해부(사타구니) 림프관이 축소되어, 하체에서 올라오는 체액이 판막을 통과하지 못하고 고여 지방화되는 타입.</p>
+            <span class="mini-routine">하체 림프 리프팅 & 족욕 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>경추 C커브 파괴 & 승모근 체증형</b></div>
+            <span class="mini-sub">거북목·일자목·만성 어깨/목 통증</span>
+            <p class="mini-mech">경추 C커브가 평평해지면서 두부 무게를 견디기 위해 승모근과 견갑거근이 상시 과긴장하고, 액와 림프절로 빠져나가는 안면/두부 림프관이 압박받는 타입.</p>
+            <span class="mini-routine">C커브 리셋 & 흉추 열기 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>골반 변형 & 정맥 울혈형</b></div>
+            <span class="mini-sub">골반 불균형·짝다리·골반 통증</span>
+            <p class="mini-mech">요추 및 골반 구조 비대칭으로 정맥과 림프관이 물리적으로 눌려 골반 내부에 혈액이 갇히는 골반 울혈(Pelvic Congestion) 발생.</p>
+            <span class="mini-routine">골반 밸런스 & 힙 교정 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>교감신경 과항진 & 전신 근육 경직형</b></div>
+            <span class="mini-sub">전신 몸살·섬유근통 양상·담 걸림</span>
+            <p class="mini-mech">교감신경이 늘 켜져 있어 미세 근육 입자들이 지속해서 수축 상태를 유지하며, 근육 내 젖산과 노폐물이 림프관으로 배출되지 못하고 고이는 상태.</p>
+            <span class="mini-routine">부교감 리프팅 & 전신 이완 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>인슐린 저항성 & 만성 관절 염증형</b></div>
+            <span class="mini-sub">무릎/손가락 관절 통증·지방 림프 부종</span>
+            <p class="mini-mech">혈당 스파이크와 인슐린 과다 분비가 전신 염증 수치를 올리고, 과도한 체지방이 림프관을 눌러 지방-림프 부종(Lipedema)을 유발.</p>
+            <span class="mini-routine">혈당 방어 & 항염 림프 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>기혈 허약 & 근육 자원 고갈형</b></div>
+            <span class="mini-sub">마른 부종·골밀도 저하·자세 유지 불능</span>
+            <p class="mini-mech">소화 흡수력 저하로 근육을 생성할 단백질과 미네랄(칼슘, 아연)이 부족해 체형을 지지하는 코어 근육이 무너지고 림프 펌핑력이 상실된 타입.</p>
+            <span class="mini-routine">단백질 득근 & 골밀도 밸런스 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">11</div>
+        <div>
+          <h2 class="cat-merged-title">기관 징후 & 정기 모니터링</h2>
+          <p class="cat-cover-count">6유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">이 카테고리는 특정 질병을 단정하는 의료 행위가 아니라, 생체 온도 변화·내분비 신호·자율신경 균형·
+            장내 독소 반응을 추적해 신체 기관의 이상 징후를 조기에 감지하고 병원 정기 검진 및 생활습관 리셋을
+            돕는 예방적 웰니스 모니터링이에요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(3,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>갑상선 대사 지연 & 온열 저하형</b></div>
+            <span class="mini-sub">갑상선 체온/대사 이상 징후</span>
+            <p class="mini-mech">갑상선 호르몬 대사 신호가 저하되어 신체 기초대사량이 떨어지고, 장기 온도가 낮아져 에너지가 소비되지 않는 타입.</p>
+            <span class="mini-routine">체온 1도 올리기 & 아침 체온 기록 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>하초(골반강) 체온 저하 & 자궁/난소 울혈형</b></div>
+            <span class="mini-sub">자궁/난소 이상 신호</span>
+            <p class="mini-mech">하복부 장기 온도가 떨어지면서 자궁과 난소 주변 정맥/림프 순환이 멈춰 울혈이 발생하고 이상 조직 반응이 유발되는 타입.</p>
+            <span class="mini-routine">하초 온열 & 자궁 웜업 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>장관 독소 유출 & 간 반사구 자극형</b></div>
+            <span class="mini-sub">간 대사/해독 부담 이상 징후</span>
+            <p class="mini-mech">장내 유해균 독소가 간문맥을 통해 들어와 간의 1·2단계 해독 경로에 부담을 주고 만성 대사 피로를 유발.</p>
+            <span class="mini-routine">간 디톡스 & 노 알코올 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>인슐린 저항성 & 췌장 자극형</b></div>
+            <span class="mini-sub">당대사/대사증후군 조기 징후</span>
+            <p class="mini-mech">지속적인 혈당 스파이크로 췌장의 인슐린 분비 세포가 혹사당하여 혈당 조절 능력이 저하되는 이상 신호.</p>
+            <span class="mini-routine">혈당 방어 & 식순 다이어트 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>교감신경 지속 과항진 & 심혈관 부담형</b></div>
+            <span class="mini-sub">자율신경/혈압 이상 징후</span>
+            <p class="mini-mech">만성 스트레스로 교감신경이 가라앉지 않고 지속 켜져 있어 혈관 수축과 심박수 상승이 계속되는 상태.</p>
+            <span class="mini-routine">부교감 리프팅 & 혈압 이완 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>기혈 수척 & 전신 면역선 약화형</b></div>
+            <span class="mini-sub">림프/면역 징후 저하</span>
+            <p class="mini-mech">영양 흡수 부진과 면역 세포 생성이 떨어져 림프절 및 면역 체계가 체내 이상 세포나 바이러스를 감시하는 기능이 저하된 상태.</p>
+            <span class="mini-routine">면역 리셋 & 영양 식단 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-light mini-slide cat-merged-slide">
+      <span class="eyebrow on-light">04 · FULL CARE GUIDE</span>
+      <div class="cat-merged-head">
+        <div class="cat-cover-badge">12</div>
+        <div>
+          <h2 class="cat-merged-title">시니어 웰니스 & 액티브 케어</h2>
+          <p class="cat-cover-count">8유형</p>
+        </div>
+      </div>
+      <p class="lede cat-cover-intro cat-merged-intro">시니어 계층의 건강 문제는 &ldquo;운동량을 늘려라&rdquo;나 &ldquo;영양제를 잘 챙겨 드시라&rdquo;는 일편단심형
+            접근으로 해결되지 않아요. 퇴행성 관절 마모, 근감소증, 복합 대사 질환, 뇌-모세혈관 순환 저하, 요추/
+            골반 변형, 부신/면역 체온 고갈 등 시니어 특유의 다발성 메커니즘별로 커뮤니티·식습관·운동·홈케어를
+            결합한 맞춤 플랜이 들어가요.</p>
+      <div class="mini-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">01</span><b>퇴행성 관절 마모 & 관절염 염증형</b></div>
+            <span class="mini-sub">무릎·손가락 통증 & 붓기</span>
+            <p class="mini-mech">연골 마모와 함께 관절 활액막에 염증이 생기고, 체중 하중이 관절에 직접 전달되어 통증을 유발하는 타입.</p>
+            <span class="mini-routine">관절 관전 & 관절 무부하 체조 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">02</span><b>기혈 고갈 & 마른 근감소(Sarcopenia)형</b></div>
+            <span class="mini-sub">하체 약화·낙상 위험·기력 저하</span>
+            <p class="mini-mech">소화 흡수 기능 저하로 단백질과 미네랄 섭취가 부진하여 하체 대퇴사두근과 코어 근육 자원이 고갈되고 낙상 위험이 높아진 타입.</p>
+            <span class="mini-routine">시니어 득근 & 부드러운 단백질 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">03</span><b>복합 대사 & 혈관 탄력 저하형</b></div>
+            <span class="mini-sub">고혈압·당뇨·고지혈증 동반</span>
+            <p class="mini-mech">혈관 벽의 탄력이 떨어지고 인슐린 저항성이 결합하여 전신 미세 염증을 유발하고 성인병 대사 증후군을 가속화하는 타입.</p>
+            <span class="mini-routine">혈당·혈압 안정 15분 산책 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">04</span><b>체온 저하 & 뇌 모세혈관 정체형</b></div>
+            <span class="mini-sub">수면 장애·건망증·브레인 둔화</span>
+            <p class="mini-mech">전신 및 하복부 생체 온도가 떨어지면서 뇌 모세혈관 순환이 지연되고 신경 전달 물질 분비가 축소되는 타입.</p>
+            <span class="mini-routine">시니어 체온 1도 올리기 & 브레인 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">05</span><b>요추 변형 & 골반 협착형</b></div>
+            <span class="mini-sub">퇴행성 허리 디스크·협착증·엉치 통증</span>
+            <p class="mini-mech">요추 변형 및 척추관이 좁아져 신경과 림프관이 눌리면서 다리로 내려가는 신경 혈류 장애를 유발하는 타입.</p>
+            <span class="mini-routine">척추 바른 골반 & 바른 자세 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">06</span><b>장관 독소 & 소화기 마비형</b></div>
+            <span class="mini-sub">시니어 만성 변비 & 복부 팽만</span>
+            <p class="mini-mech">연령 증가에 따른 장 연동 운동 능력 저하 및 장내 유익균 감소로 대변이 장에 오래 머물며 독소를 배출하는 타입.</p>
+            <span class="mini-routine">장 클린 & 쾌변 일기 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">07</span><b>골반저근 약화 & 하초 림프 체증형</b></div>
+            <span class="mini-sub">시니어 요실금·요의 자극</span>
+            <p class="mini-mech">노화 및 호르몬 저하로 골반 장기를 받쳐주는 골반저근(Pelvic Floor Muscle)의 탄력이 떨어지고, 하복부 체온 저하로 방광 주변 림프 순환이 막히는 타입.</p>
+            <span class="mini-routine">골반저근 리프팅 & 코어 케어 클럽</span>
+          </div>
+          <div class="mini-card">
+            <div class="mini-head"><span class="mini-num">08</span><b>세로토닌 고갈 & 고립성 노년 우울형</b></div>
+            <span class="mini-sub">시니어 우울증·무기력·의욕 상실</span>
+            <p class="mini-mech">단백질/미네랄 소화 흡수 저하로 행복 호르몬(세로토닌, 도파민)의 원료가 고갈되고, 사회적 활동 축소로 자율신경 생체 바이오리듬이 파괴된 타입.</p>
+            <span class="mini-routine">햇빛 산책 & 마음 나눔 칭찬 클럽</span>
+          </div></div>
+    </section>
+
+<section class="slide on-dark">
+  <span class="eyebrow on-dark">05 · WHERE I WANT TO GO</span>
+  <h2>제가 LUDIA로 만들고 싶은 세상</h2>
+  <div class="story-body slide-body">
+        <p>
+          돈과 시간이 없어서 내 몸을 이해하는 걸 포기하는 사람이 없었으면 합니다. 학업과 일에 쫓기는
+          20대부터 관절과 성인병을 관리해야 하는 5070세대까지, 나이와 상관없이 자신의 원인을 알고 그에
+          맞게 관리할 수 있는 생태계를 만들고 싶습니다.
+        </p>
+        <p>
+          혼자 하는 관리는 오래가지 못한다는 것도 알고 있습니다. 그래서 같은 원인, 같은 목표를 가진
+          사람들이 함께 인증하고 지속할 수 있는 커뮤니티를 함께 키워가려 합니다.
+        </p>
+        <p>
+          그리고 이 모든 과정이 의료 행위로 오인되지 않는 안전한 웰니스 영역 안에서, 개인의 민감한
+          생체 데이터를 책임감 있게 다루며 이루어지길 바랍니다. 언젠가는 국내를 넘어, 해외에서도 자신의
+          몸을 이해하고 싶은 사람들에게 닿는 서비스가 되었으면 합니다.
+        </p>
+      </div>
+  <div class="commit-row">
+        <span class="commit-chip">전 연령 포용</span>
+        <span class="commit-chip">실행 가능한 지속성</span>
+        <span class="commit-chip">책임 있는 데이터 운용</span>
+        <span class="commit-chip">글로벌 확장</span>
+      </div>
+</section>
+
+<section class="slide on-dark cover-slide">
+  <img class="foot-logo" src="ludia-logo.png" alt="LUDIA 로고">
+  <div class="foot-word">LUDIA</div>
+  <p class="foot-kr">INTEGRATIVE HEALTH</p>
+  <div class="foot-line"></div>
+  <p class="foot-closing">당신의 몸속, 진짜 원인을 함께 찾습니다.</p>
+  <p class="foot-sub">LUDIA &middot; Regeneration &middot; Healing &middot; Luminous Insight</p>
+</section>
+</div>

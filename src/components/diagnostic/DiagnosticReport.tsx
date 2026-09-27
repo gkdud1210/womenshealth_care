@@ -10,6 +10,7 @@ import { CareTypeCard } from './CareTypeCard'
 import { SUBTYPE_CARD_IDS } from '@/data/careSubtypes'
 import { MultimodalDataPanel } from '@/components/calendar/MultimodalDataPanel'
 import { DiagnosticAnswerPanel } from './DiagnosticAnswerPanel'
+import { IrisDetectionCard } from './IrisDetectionCard'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { OnboardingProfile } from '@/lib/onboarding-profile'
 import type { DiagnosticSession } from '@/lib/diagnosticHistory'
@@ -311,6 +312,9 @@ export function DiagnosticReport({ session }: Props) {
           </div>
         </div>
       </div>
+
+      {/* 홍채 스캔에서 실제 검출된 병소 (기기 스캔으로 분석한 경우에만) */}
+      <IrisDetectionCard iris={data.iris} />
 
       {/* 탈모 케어 유형 분류 & 맞춤 웰니스 */}
       {hasCare(profile, 'hair_scalp') && (
