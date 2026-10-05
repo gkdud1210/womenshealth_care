@@ -352,6 +352,11 @@ function CategoryChips({ value, onChange, recommended = [] }: {
   return (
     <>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3">
+        <button onClick={() => setShowAll(true)}
+          className="flex-shrink-0 flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
+          style={{ background: '#fff', borderColor: '#fda4af', color: '#e11d5a' }}>
+          <LayoutGrid className="w-3.5 h-3.5" /> 전체 종목 보기
+        </button>
         <button onClick={() => onChange('all')}
           className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
           style={value === 'all'
@@ -373,11 +378,6 @@ function CategoryChips({ value, onChange, recommended = [] }: {
             </button>
           )
         })}
-        <button onClick={() => setShowAll(true)}
-          className="flex-shrink-0 flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-          style={{ background: '#fff', borderColor: '#fda4af', color: '#e11d5a' }}>
-          <LayoutGrid className="w-3.5 h-3.5" /> 전체 종목 보기
-        </button>
       </div>
       {showAll && (
         <CategoryBrowser value={value} onSelect={onChange} onClose={() => setShowAll(false)}
