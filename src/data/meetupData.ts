@@ -15,7 +15,19 @@ export type MeetupCategory =
   | 'climbing'
   | 'dance'
   | 'golf'
+  | 'table_tennis'
+  | 'volleyball'
+  | 'bowling'
+  | 'pilates'
   | 'cooking'
+  | 'baking'
+  | 'tea'
+  | 'piano'
+  | 'guitar'
+  | 'violin'
+  | 'singing'
+  | 'drawing'
+  | 'crafts'
   | 'study'
   | 'mind'
   | 'etc'
@@ -38,7 +50,7 @@ export const CATEGORY_META: Record<MeetupCategory, CategoryMeta> = {
     gradient: 'linear-gradient(135deg,#fee2e2,#fca5a5)',
   },
   yoga: {
-    label: '요가·필라테스', emoji: '🧘', color: '#7c3aed', bg: 'rgba(124,58,237,0.1)',
+    label: '요가', emoji: '🧘', color: '#7c3aed', bg: 'rgba(124,58,237,0.1)',
     gradient: 'linear-gradient(135deg,#ede9fe,#c4b5fd)',
   },
   running: {
@@ -77,9 +89,57 @@ export const CATEGORY_META: Record<MeetupCategory, CategoryMeta> = {
     label: '골프', emoji: '⛳', color: '#4d7c0f', bg: 'rgba(77,124,15,0.1)',
     gradient: 'linear-gradient(135deg,#f7fee7,#a3e635)',
   },
+  table_tennis: {
+    label: '탁구', emoji: '🏓', color: '#e11d48', bg: 'rgba(225,29,72,0.1)',
+    gradient: 'linear-gradient(135deg,#ffe4e6,#fda4af)',
+  },
+  volleyball: {
+    label: '배구', emoji: '🏐', color: '#d97706', bg: 'rgba(217,119,6,0.1)',
+    gradient: 'linear-gradient(135deg,#fef3c7,#fbbf24)',
+  },
+  bowling: {
+    label: '볼링', emoji: '🎳', color: '#475569', bg: 'rgba(71,85,105,0.1)',
+    gradient: 'linear-gradient(135deg,#f1f5f9,#cbd5e1)',
+  },
+  pilates: {
+    label: '필라테스', emoji: '🤸', color: '#a21caf', bg: 'rgba(162,28,175,0.1)',
+    gradient: 'linear-gradient(135deg,#fae8ff,#f0abfc)',
+  },
   cooking: {
     label: '쿠킹·건강식', emoji: '🍳', color: '#ca8a04', bg: 'rgba(202,138,4,0.1)',
     gradient: 'linear-gradient(135deg,#fef9c3,#fde047)',
+  },
+  baking: {
+    label: '베이킹', emoji: '🧁', color: '#c2410c', bg: 'rgba(194,65,12,0.1)',
+    gradient: 'linear-gradient(135deg,#ffedd5,#fed7aa)',
+  },
+  tea: {
+    label: '차·티타임', emoji: '🍵', color: '#15803d', bg: 'rgba(21,128,61,0.1)',
+    gradient: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
+  },
+  piano: {
+    label: '피아노', emoji: '🎹', color: '#334155', bg: 'rgba(51,65,85,0.1)',
+    gradient: 'linear-gradient(135deg,#f1f5f9,#94a3b8)',
+  },
+  guitar: {
+    label: '기타(악기)', emoji: '🎸', color: '#b91c1c', bg: 'rgba(185,28,28,0.1)',
+    gradient: 'linear-gradient(135deg,#fee2e2,#f87171)',
+  },
+  violin: {
+    label: '바이올린·현악', emoji: '🎻', color: '#92400e', bg: 'rgba(146,64,14,0.1)',
+    gradient: 'linear-gradient(135deg,#fef3c7,#d97706)',
+  },
+  singing: {
+    label: '노래·합창', emoji: '🎤', color: '#be185d', bg: 'rgba(190,24,93,0.1)',
+    gradient: 'linear-gradient(135deg,#fce7f3,#f472b6)',
+  },
+  drawing: {
+    label: '그림·드로잉', emoji: '🎨', color: '#0369a1', bg: 'rgba(3,105,161,0.1)',
+    gradient: 'linear-gradient(135deg,#e0f2fe,#38bdf8)',
+  },
+  crafts: {
+    label: '공예·뜨개', emoji: '🧶', color: '#9d174d', bg: 'rgba(157,23,77,0.1)',
+    gradient: 'linear-gradient(135deg,#fce7f3,#f9a8d4)',
   },
   study: {
     label: '독서·스터디', emoji: '📚', color: '#4f46e5', bg: 'rgba(79,70,229,0.1)',
@@ -96,6 +156,54 @@ export const CATEGORY_META: Record<MeetupCategory, CategoryMeta> = {
 }
 
 export const ALL_CATEGORIES = Object.keys(CATEGORY_META) as MeetupCategory[]
+
+// ── 종목 분류 (전체 종목 보기 창) ───────────────────────────────────────────
+
+export interface CategorySection {
+  label: string
+  categories: MeetupCategory[]
+}
+
+export interface CategoryGroup {
+  id: string
+  label: string
+  emoji: string
+  sections: CategorySection[]   // 세부 분류가 없으면 label '' 인 섹션 하나
+}
+
+export const CATEGORY_GROUPS: CategoryGroup[] = [
+  {
+    id: 'sports', label: '스포츠', emoji: '🏅',
+    sections: [
+      { label: '라켓 스포츠', categories: ['badminton', 'tennis', 'table_tennis'] },
+      { label: '구기·레저',   categories: ['volleyball', 'golf', 'bowling'] },
+      { label: '러닝·걷기',   categories: ['running', 'walking'] },
+      { label: '피트니스',    categories: ['gym', 'yoga', 'pilates', 'dance'] },
+      { label: '아웃도어',    categories: ['hiking', 'cycling', 'climbing'] },
+      { label: '수상 스포츠', categories: ['swimming'] },
+    ],
+  },
+  {
+    id: 'food', label: '요리', emoji: '🍳',
+    sections: [{ label: '', categories: ['cooking', 'baking', 'tea'] }],
+  },
+  {
+    id: 'music', label: '악기·음악', emoji: '🎵',
+    sections: [{ label: '', categories: ['piano', 'guitar', 'violin', 'singing'] }],
+  },
+  {
+    id: 'art', label: '취미·공예', emoji: '🎨',
+    sections: [{ label: '', categories: ['drawing', 'crafts'] }],
+  },
+  {
+    id: 'mind', label: '마음·배움', emoji: '🕯️',
+    sections: [{ label: '', categories: ['mind', 'study'] }],
+  },
+  {
+    id: 'etc', label: '기타', emoji: '✨',
+    sections: [{ label: '', categories: ['etc'] }],
+  },
+]
 
 export function isMeetupCategory(v: string): v is MeetupCategory {
   return (ALL_CATEGORIES as string[]).includes(v)
@@ -223,7 +331,7 @@ export const SEED_GROUPS: MeetupGroup[] = [
     createdBy: 'user-11', createdByName: '밴쿠버새댁', createdAt: daysAgo(25),
   },
   {
-    id: 'g-au-syd-1', name: '시드니 스트라스필드 필라테스', category: 'yoga',
+    id: 'g-au-syd-1', name: '시드니 스트라스필드 필라테스', category: 'pilates',
     description: '저녁 필라테스 소모임. 워홀·유학생도 부담 없이 오세요 🇦🇺',
     place: { country: 'AU', region: 'nsw', city: 'strathfield', venue: 'Strathfield Studio' },
     onlineJoinable: false, language: '한국어', schedule: '매주 월·목 19:30',

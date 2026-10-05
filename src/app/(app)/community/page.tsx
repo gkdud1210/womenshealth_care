@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Plus, X, Search, MapPin, Clock, Users, Heart, MessageCircle,
-  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages, Sparkles,
+  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages, Sparkles, LayoutGrid,
 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -11,7 +11,7 @@ import { cn, compressImage } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
 import { recommendedMeetupCategories } from '@/lib/care-recommend'
 import {
-  ALL_CATEGORIES, CATEGORY_META, SEED_GROUPS, LANGUAGE_OPTIONS, isMeetupCategory, normalizeGroup,
+  CATEGORY_GROUPS, CATEGORY_META, SEED_GROUPS, LANGUAGE_OPTIONS, isMeetupCategory, normalizeGroup,
   type MeetupCategory, type MeetupGroup, type MeetupPost, type MeetupLanguage, type MeetupPlace,
 } from '@/data/meetupData'
 import {
@@ -274,37 +274,116 @@ function LocationPicker({ mode, initial, onClose, onSelect }: {
   )
 }
 
+// ── Category browser (전체 종목 보기) ────────────────────────────────────────
+
+function CategoryBrowser({ value, onSelect, onClose, recommended = [], allowAll = false }: {
+  value: MeetupCategory | 'all'
+  onSelect: (c: MeetupCategory | 'all') => void
+  onClose: () => void
+  recommended?: MeetupCategory[]
+  allowAll?: boolean
+}) {
+  const pick = (c: MeetupCategory | 'all') => { onSelect(c); onClose() }
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
+      style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
+      <div className="w-full sm:max-w-lg max-h-[85vh] flex flex-col bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
+          <p className="text-base font-bold text-slate-800">전체 종목</p>
+          <button onClick={onClose} aria-label="닫기" className="p-1 -mr-1 rounded-full hover:bg-slate-100">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+          {allowAll && (
+            <button onClick={() => pick('all')}
+              className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold border transition-all"
+              style={value === 'all'
+                ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' }
+                : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b' }}>
+              🏠 모든 종목 모임 보기
+            </button>
+          )}
+          {CATEGORY_GROUPS.map(group => (
+            <div key={group.id}>
+              <p className="text-sm font-bold text-slate-800 mb-2.5">{group.emoji} {group.label}</p>
+              <div className="space-y-3">
+                {group.sections.map(section => (
+                  <div key={section.label || group.id}>
+                    {section.label && (
+                      <p className="text-[11px] font-semibold text-slate-400 mb-1.5">{section.label}</p>
+                    )}
+                    <div className="flex flex-wrap gap-2">
+                      {section.categories.map(c => {
+                        const meta = CATEGORY_META[c]
+                        const on = value === c
+                        return (
+                          <button key={c} onClick={() => pick(c)}
+                            className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
+                            style={on
+                              ? { background: meta.bg, borderColor: meta.color, color: meta.color }
+                              : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b' }}>
+                            {meta.emoji} {meta.label}{recommended.includes(c) && ' 💜'}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Category chip row ────────────────────────────────────────────────────
 
 function CategoryChips({ value, onChange, recommended = [] }: {
   value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void; recommended?: MeetupCategory[]
 }) {
-  // 내 케어카드에 맞는 종목을 앞에 보여줘요
-  const ordered = [...recommended, ...ALL_CATEGORIES.filter(c => !recommended.includes(c))]
+  const [showAll, setShowAll] = useState(false)
+  // 내 케어카드에 맞는 종목 몇 개만 바로 보여주고, 나머지는 전체 종목 보기 창에서 골라요
+  const quick = recommended.slice(0, 4)
+  const shown = value !== 'all' && !quick.includes(value) ? [value, ...quick] : quick
   return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3">
-      <button onClick={() => onChange('all')}
-        className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-        style={value === 'all'
-          ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' }
-          : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-        🏠 전체 종목
-      </button>
-      {ordered.map(c => {
-        const meta = CATEGORY_META[c]
-        const on = value === c
-        const rec = recommended.includes(c)
-        return (
-          <button key={c} onClick={() => onChange(c)}
-            className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-            style={on
-              ? { background: meta.bg, borderColor: meta.color, color: meta.color }
-              : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-            {meta.emoji} {meta.label}{rec && ' 💜'}
-          </button>
-        )
-      })}
-    </div>
+    <>
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3">
+        <button onClick={() => onChange('all')}
+          className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
+          style={value === 'all'
+            ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' }
+            : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
+          🏠 전체
+        </button>
+        {shown.map(c => {
+          const meta = CATEGORY_META[c]
+          const on = value === c
+          const rec = recommended.includes(c)
+          return (
+            <button key={c} onClick={() => onChange(c)}
+              className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
+              style={on
+                ? { background: meta.bg, borderColor: meta.color, color: meta.color }
+                : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
+              {meta.emoji} {meta.label}{rec && ' 💜'}
+            </button>
+          )
+        })}
+        <button onClick={() => setShowAll(true)}
+          className="flex-shrink-0 flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
+          style={{ background: '#fff', borderColor: '#fda4af', color: '#e11d5a' }}>
+          <LayoutGrid className="w-3.5 h-3.5" /> 전체 종목 보기
+        </button>
+      </div>
+      {showAll && (
+        <CategoryBrowser value={value} onSelect={onChange} onClose={() => setShowAll(false)}
+          recommended={recommended} allowAll />
+      )}
+    </>
   )
 }
 
@@ -407,6 +486,7 @@ function CreateGroupModal({ defaultPlace, onClose, onCreate }: {
   const [schedule, setSchedule] = useState('')
   const [maxMembers, setMaxMembers] = useState(10)
   const [showPicker, setShowPicker] = useState(false)
+  const [showCategories, setShowCategories] = useState(false)
 
   const isOnlineGroup = place.country === ONLINE_CODE
   const canSubmit = name.trim().length > 0 && description.trim().length > 0
@@ -428,19 +508,22 @@ function CreateGroupModal({ defaultPlace, onClose, onCreate }: {
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
         <div>
           <p className="text-xs font-bold text-slate-500 mb-2">종목</p>
-          <div className="flex flex-wrap gap-2">
-            {ALL_CATEGORIES.map(c => {
-              const meta = CATEGORY_META[c]
-              const on = category === c
-              return (
-                <button key={c} onClick={() => setCategory(c)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
-                  style={on ? { background: meta.bg, borderColor: meta.color, color: meta.color } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-                  {meta.emoji} {meta.label}
-                </button>
-              )
-            })}
+          <div className="flex items-center gap-2">
+            <span className="px-3 py-1.5 rounded-full text-xs font-semibold border"
+              style={{ background: CATEGORY_META[category].bg, borderColor: CATEGORY_META[category].color, color: CATEGORY_META[category].color }}>
+              {CATEGORY_META[category].emoji} {CATEGORY_META[category].label}
+            </span>
+            <button onClick={() => setShowCategories(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold border"
+              style={{ background: '#fff', borderColor: '#fda4af', color: '#e11d5a' }}>
+              <LayoutGrid className="w-3.5 h-3.5" /> 종목 선택
+            </button>
           </div>
+          {showCategories && (
+            <CategoryBrowser value={category}
+              onSelect={c => { if (c !== 'all') setCategory(c) }}
+              onClose={() => setShowCategories(false)} />
+          )}
         </div>
 
         <div>

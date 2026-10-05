@@ -149,7 +149,7 @@ export const CARE_MEETUP_CATEGORIES: Record<CareCaseId, MeetupCategory[]> = {
   hair_scalp:            ['walking', 'mind', 'cooking'],
   weight_metabolic:      ['running', 'gym', 'dance', 'cooking'],
   male_wellness:         ['gym', 'climbing', 'running', 'golf'],
-  posture_correction:    ['yoga', 'swimming', 'climbing'],
+  posture_correction:    ['pilates', 'yoga', 'swimming', 'climbing'],
   gut_detox:             ['cooking', 'walking', 'yoga'],
   mental_brain:          ['mind', 'yoga', 'study', 'walking'],
   hormone_female:        ['yoga', 'walking', 'mind', 'cooking'],
