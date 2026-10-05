@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Plus, X, Search, MapPin, Clock, Users, Heart, MessageCircle,
-  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages, Sparkles, LayoutGrid,
+  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages, Sparkles, LayoutGrid, Map as MapIcon,
 } from 'lucide-react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { useAuth } from '@/hooks/useAuth'
 import { cn, compressImage } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
@@ -24,6 +25,16 @@ import {
   CHAT_KEY, loadChats, saveChats, loadChatReads, saveChatReads, appendMessage, roomMessages, unreadCount,
   type ChatMessage, type ChatRooms, type ChatReadMap,
 } from '@/lib/meetup-chat'
+
+// 지도(Leaflet)는 브라우저에서만 동작해서 필요할 때 불러와요
+const MeetupMap = dynamic(() => import('@/components/community/MeetupMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="fixed inset-0 z-[45] flex items-center justify-center bg-white">
+      <p className="text-sm text-slate-400">지도를 불러오는 중…</p>
+    </div>
+  ),
+})
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -149,11 +160,12 @@ function matchesPlace(g: MeetupGroup, f: PlaceFilter): boolean {
 
 // ── 위치 선택 모달 ──────────────────────────────────────────────────────────
 
-function LocationPicker({ mode, initial, onClose, onSelect }: {
+function LocationPicker({ mode, initial, onClose, onSelect, onOpenMap }: {
   mode: 'filter' | 'create'
   initial: PlaceRef | null
   onClose: () => void
   onSelect: (place: PlaceRef | null) => void   // filter 모드에서 null = 전체
+  onOpenMap?: () => void
 }) {
   const [country, setCountry] = useState<Country | null>(initial ? getCountry(initial.country) ?? null : null)
   const [region, setRegion] = useState<Region | null>(
@@ -215,6 +227,15 @@ function LocationPicker({ mode, initial, onClose, onSelect }: {
                 style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.2)' }}>
                 <Globe className="w-4.5 h-4.5" style={{ color: '#e11d5a', width: 18, height: 18 }} />
                 <span className="flex-1 text-[13.5px] font-bold" style={{ color: '#e11d5a' }}>전 세계 모든 지역 보기</span>
+              </button>
+            )}
+            {onOpenMap && (
+              <button onClick={() => { onClose(); onOpenMap() }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl mb-3 text-left"
+                style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)' }}>
+                <MapIcon style={{ color: '#4f46e5', width: 18, height: 18 }} />
+                <span className="flex-1 text-[13.5px] font-bold" style={{ color: '#4f46e5' }}>🗺️ 지도로 전 세계 모임 보기</span>
+                <ChevronRight className="w-4 h-4" style={{ color: '#818cf8' }} />
               </button>
             )}
             {COUNTRIES_BY_CONTINENT.map(group => (
@@ -866,6 +887,7 @@ export default function CommunityPage() {
   const [query, setQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showFilterPicker, setShowFilterPicker] = useState(false)
+  const [showMap, setShowMap] = useState(false)
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
   const [chatGroupId, setChatGroupId] = useState<string | null>(null)
   const [chats, setChats] = useState<ChatRooms>({})
@@ -907,16 +929,21 @@ export default function CommunityPage() {
   const recCategories = useMemo(() => recommendedMeetupCategories(myCare), [myCare])
   const recRank = (c: MeetupCategory) => { const i = recCategories.indexOf(c); return i < 0 ? Infinity : i }
 
+  // 종목·검색어 조건 (지역 조건은 제외 — 지도는 지역을 직접 고르니까요)
+  const matchesTopic = useCallback((g: MeetupGroup) => {
+    if (categoryFilter !== 'all' && g.category !== categoryFilter) return false
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    const place = `${placeLabel(g.place, { withFlag: false })} ${g.place.venue}`.toLowerCase()
+    return g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)
+      || place.includes(q) || CATEGORY_META[g.category].label.toLowerCase().includes(q)
+  }, [categoryFilter, query])
+
+  const mapGroups = useMemo(() => groups.filter(matchesTopic), [groups, matchesTopic])
+
   const filteredGroups = useMemo(() => groups
-    .filter(g => categoryFilter === 'all' || g.category === categoryFilter)
+    .filter(matchesTopic)
     .filter(g => matchesPlace(g, placeFilter))
-    .filter(g => {
-      const q = query.trim().toLowerCase()
-      if (!q) return true
-      const place = `${placeLabel(g.place, { withFlag: false })} ${g.place.venue}`.toLowerCase()
-      return g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)
-        || place.includes(q) || CATEGORY_META[g.category].label.toLowerCase().includes(q)
-    })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     // 추천 종목 모임을 먼저 (케어카드 순서 → 종목 우선순위 순)
     .sort((a, b) => {
@@ -924,7 +951,7 @@ export default function CommunityPage() {
       return ra === rb ? 0 : ra < rb ? -1 : 1
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [groups, categoryFilter, placeFilter, query, recCategories])
+  [groups, matchesTopic, placeFilter, recCategories])
 
   const myGroups = useMemo(
     () => groups.filter(g => g.memberIds.includes(currentUserId))
@@ -1088,6 +1115,11 @@ export default function CommunityPage() {
                     : { background: '#f1f5f9', color: '#475569' }}>
                   <Globe className="w-3.5 h-3.5" /> 온라인
                 </button>
+                <button onClick={() => setShowMap(true)}
+                  className="flex items-center gap-1 px-3 py-2 rounded-2xl text-[12.5px] font-bold flex-shrink-0 transition-colors"
+                  style={{ background: 'rgba(99,102,241,0.1)', color: '#4f46e5' }}>
+                  <MapIcon className="w-3.5 h-3.5" /> 지도
+                </button>
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
@@ -1206,9 +1238,21 @@ export default function CommunityPage() {
         <LocationPicker mode="filter"
           initial={placeFilter.country === ANY ? null : { country: placeFilter.country, region: placeFilter.region, city: placeFilter.city }}
           onClose={() => setShowFilterPicker(false)}
+          onOpenMap={() => setShowMap(true)}
           onSelect={p => setPlaceFilter(f => p
             ? { ...f, country: p.country, region: p.region, city: p.city }
             : { ...f, country: ANY, region: ANY, city: ANY })} />
+      )}
+
+      {showMap && (
+        <MeetupMap
+          groups={mapGroups}
+          hidden={!!openGroup || !!chatGroup}
+          onClose={() => setShowMap(false)}
+          renderGroup={g => (
+            <GroupCard group={g} joined={g.memberIds.includes(currentUserId)}
+              recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
+          )} />
       )}
 
       {openGroup && (
