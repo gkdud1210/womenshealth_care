@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ChevronRight, Dumbbell, Salad, Sparkles, Users, Images, Home } from 'lucide-react'
+import { ArrowLeft, ChevronRight, Dumbbell, Salad, Sparkles, Users, Home, Plus } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES, type CareCase, type CareCaseId } from '@/data/careCases'
 import { CARE_BODY_PARTS } from '@/data/careBodyParts'
 import { CATEGORY_META } from '@/data/meetupData'
 import { recommendedMeetupCategories } from '@/lib/care-recommend'
+import { useFeed, AlbumGrid, PostCard, WriteModal, albumSectionsByPeriod } from '@/components/feed/LudiaFeed'
 
 function accent(gradient: string) {
   return gradient.match(/#[0-9a-fA-F]{6}/)?.[0] ?? '#f43f75'
@@ -27,6 +28,14 @@ function CareDetail({ care, onBack }: { care: CareCase; onBack: () => void }) {
   const color = accent(care.gradient)
   const meetup = recommendedMeetupCategories([care.id])[0]
   const Icon = care.icon
+
+  const feed = useFeed()
+  const [openPostId, setOpenPostId] = useState<string | null>(null)
+  const [showWrite, setShowWrite] = useState(false)
+  const carePosts = feed.posts
+    .filter(p => p.tags.includes(care.id))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const openPost = feed.posts.find(p => p.id === openPostId) ?? null
 
   const tips = [
     { key: 'exercise', label: '운동', Icon: Dumbbell, text: part.exercise },
@@ -94,12 +103,6 @@ function CareDetail({ care, onBack }: { care: CareCase; onBack: () => void }) {
         </div>
 
         <div className="space-y-2">
-          <Link href={`/nutrition?care=${care.id}`}
-            className="flex items-center gap-3 bg-white rounded-2xl shadow-sm px-4 py-3 hover:shadow-md transition-shadow">
-            <Images className="w-5 h-5 text-rose-400" />
-            <span className="flex-1 text-[13.5px] font-semibold text-slate-700">루디아피드에서 관련 글 보기</span>
-            <ChevronRight className="w-4 h-4 text-slate-300" />
-          </Link>
           {meetup && (
             <Link href={`/community?category=${meetup}`}
               className="flex items-center gap-3 bg-white rounded-2xl shadow-sm px-4 py-3 hover:shadow-md transition-shadow">
@@ -116,6 +119,56 @@ function CareDetail({ care, onBack }: { care: CareCase; onBack: () => void }) {
           생활 속 웰니스 가이드예요. 통증이나 이상 증상이 계속되면 전문의와 상담하세요.
         </p>
       </div>
+
+      {/* ── 이 케어카드의 루디아피드 (앨범) ── */}
+      <div className="max-w-lg mx-auto mt-2 bg-white border-t border-slate-100">
+        <div className="flex items-center gap-2 px-4 pt-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-bold text-slate-900">{care.label} 피드</p>
+            <p className="text-[11.5px] text-slate-400">레시피·팁 {carePosts.length}개</p>
+          </div>
+          <button onClick={() => setShowWrite(true)}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-bold text-white flex-shrink-0"
+            style={{ background: care.gradient }}>
+            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> 글쓰기
+          </button>
+        </div>
+        {carePosts.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-3xl mb-2">📷</p>
+            <p className="text-[13px] text-slate-400">아직 이 케어카드에 올라온 글이 없어요</p>
+            <button onClick={() => setShowWrite(true)} className="mt-2 text-xs font-bold text-rose-500">첫 글 남기기</button>
+          </div>
+        ) : (
+          <AlbumGrid sections={albumSectionsByPeriod(carePosts)} onOpen={setOpenPostId} />
+        )}
+      </div>
+
+      {openPost && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: '#fafafa' }}>
+          <div className="sticky top-0 z-10 bg-white border-b border-slate-100">
+            <div className="flex items-center gap-3 px-4 py-3 max-w-lg mx-auto">
+              <button onClick={() => setOpenPostId(null)} className="p-1"><ArrowLeft className="w-5 h-5 text-slate-700" /></button>
+              <p className="flex-1 text-[15px] font-bold text-slate-900 truncate">{openPost.title}</p>
+            </div>
+          </div>
+          <div className="max-w-lg mx-auto pt-2 pb-24">
+            <PostCard post={openPost}
+              liked={feed.liked.has(openPost.id)} saved={feed.saved.has(openPost.id)}
+              currentUserId={feed.user?.userId}
+              currentUserName={feed.authorName} currentUserEmoji={feed.authorEmoji}
+              onLike={feed.handleLike} onSave={feed.handleSave}
+              onDelete={id => { feed.handleDelete(id); setOpenPostId(null) }} onAddComment={feed.handleAddComment}
+              analyzing={feed.analyzingIds.has(openPost.id)} onAnalyze={feed.handleAnalyze} />
+          </div>
+        </div>
+      )}
+
+      {showWrite && (
+        <WriteModal authorName={feed.authorName} authorEmoji={feed.authorEmoji} defaultTags={[care.id]}
+          onClose={() => setShowWrite(false)}
+          onSubmit={draft => { feed.handleSubmit(draft); setShowWrite(false) }} />
+      )}
     </div>
   )
 }

@@ -45,7 +45,7 @@ export default function LoginPage() {
     }
 
     startSession()
-    router.push('/nutrition')
+    router.push('/care')
   }
 
   function handleGuest() {

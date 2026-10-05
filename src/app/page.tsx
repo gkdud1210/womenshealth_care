@@ -12,7 +12,7 @@ export default function RootPage() {
 
   useEffect(() => {
     if (!ready) return
-    if (hasSession && user && isOnboarded) { router.replace('/nutrition'); return }
+    if (hasSession && user && isOnboarded) { router.replace('/care'); return }
 
     if (hasSession && user && !isOnboarded) {
       router.replace('/onboarding')

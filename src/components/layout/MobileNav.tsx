@@ -4,14 +4,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Microscope,
-  Settings, ShoppingBag, Apple, Users, ChefHat, HeartPulse
+  Settings, ShoppingBag, Users, ChefHat, HeartPulse
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/diagnostic', icon: Microscope,      label: '진단' },
   { href: '/care',       icon: HeartPulse,      label: '케어' },
-  { href: '/nutrition',  icon: Apple,           label: '헬스피드' },
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 호출', highlight: true },
   { href: '/community',  icon: Users,           label: '모임' },
   { href: '/shop',       icon: ShoppingBag,     label: '샵' },

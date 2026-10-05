@@ -77,7 +77,7 @@ export default function QuestionsPage() {
     return (
       <DeviceScreen
         onHasDevice={() => setStep('bluetooth')}
-        onNoDevice={() => router.push('/nutrition')}
+        onNoDevice={() => router.push('/care')}
       />
     )
   }
