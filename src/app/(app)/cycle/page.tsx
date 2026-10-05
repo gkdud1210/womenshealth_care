@@ -343,7 +343,7 @@ export default function CyclePage() {
       {/* ── Header ── */}
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-1">
-          <Link href="/calendar"
+          <Link href="/ludia-call/calendar"
             className="w-8 h-8 flex items-center justify-center rounded-xl flex-shrink-0 transition-all active:scale-95"
             style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.15)' }}>
             <ChevronLeft className="w-4 h-4 text-rose-400" />

@@ -77,7 +77,7 @@ export default function QuestionsPage() {
     return (
       <DeviceScreen
         onHasDevice={() => setStep('bluetooth')}
-        onNoDevice={() => router.push('/calendar')}
+        onNoDevice={() => router.push('/nutrition')}
       />
     )
   }
@@ -410,7 +410,7 @@ function DeviceScreen({ onHasDevice, onNoDevice }: {
               background: 'rgba(255,255,255,0.8)',
               border: '1.5px solid rgba(200,200,210,0.6)',
             }}>
-            기기가 없어요 — 캘린더로 바로 가기
+            기기가 없어요 — 루디아피드로 바로 가기
           </button>
         </div>
       </div>

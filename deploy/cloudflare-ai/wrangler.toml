@@ -1,0 +1,11 @@
+# LUDIA AI 서비스 — Cloudflare Workers (무료 플랜)
+# 배포:  cd deploy/cloudflare-ai && npx wrangler deploy
+# 키 등록: npx wrangler secret put GEMINI_API_KEY   (앱 코드·저장소에는 절대 넣지 않는다)
+name = "ludia-ai"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+[vars]
+GEMINI_MODEL = "gemini-flash-lite-latest"
+ALLOWED_ORIGINS = "https://gkdud1210.github.io,http://localhost:3000"
+RATE_LIMIT_PER_10MIN = "40"

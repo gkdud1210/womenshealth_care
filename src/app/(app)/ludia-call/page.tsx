@@ -6,6 +6,7 @@ import {
   Camera, X, ChevronRight, Sparkles, Loader2, RotateCcw,
   Plus, Minus, ChevronLeft, ShoppingBag, ChefHat, Trash2, ImagePlus,
   Salad, UtensilsCrossed, Flame, Soup, MessageCircle, Stethoscope, Users, Dumbbell, SprayCan, TrendingUp,
+  CalendarHeart,
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -22,6 +23,8 @@ import {
 } from '@/lib/careSubtypeClassifier'
 import { ROOT_CAUSE_META, rootCauseOf } from '@/data/rootCause'
 import { SYMPTOM_OPTIONS } from '@/data/symptomOptions'
+import { loadIntake } from '@/lib/care-recommend'
+import { ludiaApiUrl } from '@/lib/ludia-api'
 import { CATEGORY_META as MEETUP_CATEGORY_META } from '@/data/meetupData'
 import type { HairCareType } from '@/data/hairCareTypes'
 import {
@@ -160,7 +163,7 @@ async function callVisionApi(
     fd.append('careLabels', careLabel)
     fd.append('targetLo', String(target[0]))
     fd.append('targetHi', String(target[1]))
-    const res = await fetch('/api/ludia/vision-nutrition/', { method: 'POST', body: fd, signal: AbortSignal.timeout(25_000) })
+    const res = await fetch(ludiaApiUrl('vision-nutrition'), { method: 'POST', body: fd, signal: AbortSignal.timeout(25_000) })
     if (!res.ok) return null
     const data = await res.json()
     if (data.error) return null
@@ -521,28 +524,25 @@ function MealSlotCard({ mealType, entry, onOpen }: { mealType: MealType; entry?:
   const meta = MEAL_META[mealType]
   return (
     <button onClick={onOpen}
-      className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-100 text-left hover:border-rose-200 transition-colors">
-      <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center"
+      className="w-full flex flex-col rounded-2xl bg-white border border-slate-100 text-left overflow-hidden hover:border-rose-200 transition-colors active:scale-[0.98]">
+      <div className="w-full aspect-square flex flex-col items-center justify-center gap-1"
         style={{ background: entry ? undefined : 'rgba(244,63,117,0.06)' }}>
         {entry
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={entry.photo} alt="" className="w-full h-full object-cover" />
-          : <ImagePlus className="w-5 h-5 text-rose-300" />}
+          : <>
+              <ImagePlus className="w-6 h-6 text-rose-300" />
+              <span className="text-[10.5px] font-semibold text-rose-300">사진 올리기</span>
+            </>}
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <p className="text-[13.5px] font-bold text-slate-800">{meta.emoji} {meta.label}</p>
-          <span className="text-[10.5px] text-slate-300">{meta.timeHint}</span>
-        </div>
+      <div className="px-2.5 py-2 min-w-0">
+        <p className="text-[13px] font-bold text-slate-800">{meta.emoji} {meta.label}</p>
         {entry ? (
-          <p className="text-[12.5px] text-slate-500 mt-0.5 line-clamp-1">
-            <span className="font-bold text-rose-500">{entry.totalCalories.toLocaleString()}kcal</span> · {entry.assessment.slice(0, 24)}{entry.assessment.length > 24 ? '…' : ''}
-          </p>
+          <p className="text-[11.5px] font-bold text-rose-500 mt-0.5">{entry.totalCalories.toLocaleString()}kcal</p>
         ) : (
-          <p className="text-[12.5px] text-slate-400 mt-0.5">사진으로 기록하고 분석받기</p>
+          <p className="text-[10.5px] text-slate-300 mt-0.5">{meta.timeHint}</p>
         )}
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
     </button>
   )
 }
@@ -552,22 +552,24 @@ function MealSlotCard({ mealType, entry, onOpen }: { mealType: MealType; entry?:
 function AskLudiaCard() {
   return (
     <Link href="/ludia-call/chat"
-      className="flex items-center gap-3 p-4 rounded-2xl transition-transform active:scale-[0.98]"
+      className="flex flex-col gap-2.5 p-3.5 rounded-2xl transition-transform active:scale-[0.98]"
       style={{
         background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',
         boxShadow: '0 4px 20px rgba(244,63,117,0.22)',
       }}>
-      <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
-        <MessageCircle className="w-5 h-5 text-white" />
+      <div className="flex items-center justify-between">
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
+          <MessageCircle className="w-5 h-5 text-white" />
+        </div>
+        <ChevronRight className="w-4 h-4 text-white/40 flex-shrink-0" />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[13.5px] font-bold text-white flex items-center gap-1.5">
-          루디아에게 물어보기 <Sparkles className="w-3.5 h-3.5 text-rose-300" />
+      <div className="min-w-0">
+        <p className="text-[13.5px] font-bold text-white flex items-center gap-1">
+          루디아에게 물어보기 <Sparkles className="w-3 h-3 text-rose-300 flex-shrink-0" />
         </p>
-        <p className="text-[11.5px] text-white/55 mt-0.5">컨디션, 식단, 건강 고민을 언제든 편하게 대화해요</p>
+        <p className="text-[11px] text-white/55 mt-0.5 leading-snug">컨디션·식단·건강 고민을 편하게 대화해요</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-white/40 flex-shrink-0" />
     </Link>
   )
 }
@@ -650,17 +652,19 @@ function HistoryList({ logs, todayK, onOpenEntry }: {
 function SymptomCheckCard({ onOpen }: { onOpen: () => void }) {
   return (
     <button onClick={onOpen}
-      className="w-full flex items-center gap-3 p-4 rounded-2xl text-left transition-transform active:scale-[0.98]"
+      className="w-full flex flex-col gap-2.5 p-3.5 rounded-2xl text-left transition-transform active:scale-[0.98]"
       style={{ background: 'rgba(139,92,246,0.08)', border: '1.5px solid rgba(139,92,246,0.2)' }}>
-      <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-        style={{ background: 'linear-gradient(135deg,#8b5cf6,#6366f1)' }}>
-        <Stethoscope className="w-5 h-5 text-white" />
+      <div className="w-full flex items-center justify-between">
+        <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#8b5cf6,#6366f1)' }}>
+          <Stethoscope className="w-5 h-5 text-white" />
+        </div>
+        <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
       </div>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         <p className="text-[13.5px] font-bold text-slate-800">지금 뭐가 불편하세요?</p>
-        <p className="text-[11.5px] text-slate-500 mt-0.5">증상만 골라도 홍채·BMI로 원인을 실시간으로 찾아드려요</p>
+        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">증상만 골라도 원인을 실시간으로 찾아드려요</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
     </button>
   )
 }
@@ -748,7 +752,9 @@ function SymptomResultView({ match }: { match: GlobalSubtypeMatch }) {
 function SymptomDiagnosisSheet({ data, profile, baseOverrides, onClose }: {
   data: MultimodalData; profile: OnboardingProfile; baseOverrides?: SignalOverrides; onClose: () => void
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  // 첫 로그인 문진에서 고른 증상을 미리 체크해 둬요
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(loadIntake().filter(id => SYMPTOM_OPTIONS.some(o => o.id === id))))
   const [result, setResult] = useState<GlobalSubtypeMatch | null>(null)
 
   function toggle(id: string) {
@@ -976,25 +982,38 @@ export default function LudiaCallPage() {
               style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
               <ChefHat className="w-5 h-5 text-white" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 호출</h1>
               <p className="text-[11.5px] text-slate-400">사진 한 장으로 받는 AI 웰니스 코칭</p>
             </div>
+            <Link href="/ludia-call/calendar"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-shrink-0 transition-all active:scale-95"
+              style={{
+                background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',
+                boxShadow: '0 2px 10px rgba(244,63,117,0.2)',
+              }}>
+              <CalendarHeart className="w-3.5 h-3.5 text-rose-300" />
+              <span className="text-xs font-bold text-white tracking-wide">캘린더</span>
+            </Link>
           </div>
         </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        <AskLudiaCard />
-        <SymptomCheckCard onOpen={() => setShowSymptomCheck(true)} />
+        <div className="grid grid-cols-2 gap-2.5">
+          <AskLudiaCard />
+          <SymptomCheckCard onOpen={() => setShowSymptomCheck(true)} />
+        </div>
         <DailySummary dayLog={todayLog} mealProfile={mealProfile} subtypeLabel={primarySubtype?.label} />
 
         <div className="space-y-2">
           <p className="text-[11.5px] font-bold text-slate-500 px-0.5">오늘의 식단</p>
-          {MEAL_ORDER.map(m => (
-            <MealSlotCard key={m} mealType={m} entry={todayLog[m]}
-              onOpen={() => todayLog[m] ? setViewing({ dateKey: tKey, mealType: m }) : setCaptureMeal(m)} />
-          ))}
+          <div className="grid grid-cols-3 gap-2">
+            {MEAL_ORDER.map(m => (
+              <MealSlotCard key={m} mealType={m} entry={todayLog[m]}
+                onOpen={() => todayLog[m] ? setViewing({ dateKey: tKey, mealType: m }) : setCaptureMeal(m)} />
+            ))}
+          </div>
         </div>
 
         <WeeklyNutritionSummary logs={logs} mealProfile={mealProfile} />

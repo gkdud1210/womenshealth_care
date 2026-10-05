@@ -6,6 +6,8 @@ import { Mic, MicOff, Volume2, CalendarCheck, Send, Loader2, ChevronLeft } from 
 import { cn } from '@/lib/utils'
 import { askLudia } from '@/lib/ludia-engine'
 import { useOnboardingProfile } from '@/lib/onboarding-profile'
+import { loadIntake, personalSuggestionPool } from '@/lib/care-recommend'
+import { ludiaApiUrl } from '@/lib/ludia-api'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
 import { useSchedule } from '@/hooks/useSchedule'
 import { getPhaseLabel, getPhaseColor } from '@/lib/cycle-utils'
@@ -67,7 +69,7 @@ interface Props {
   phase: CyclePhase
   cycleDay: number
   userName: string
-  /** 헤더 뒤로가기 버튼이 이동할 경로 (기본값: /calendar) */
+  /** 헤더 뒤로가기 버튼이 이동할 경로 (기본값: /ludia-call/calendar) */
   backHref?: string
 }
 
@@ -276,17 +278,8 @@ function speak(text: string, onEnd?: () => void) {
     : window.speechSynthesis.addEventListener('voiceschanged', go, { once: true })
 }
 
-function makeWelcome(name: string, cycleDay: number, phase: CyclePhase): Message {
-  const info: Record<CyclePhase, string> = {
-    menstrual:  '몸을 따뜻하게 챙기고 계신가요?',
-    follicular: '에너지가 올라오는 시기예요!',
-    ovulation:  '활력이 넘치는 시기예요.',
-    luteal:     'PMS 관리가 중요한 시기예요.',
-  }
-  return {
-    id: 'welcome', role: 'ludia',
-    text: `안녕하세요, ${name}님! 현재 D+${cycleDay}일 ${getPhaseLabel(phase)}이에요. ${info[phase]} 건강에 대해 무엇이든 물어보세요.`,
-  }
+function makeWelcome(): Message {
+  return { id: 'welcome', role: 'ludia', text: '건강에 대해 무엇이든 물어보세요.' }
 }
 
 const SUGGESTION_BANK = [
@@ -312,11 +305,15 @@ const SUGGESTION_BANK = [
   '호르몬이 불균형한 것 같아', '배란일은 언제야?', '에스트로겐이 뭐야?',
 ]
 
-function pickSuggestions(exclude: Set<string>, count: number): string[] {
-  let pool = SUGGESTION_BANK.filter(s => !exclude.has(s))
-  if (pool.length < count) pool = [...SUGGESTION_BANK]
-  const shuffled = pool.slice().sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, count)
+/** 내 케어카드·증상 관련 질문(personal)을 먼저 채우고, 모자라면 일반 질문으로 채워요. */
+function pickSuggestions(exclude: Set<string>, count: number, personal: string[] = []): string[] {
+  const shuffle = (a: string[]) => a.slice().sort(() => Math.random() - 0.5)
+  const mine = shuffle(personal.filter(s => !exclude.has(s))).slice(0, count)
+  if (mine.length >= count) return mine
+  let rest = SUGGESTION_BANK.filter(s => !exclude.has(s) && !mine.includes(s))
+  if (rest.length < count - mine.length) rest = SUGGESTION_BANK.filter(s => !mine.includes(s))
+  // 개인 맞춤이 하나라도 있으면 일반 질문은 최소한으로만 섞어요
+  return [...mine, ...shuffle(rest).slice(0, count - mine.length)]
 }
 
 const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
@@ -327,7 +324,7 @@ const PHASE_ACCENT: Record<CyclePhase, { badge: string; text: string }> = {
 }
 
 /* ─── Component ───────────────────────────────────────────────────────── */
-export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calendar' }: Props) {
+export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/ludia-call/calendar' }: Props) {
   const profile          = useOnboardingProfile()
   const { setLogs }      = usePersistedLogs()
   const { addEvents }    = useSchedule()
@@ -335,7 +332,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calen
   const accent      = PHASE_ACCENT[phase]
 
   const [vs, setVs]                           = useState<VoiceState>('idle')
-  const [messages, setMessages]               = useState<Message[]>(() => [makeWelcome(userName, cycleDay, phase)])
+  const [messages, setMessages]               = useState<Message[]>(() => [makeWelcome()])
   const [interim, setInterim]                 = useState('')
   const [inputText, setInputText]             = useState('')
   const [recurringPending, setRecurringPending] = useState<RecurringPending | null>(null)
@@ -348,6 +345,17 @@ export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calen
   const usedSugRef     = useRef<Set<string>>(new Set())
 
   const setVsSync = useCallback((s: VoiceState) => { vsRef.current = s; setVs(s) }, [])
+
+  /* 제안 칩에 쓸 내 케어카드·온보딩 증상 관련 질문 */
+  const careKey = (profile.careTypes ?? []).join(',')
+  const personalPoolRef = useRef<string[]>([])
+  useEffect(() => {
+    personalPoolRef.current = personalSuggestionPool(profile.careTypes ?? [], loadIntake())
+    // 아직 대화 전이면 첫 제안 칩을 맞춤 질문으로 바로 교체
+    if (personalPoolRef.current.length) {
+      setSuggestions(prev => usedSugRef.current.size <= 10 ? pickSuggestions(new Set(), 10, personalPoolRef.current) : prev)
+    }
+  }, [careKey])
 
   /* auto-scroll chat */
   useEffect(() => {
@@ -373,9 +381,12 @@ export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calen
     if (!last || last.role !== 'ludia') return
     const isFirst = messages.filter(m => m.role === 'ludia').length <= 1
     const count = isFirst ? 10 : 6
-    const next = pickSuggestions(usedSugRef.current, count)
+    const next = pickSuggestions(usedSugRef.current, count, personalPoolRef.current)
     next.forEach(s => usedSugRef.current.add(s))
-    if (usedSugRef.current.size > SUGGESTION_BANK.length * 0.7) usedSugRef.current.clear()
+    // 맞춤 질문을 다 보여줬으면 다시 처음부터 돌려요
+    const personal = personalPoolRef.current
+    if (personal.length && personal.every(q => usedSugRef.current.has(q))) usedSugRef.current.clear()
+    else if (usedSugRef.current.size > SUGGESTION_BANK.length * 0.7) usedSugRef.current.clear()
     setSuggestions(next)
   }, [messages])
 
@@ -508,7 +519,7 @@ export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calen
     let ev: ParsedEvent = { hasEvent: false, title: null, date: null, startTime: null, endTime: null, category: null }
 
     try {
-      const res = await fetch('/api/ludia/chat/', {
+      const res = await fetch(ludiaApiUrl('chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -520,6 +531,8 @@ export function LudiaVoice({ data, phase, cycleDay, userName, backHref = '/calen
             today: todayStr(), userName,
           },
         }),
+        // AI 서버가 잠들어 있거나 느리면 로컬 엔진으로 넘어가요
+        signal: AbortSignal.timeout(30_000),
       })
       if (res.ok) { const j = await res.json(); reply = j.reply ?? ''; ev = { ...ev, ...(j.event ?? {}) } }
       else { ev = parseEventLocally(text); reply = ev.hasEvent ? makeConfirmReply(ev) : askLudia(text, data, phase, cycleDay, profile).text }

@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Plus, X, Search, MapPin, Clock, Users, Heart, MessageCircle,
-  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages,
+  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages, Sparkles,
 } from 'lucide-react'
+import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
-import { cn } from '@/lib/utils'
+import { cn, compressImage } from '@/lib/utils'
+import { CARE_CASES } from '@/data/careCases'
+import { recommendedMeetupCategories } from '@/lib/care-recommend'
 import {
   ALL_CATEGORIES, CATEGORY_META, SEED_GROUPS, LANGUAGE_OPTIONS, isMeetupCategory, normalizeGroup,
   type MeetupCategory, type MeetupGroup, type MeetupPost, type MeetupLanguage, type MeetupPlace,
@@ -16,6 +19,11 @@ import {
   getCountry, getRegion, getCity, placeLabel, searchPlaces,
   type Country, type Region, type PlaceRef,
 } from '@/data/regionData'
+import GroupChat from '@/components/community/GroupChat'
+import {
+  CHAT_KEY, loadChats, saveChats, loadChatReads, saveChatReads, appendMessage, roomMessages, unreadCount,
+  type ChatMessage, type ChatRooms, type ChatReadMap,
+} from '@/lib/meetup-chat'
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -82,28 +90,6 @@ function loadHomePlace(): PlaceRef | null {
 }
 function saveHomePlace(p: PlaceRef | null) {
   try { p ? localStorage.setItem(HOME_KEY, JSON.stringify(p)) : localStorage.removeItem(HOME_KEY) } catch {}
-}
-
-async function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = e => {
-      const img = new window.Image()
-      img.onload = () => {
-        const MAX = 1080
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-        const canvas = document.createElement('canvas')
-        canvas.width = Math.round(img.width * scale)
-        canvas.height = Math.round(img.height * scale)
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-        resolve(canvas.toDataURL('image/jpeg', 0.82))
-      }
-      img.onerror = reject
-      img.src = e.target!.result as string
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
 }
 
 function timeAgo(iso: string) {
@@ -290,7 +276,11 @@ function LocationPicker({ mode, initial, onClose, onSelect }: {
 
 // ── Category chip row ────────────────────────────────────────────────────
 
-function CategoryChips({ value, onChange }: { value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void }) {
+function CategoryChips({ value, onChange, recommended = [] }: {
+  value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void; recommended?: MeetupCategory[]
+}) {
+  // 내 케어카드에 맞는 종목을 앞에 보여줘요
+  const ordered = [...recommended, ...ALL_CATEGORIES.filter(c => !recommended.includes(c))]
   return (
     <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3">
       <button onClick={() => onChange('all')}
@@ -300,16 +290,17 @@ function CategoryChips({ value, onChange }: { value: MeetupCategory | 'all'; onC
           : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
         🏠 전체 종목
       </button>
-      {ALL_CATEGORIES.map(c => {
+      {ordered.map(c => {
         const meta = CATEGORY_META[c]
         const on = value === c
+        const rec = recommended.includes(c)
         return (
           <button key={c} onClick={() => onChange(c)}
             className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
             style={on
               ? { background: meta.bg, borderColor: meta.color, color: meta.color }
               : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-            {meta.emoji} {meta.label}
+            {meta.emoji} {meta.label}{rec && ' 💜'}
           </button>
         )
       })}
@@ -329,15 +320,21 @@ function placeLine(place: MeetupPlace): string {
   return `${prefix}${country.label}${spot ? ` · ${spot}` : ''}`
 }
 
-function GroupCard({ group, joined, onOpen }: { group: MeetupGroup; joined: boolean; onOpen: () => void }) {
+function GroupCard({ group, joined, recommended, unread = 0, onOpen }: { group: MeetupGroup; joined: boolean; recommended?: boolean; unread?: number; onOpen: () => void }) {
   const meta = CATEGORY_META[group.category]
   const isOnline = group.place.country === ONLINE_CODE
   return (
     <button onClick={onOpen}
       className="w-full bg-white rounded-2xl shadow-sm p-4 flex gap-3.5 text-left mb-2.5 hover:shadow-md transition-shadow">
-      <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
+      <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0"
         style={{ background: meta.gradient }}>
         {meta.emoji}
+        {unread > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1.5 rounded-full flex items-center justify-center text-[10.5px] font-bold text-white"
+            style={{ background: '#f43f75', boxShadow: '0 0 0 2px #fff' }}>
+            {unread > 99 ? '99+' : unread}
+          </span>
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
@@ -345,6 +342,12 @@ function GroupCard({ group, joined, onOpen }: { group: MeetupGroup; joined: bool
           {joined && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0"
               style={{ background: 'rgba(244,63,117,0.12)', color: '#e11d5a' }}>참여중</span>
+          )}
+          {recommended && !joined && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 text-white"
+              style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
+              <Sparkles className="w-2.5 h-2.5" /> 맞춤
+            </span>
           )}
         </div>
         <p className="text-[12.5px] text-slate-500 line-clamp-2 leading-snug mb-1.5">{group.description}</p>
@@ -637,12 +640,15 @@ function ActivityCard({ post, liked, isOwn, onLike, onComment }: {
 // ── Group detail view ────────────────────────────────────────────────────────
 
 function GroupDetail({
-  group, posts, liked, joined, currentUserId,
-  onBack, onJoinToggle, onSubmitActivity, onLike, onComment,
+  group, posts, liked, joined, currentUserId, lastMessage, unread,
+  onBack, onJoinToggle, onOpenChat, onSubmitActivity, onLike, onComment,
 }: {
   group: MeetupGroup; posts: MeetupPost[]; liked: Set<string>; joined: boolean
   currentUserId: string
+  lastMessage: ChatMessage
+  unread: number
   onBack: () => void
+  onOpenChat: () => void
   onJoinToggle: () => void
   onSubmitActivity: (content: string, image: string | undefined) => void
   onLike: (id: string) => void
@@ -702,6 +708,39 @@ function GroupDetail({
           )}
         </div>
 
+        {joined ? (
+          <button onClick={onOpenChat}
+            className="w-full bg-white rounded-2xl shadow-sm p-3.5 mb-3 flex items-center gap-3 text-left hover:shadow-md transition-shadow">
+            <div className="relative w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(244,63,117,0.1)' }}>
+              <MessageCircle className="w-5 h-5 text-rose-500" />
+              {unread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                  style={{ background: '#f43f75', boxShadow: '0 0 0 2px #fff' }}>
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="text-[14px] font-bold text-slate-900">모임 대화방</p>
+                <span className="text-[11px] text-slate-400">{group.memberIds.length}명</span>
+                <span className="ml-auto text-[10.5px] text-slate-400 flex-shrink-0">{timeAgo(lastMessage.createdAt)}</span>
+              </div>
+              <p className="text-[12.5px] text-slate-500 truncate">
+                {lastMessage.system ? lastMessage.text
+                  : `${lastMessage.authorId === currentUserId ? '나' : lastMessage.authorName}: ${lastMessage.text || '사진'}`}
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-slate-300 flex-shrink-0" />
+          </button>
+        ) : (
+          <div className="rounded-2xl p-3.5 mb-3 flex items-center gap-3" style={{ background: '#f1f5f9' }}>
+            <MessageCircle className="w-5 h-5 text-slate-400 flex-shrink-0" />
+            <p className="flex-1 text-[12.5px] text-slate-500">모임에 참여하면 멤버끼리 대화방에서 이야기할 수 있어요</p>
+            <button onClick={onJoinToggle} className="text-xs font-bold text-rose-500 flex-shrink-0">참여하기</button>
+          </div>
+        )}
+
         <button onClick={() => setShowActivity(true)}
           className="w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-sm font-bold text-white mb-3 shadow-sm"
           style={{ background: 'linear-gradient(135deg,#f43f75,#e11d5a)' }}>
@@ -745,6 +784,9 @@ export default function CommunityPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showFilterPicker, setShowFilterPicker] = useState(false)
   const [openGroupId, setOpenGroupId] = useState<string | null>(null)
+  const [chatGroupId, setChatGroupId] = useState<string | null>(null)
+  const [chats, setChats] = useState<ChatRooms>({})
+  const [chatReads, setChatReads] = useState<ChatReadMap>({})
 
   const currentUserId = user?.userId ?? 'me'
   const currentUserName = user?.nickname || user?.name || '나'
@@ -754,6 +796,8 @@ export default function CommunityPage() {
     setGroups(loadGroups())
     setPosts(loadPosts())
     setLiked(loadLikes())
+    setChats(loadChats())
+    setChatReads(loadChatReads())
     const home = loadHomePlace()
     setHomePlace(home)
 
@@ -768,7 +812,17 @@ export default function CommunityPage() {
         setPlaceFilter(f => ({ ...f, country: home.country, region: home.region, city: ANY }))
       }
     } catch {}
+
+    // 같은 기기의 다른 탭에서 보낸 메시지도 바로 반영해요
+    const onStorage = (e: StorageEvent) => { if (e.key === CHAT_KEY) setChats(loadChats()) }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
+
+  // 온보딩 문진으로 자동 선택된(또는 직접 수정한) 케어카드 → 추천 모임 종목
+  const myCare = useMemo(() => user?.careTypes ?? [], [user])
+  const recCategories = useMemo(() => recommendedMeetupCategories(myCare), [myCare])
+  const recRank = (c: MeetupCategory) => { const i = recCategories.indexOf(c); return i < 0 ? Infinity : i }
 
   const filteredGroups = useMemo(() => groups
     .filter(g => categoryFilter === 'all' || g.category === categoryFilter)
@@ -780,8 +834,14 @@ export default function CommunityPage() {
       return g.name.toLowerCase().includes(q) || g.description.toLowerCase().includes(q)
         || place.includes(q) || CATEGORY_META[g.category].label.toLowerCase().includes(q)
     })
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-  [groups, categoryFilter, placeFilter, query])
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    // 추천 종목 모임을 먼저 (케어카드 순서 → 종목 우선순위 순)
+    .sort((a, b) => {
+      const ra = recRank(a.category), rb = recRank(b.category)
+      return ra === rb ? 0 : ra < rb ? -1 : 1
+    }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [groups, categoryFilter, placeFilter, query, recCategories])
 
   const myGroups = useMemo(
     () => groups.filter(g => g.memberIds.includes(currentUserId))
@@ -795,6 +855,14 @@ export default function CommunityPage() {
   const remoteGroups = splitList ? filteredGroups.filter(g => !isLocalMatch(g, placeFilter)) : []
 
   const openGroup = groups.find(g => g.id === openGroupId) ?? null
+  const chatGroup = groups.find(g => g.id === chatGroupId && g.memberIds.includes(currentUserId)) ?? null
+  const unreadOf = (groupId: string) => unreadCount(chats, chatReads, groupId, currentUserId)
+
+  // 대화방을 보고 있는 동안 들어온 메시지는 읽은 것으로 처리해요
+  useEffect(() => {
+    if (!chatGroupId) return
+    setChatReads(prev => { const u = { ...prev, [chatGroupId]: new Date().toISOString() }; saveChatReads(u); return u })
+  }, [chatGroupId, chats])
 
   const handleSetHome = useCallback(() => {
     if (placeFilter.country === ANY || placeFilter.country === ONLINE_CODE) return
@@ -814,16 +882,33 @@ export default function CommunityPage() {
     setOpenGroupId(group.id)
   }, [currentUserId, currentUserName])
 
+  const pushChat = useCallback((msg: ChatMessage) => {
+    setChats(prev => { const u = appendMessage(prev, msg); saveChats(u); return u })
+  }, [])
+
   const handleJoinToggle = useCallback((groupId: string) => {
+    const group = groups.find(g => g.id === groupId)
+    if (!group) return
+    const isMember = group.memberIds.includes(currentUserId)
     setGroups(prev => {
-      const u = prev.map(g => {
-        if (g.id !== groupId) return g
-        const isMember = g.memberIds.includes(currentUserId)
-        return { ...g, memberIds: isMember ? g.memberIds.filter(id => id !== currentUserId) : [...g.memberIds, currentUserId] }
+      const u = prev.map(g => g.id !== groupId ? g : {
+        ...g, memberIds: isMember ? g.memberIds.filter(id => id !== currentUserId) : [...g.memberIds, currentUserId],
       })
       saveGroups(u); return u
     })
-  }, [currentUserId])
+    pushChat({
+      id: `sys-${Date.now()}`, groupId, authorId: currentUserId, authorName: currentUserName, authorEmoji: currentUserEmoji,
+      text: `${currentUserName}님이 ${isMember ? '모임을 나갔어요' : '들어왔어요'}`, createdAt: new Date().toISOString(), system: true,
+    })
+    if (isMember) setChatGroupId(null)
+  }, [groups, currentUserId, currentUserName, currentUserEmoji, pushChat])
+
+  const handleSendChat = useCallback((groupId: string, text: string, image: string | undefined) => {
+    pushChat({
+      id: `msg-${Date.now()}`, groupId, authorId: currentUserId, authorName: currentUserName, authorEmoji: currentUserEmoji,
+      text, image, createdAt: new Date().toISOString(),
+    })
+  }, [currentUserId, currentUserName, currentUserEmoji, pushChat])
 
   const handleSubmitActivity = useCallback((groupId: string, content: string, image: string | undefined) => {
     const post: MeetupPost = {
@@ -853,6 +938,7 @@ export default function CommunityPage() {
     })
   }, [currentUserName, currentUserEmoji])
 
+  const totalUnread = myGroups.reduce((n, g) => n + unreadOf(g.id), 0)
   const placeIsSet = placeFilter.country !== ANY
   const canSetHome = placeIsSet && placeFilter.country !== ONLINE_CODE &&
     !(homePlace && homePlace.country === placeFilter.country && homePlace.region === placeFilter.region && homePlace.city === placeFilter.city)
@@ -878,6 +964,9 @@ export default function CommunityPage() {
               className="flex-1 py-2.5 text-sm font-bold relative"
               style={{ color: tab === t.key ? '#e11d5a' : '#94a3b8' }}>
               {t.label}
+              {t.key === 'mine' && totalUnread > 0 && (
+                <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full align-top" style={{ background: '#f43f75' }} />
+              )}
               {tab === t.key && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-10 h-0.5 rounded-full" style={{ background: '#e11d5a' }} />}
             </button>
           ))}
@@ -942,13 +1031,24 @@ export default function CommunityPage() {
                 )}
               </div>
             </div>
-            <CategoryChips value={categoryFilter} onChange={setCategoryFilter} />
+            <CategoryChips value={categoryFilter} onChange={setCategoryFilter} recommended={recCategories} />
           </>
         )}
       </div>
 
       {tab === 'explore' ? (
         <div className="max-w-lg mx-auto px-4 py-3">
+          {recCategories.length > 0 && categoryFilter === 'all' && !query && (
+            <div className="flex items-center gap-2 mb-3 px-3.5 py-2.5 rounded-2xl"
+              style={{ background: 'linear-gradient(135deg,#fff1f5,#f5f0ff)', border: '1px solid rgba(244,63,117,0.12)' }}>
+              <Sparkles className="w-4 h-4 text-rose-400 flex-shrink-0" />
+              <p className="flex-1 min-w-0 text-[12px] text-slate-600 leading-snug">
+                <span className="font-bold">{myCare.map(id => CARE_CASES.find(c => c.id === id)?.label).filter(Boolean).join(' · ')}</span>
+                에 좋은 {recCategories.slice(0, 3).map(c => CATEGORY_META[c].label).join(' · ')} 모임을 먼저 보여드려요
+              </p>
+              <Link href="/onboarding" className="text-[11px] font-bold text-rose-500 flex-shrink-0">수정</Link>
+            </div>
+          )}
           {filteredGroups.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-4xl mb-3">🌏</p>
@@ -971,7 +1071,7 @@ export default function CommunityPage() {
                     </div>
                   ) : (
                     localGroups.map(g => (
-                      <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} onOpen={() => setOpenGroupId(g.id)} />
+                      <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
                     ))
                   )}
                   {remoteGroups.length > 0 && (
@@ -980,7 +1080,7 @@ export default function CommunityPage() {
                         🌐 어디서든 원격으로 함께할 수 있는 모임 {remoteGroups.length}개
                       </p>
                       {remoteGroups.map(g => (
-                        <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} onOpen={() => setOpenGroupId(g.id)} />
+                        <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
                       ))}
                     </>
                   )}
@@ -989,7 +1089,7 @@ export default function CommunityPage() {
                 <>
                   <p className="text-[11.5px] text-slate-400 mb-2 px-1">{filteredGroups.length}개 모임</p>
                   {filteredGroups.map(g => (
-                    <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} onOpen={() => setOpenGroupId(g.id)} />
+                    <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
                   ))}
                 </>
               )}
@@ -1006,7 +1106,7 @@ export default function CommunityPage() {
             </div>
           ) : (
             myGroups.map(g => (
-              <GroupCard key={g.id} group={g} joined onOpen={() => setOpenGroupId(g.id)} />
+              <GroupCard key={g.id} group={g} joined unread={unreadOf(g.id)} onOpen={() => setOpenGroupId(g.id)} />
             ))
           )}
         </div>
@@ -1035,11 +1135,24 @@ export default function CommunityPage() {
           liked={liked}
           joined={openGroup.memberIds.includes(currentUserId)}
           currentUserId={currentUserId}
+          lastMessage={roomMessages(chats, openGroup).slice(-1)[0]}
+          unread={unreadOf(openGroup.id)}
           onBack={() => setOpenGroupId(null)}
           onJoinToggle={() => handleJoinToggle(openGroup.id)}
+          onOpenChat={() => setChatGroupId(openGroup.id)}
           onSubmitActivity={(content, image) => handleSubmitActivity(openGroup.id, content, image)}
           onLike={handleLike}
           onComment={handleComment}
+        />
+      )}
+
+      {chatGroup && (
+        <GroupChat
+          group={chatGroup}
+          messages={roomMessages(chats, chatGroup)}
+          currentUserId={currentUserId}
+          onBack={() => setChatGroupId(null)}
+          onSend={(text, image) => handleSendChat(chatGroup.id, text, image)}
         />
       )}
     </div>

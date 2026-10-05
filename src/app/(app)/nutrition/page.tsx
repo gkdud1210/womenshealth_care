@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search } from 'lucide-react'
+import Link from 'next/link'
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search, Sparkles, Flame, Loader2, ChevronDown } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
+import { analyzeFeedPost, DAILY_REFERENCE, type FeedNutrition } from '@/lib/feed-nutrition'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,7 @@ interface SnsPost {
   likes: number
   saved?: boolean
   comments: SnsComment[]
+  nutrition?: FeedNutrition // 사진 속 음식·음료 칼로리/영양성분 분석 결과
 }
 
 // ── Storage ────────────────────────────────────────────────────────────────
@@ -338,7 +341,7 @@ const CARE_SHORT: Record<string, string> = {
   hair_scalp: '탈모', weight_metabolic: '체중', male_wellness: '남성웰니스',
   posture_correction: '체형교정', gut_detox: '장건강', mental_brain: '멘탈',
   hormone_female: '호르몬', disease_postcare: '질환관리', skin_beauty: '피부',
-  musculoskeletal_lymph: '근골격', organ_monitoring: '모니터링',
+  musculoskeletal_lymph: '근골격', organ_monitoring: '모니터링', senior_wellness: '시니어',
 }
 
 function careAccent(gradient: string) {
@@ -357,7 +360,7 @@ const AUTHOR_EMOJIS = ['🌸','🌿','💪','✨','🦋','🌻','🍀','💜','�
 
 function PostCard({
   post, liked, saved, currentUserId, currentUserName, currentUserEmoji,
-  onLike, onSave, onDelete, onAddComment,
+  analyzing, onLike, onSave, onDelete, onAddComment, onAnalyze,
 }: {
   post: SnsPost
   liked: boolean; saved: boolean
@@ -367,8 +370,11 @@ function PostCard({
   onSave: (id: string) => void
   onDelete: (id: string) => void
   onAddComment: (postId: string, text: string) => void
+  analyzing: boolean
+  onAnalyze: (id: string) => void
 }) {
   const [expanded, setExpanded]       = useState(false)
+  const [showNutrition, setShowNutrition] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [showMenu, setShowMenu]       = useState(false)
@@ -381,6 +387,14 @@ function PostCard({
   // 이미지 배열 통합 (하위 호환)
   const allImages = post.images?.length ? post.images : post.image ? [post.image] : []
   const hasImages = allImages.length > 0
+  const nutrition = post.nutrition
+
+  // 분석이 끝나면 결과 패널을 바로 펼쳐 보여줘요
+  const wasAnalyzing = useRef(analyzing)
+  useEffect(() => {
+    if (wasAnalyzing.current && !analyzing && post.nutrition) setShowNutrition(true)
+    wasAnalyzing.current = analyzing
+  }, [analyzing, post.nutrition])
 
   function submitComment() {
     const t = commentText.trim()
@@ -508,6 +522,26 @@ function PostCard({
                   {imgIdx + 1} / {allImages.length}
                 </div>
               )}
+
+              {/* 칼로리 분석 칩 — 결과가 있으면 kcal 배지, 없으면 분석 버튼 */}
+              <button
+                onClick={() => nutrition ? setShowNutrition(v => !v) : onAnalyze(post.id)}
+                disabled={analyzing}
+                className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow-md transition-all active:scale-95"
+                style={{
+                  background: nutrition?.isFood ? 'rgba(0,0,0,0.6)' : 'linear-gradient(135deg,#f43f75,#a855f7)',
+                  backdropFilter: 'blur(6px)',
+                }}>
+                {analyzing ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> 분석 중...</>
+                ) : nutrition?.isFood ? (
+                  <><Flame className="w-3 h-3 text-orange-300" /> {Math.round(nutrition.total.calories).toLocaleString()} kcal</>
+                ) : nutrition ? (
+                  <><Sparkles className="w-3 h-3" /> 분석 결과</>
+                ) : (
+                  <><Sparkles className="w-3 h-3" /> 칼로리 분석</>
+                )}
+              </button>
             </>
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2">
@@ -515,6 +549,13 @@ function PostCard({
             </div>
           )}
         </div>
+      )}
+
+      {/* ── 칼로리·영양성분 패널 ── */}
+      {nutrition && showNutrition && (
+        <NutritionPanel nutrition={nutrition} reanalyzing={analyzing}
+          onReanalyze={hasImages ? () => onAnalyze(post.id) : undefined}
+          onClose={() => setShowNutrition(false)} />
       )}
 
       {/* ── Reaction count row ── */}
@@ -599,6 +640,113 @@ function PostCard({
         </div>
       </div>
     </article>
+  )
+}
+
+// ── Nutrition panel ────────────────────────────────────────────────────────
+
+const MACROS: { key: keyof FeedNutrition['total']; label: string; unit: string; color: string }[] = [
+  { key: 'protein',  label: '단백질',  unit: 'g',  color: '#f43f75' },
+  { key: 'carb',     label: '탄수화물', unit: 'g',  color: '#f59e0b' },
+  { key: 'fat',      label: '지방',    unit: 'g',  color: '#a855f7' },
+  { key: 'sugar',    label: '당류',    unit: 'g',  color: '#ec4899' },
+  { key: 'sodium',   label: '나트륨',  unit: 'mg', color: '#0ea5e9' },
+  { key: 'caffeine', label: '카페인',  unit: 'mg', color: '#78716c' },
+]
+
+function NutritionPanel({ nutrition, reanalyzing, onReanalyze, onClose }: {
+  nutrition: FeedNutrition
+  reanalyzing: boolean
+  onReanalyze?: () => void
+  onClose: () => void
+}) {
+  const { total, items } = nutrition
+  const kcalPct = Math.round((total.calories / DAILY_REFERENCE.calories) * 100)
+
+  return (
+    <div className="mx-4 mt-3 rounded-2xl overflow-hidden"
+      style={{ background: 'linear-gradient(135deg,#fff7fa,#faf5ff)', border: '1px solid rgba(244,63,117,0.14)' }}>
+      <div className="flex items-center justify-between px-4 pt-3">
+        <div className="flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-rose-400" />
+          <span className="text-[12px] font-bold text-slate-700">루디아 영양 분석</span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+            style={{ background: 'rgba(168,85,247,0.1)', color: '#7e22ce' }}>
+            {nutrition.source === 'ai' ? 'AI 사진 분석' : '캡션 기반 추정'}
+          </span>
+        </div>
+        <button onClick={onClose} className="p-1 -mr-1">
+          <ChevronDown className="w-4 h-4 text-slate-400 rotate-180" />
+        </button>
+      </div>
+
+      {nutrition.isFood ? (
+        <div className="px-4 pb-4 pt-2">
+          {/* 총 칼로리 */}
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-black text-slate-900 leading-none">{Math.round(total.calories).toLocaleString()}</span>
+            <span className="text-sm font-bold text-slate-500 mb-0.5">kcal</span>
+            <span className="text-[11px] text-slate-400 mb-0.5 ml-auto">하루 권장량의 {kcalPct}%</span>
+          </div>
+          <div className="h-1.5 rounded-full mt-2 overflow-hidden" style={{ background: 'rgba(200,200,220,0.35)' }}>
+            <div className="h-full rounded-full" style={{ width: `${Math.min(100, kcalPct)}%`, background: 'linear-gradient(90deg,#f43f75,#a855f7)' }} />
+          </div>
+
+          {/* 영양성분 그리드 */}
+          <div className="grid grid-cols-3 gap-2 mt-3">
+            {MACROS.map(m => {
+              const v = total[m.key]
+              const pct = Math.min(100, Math.round((v / DAILY_REFERENCE[m.key]) * 100))
+              return (
+                <div key={m.key} className="rounded-xl px-2.5 py-2 bg-white/80">
+                  <p className="text-[10px] font-semibold text-slate-400">{m.label}</p>
+                  <p className="text-[14px] font-black text-slate-800 leading-tight">
+                    {Math.round(v).toLocaleString()}<span className="text-[10px] font-bold text-slate-400 ml-0.5">{m.unit}</span>
+                  </p>
+                  <div className="h-1 rounded-full mt-1 overflow-hidden" style={{ background: 'rgba(200,200,220,0.35)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: m.color }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* 메뉴별 내역 */}
+          <div className="mt-3 space-y-1">
+            {items.map((it, i) => (
+              <div key={i} className="flex items-center gap-2 text-[12px]">
+                <span className="w-5 text-center">{it.emoji ?? '🍽️'}</span>
+                <span className="flex-1 min-w-0 truncate text-slate-700">{it.name}</span>
+                <span className="text-slate-400 text-[11px]">탄 {Math.round(it.carb)} · 단 {Math.round(it.protein)} · 지 {Math.round(it.fat)}</span>
+                <span className="font-bold text-slate-800 w-16 text-right">{Math.round(it.calories)} kcal</span>
+              </div>
+            ))}
+          </div>
+
+          {nutrition.summary && (
+            <p className="text-[12px] text-slate-600 leading-relaxed mt-3">{nutrition.summary}</p>
+          )}
+          {nutrition.tip && (
+            <p className="text-[12px] font-semibold leading-relaxed mt-2 px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(244,63,117,0.08)', color: '#be123c' }}>
+              💡 {nutrition.tip}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="px-4 pb-4 pt-2 text-[12px] text-slate-500 leading-relaxed">{nutrition.summary}</p>
+      )}
+
+      <div className="flex items-center justify-between px-4 pb-3">
+        <p className="text-[10px] text-slate-400">사진 기준 추정치로 실제와 다를 수 있어요</p>
+        {onReanalyze && (
+          <button onClick={onReanalyze} disabled={reanalyzing}
+            className="text-[11px] font-bold text-rose-500 disabled:text-slate-300">
+            {reanalyzing ? '분석 중...' : '다시 분석'}
+          </button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -725,7 +873,7 @@ function WriteModal({
           {/* Content */}
           <textarea value={content} onChange={e => setContent(e.target.value)}
             rows={7} maxLength={2000}
-            placeholder="레시피나 건강 팁을 공유해보세요...\n\n재료, 만드는 법, 효과 등을 자세히 적어주시면 더 도움이 돼요 🙏"
+            placeholder="오늘 먹은 음식, 카페 메뉴, 레시피나 건강 팁을 공유해보세요...\n\n사진을 올리면 루디아가 칼로리와 영양성분을 자동으로 분석해 드려요 🔥"
             className="w-full text-sm text-slate-800 placeholder-slate-400 outline-none resize-none leading-relaxed" />
           <p className="text-[11px] text-slate-400 text-right">{content.length} / 2000</p>
 
@@ -780,9 +928,10 @@ export default function NutritionPage() {
   const [posts,     setPosts]      = useState<SnsPost[]>([])
   const [liked,     setLiked]      = useState<Set<string>>(new Set())
   const [saved,     setSaved]      = useState<Set<string>>(new Set())
-  const [filter,    setFilter]     = useState<string>('all')
+  const [filter,    setFilter]     = useState<string>('all') // 'foryou' | 'all' | CareCase id
   const [query,     setQuery]      = useState('')
   const [showWrite, setShowWrite]  = useState(false)
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
 
   const authorName  = user?.nickname || user?.name || '나'
   const authorEmoji = AUTHOR_EMOJIS[Math.abs(authorName.charCodeAt(0)) % AUTHOR_EMOJIS.length]
@@ -793,10 +942,21 @@ export default function NutritionPage() {
     setSaved(loadSaves())
   }, [])
 
+  // 내 케어카드(온보딩 문진으로 자동 선택 + 직접 수정)가 있으면 '맞춤' 피드를 기본으로 보여줘요
+  const myCare = user?.careTypes ?? []
+  const hasMyCare = myCare.length > 0
+  useEffect(() => { if (hasMyCare) setFilter('foryou') }, [hasMyCare])
+  const matchesMyCare = (p: SnsPost) => p.tags.some(t => myCare.includes(t))
+  const chipIds = hasMyCare
+    ? ['foryou', 'all', ...myCare, ...CARE_CASES.map(c => c.id).filter(id => !myCare.includes(id))]
+    : ['all', ...CARE_CASES.map(c => c.id)]
+
   const feed = posts
     .slice()
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .filter(p => filter === 'all' || p.tags.includes(filter))
+    // 맞춤: 내 케어카드 게시물을 먼저, 나머지는 그 뒤에
+    .sort((a, b) => filter === 'foryou' ? Number(matchesMyCare(b)) - Number(matchesMyCare(a)) : 0)
+    .filter(p => filter === 'all' || filter === 'foryou' || p.tags.includes(filter))
     .filter(p => {
       if (!query.trim()) return true
       const q = query.trim().toLowerCase()
@@ -853,11 +1013,33 @@ export default function NutritionPage() {
     })
   }, [authorName, authorEmoji])
 
+  // 게시물 사진 속 음식·음료의 칼로리/영양성분을 분석해 게시물에 붙여 저장해요
+  const analyzePost = useCallback(async (post: SnsPost) => {
+    const images = post.images?.length ? post.images : post.image ? [post.image] : []
+    setAnalyzingIds(prev => new Set(prev).add(post.id))
+    try {
+      const nutrition = await analyzeFeedPost(images, post.content)
+      setPosts(prev => {
+        const u = prev.map(p => p.id === post.id ? { ...p, nutrition } : p)
+        savePosts(u); return u
+      })
+    } finally {
+      setAnalyzingIds(prev => { const n = new Set(prev); n.delete(post.id); return n })
+    }
+  }, [])
+
+  const handleAnalyze = useCallback((id: string) => {
+    const post = posts.find(p => p.id === id)
+    if (post) analyzePost(post)
+  }, [posts, analyzePost])
+
   const handleSubmit = useCallback((draft: Omit<SnsPost, 'id' | 'createdAt' | 'likes' | 'comments'>) => {
     const post: SnsPost = { ...draft, id: `post-${Date.now()}`, createdAt: new Date().toISOString(), likes: 0, comments: [] }
     setPosts(prev => { const u = [post, ...prev]; savePosts(u); return u })
     setShowWrite(false)
-  }, [])
+    // 사진을 올리면 바로 칼로리·영양성분 분석을 시작해요
+    if (post.images?.length) analyzePost(post)
+  }, [analyzePost])
 
   return (
     <div className="min-h-screen pb-24" style={{ background: '#fafafa' }}>
@@ -898,11 +1080,14 @@ export default function NutritionPage() {
 
         {/* Category filter — 케어카드별 피드, stories style */}
         <div className="flex gap-0 overflow-x-auto scrollbar-hide px-4 pt-2 pb-3 max-w-lg mx-auto">
-          {(['all', ...CARE_CASES.map(c => c.id)]).map(id => {
+          {chipIds.map(id => {
             const on = filter === id
+            const isForYou = id === 'foryou'
             const isAll = id === 'all'
-            const c = isAll ? undefined : CARE_BY_ID[id]
-            const gradient = isAll ? 'linear-gradient(135deg,#fce7f3,#ede9fe)' : c!.gradient
+            const c = isAll || isForYou ? undefined : CARE_BY_ID[id]
+            const isMine = myCare.includes(id)
+            const gradient = isForYou ? 'linear-gradient(135deg,#f43f75,#a855f7)'
+              : isAll ? 'linear-gradient(135deg,#fce7f3,#ede9fe)' : c!.gradient
             const Icon = c?.icon
             return (
               <button key={id}
@@ -911,10 +1096,12 @@ export default function NutritionPage() {
                 <div className={cn('w-14 h-14 rounded-full flex items-center justify-center transition-all',
                   on ? 'ring-2 ring-offset-2 ring-rose-400' : 'ring-1 ring-slate-200')}
                   style={{ background: on ? gradient : '#f8fafc' }}>
-                  {isAll ? <span className="text-2xl">🏠</span> : Icon && <Icon className="w-5 h-5" style={{ color: on ? '#fff' : careAccent(gradient) }} />}
+                  {isForYou ? <Sparkles className="w-5 h-5" style={{ color: on ? '#fff' : '#f43f75' }} />
+                    : isAll ? <span className="text-2xl">🏠</span>
+                    : Icon && <Icon className="w-5 h-5" style={{ color: on ? '#fff' : careAccent(gradient) }} />}
                 </div>
                 <span className={cn('text-[10px] font-semibold whitespace-nowrap', on ? 'text-rose-500' : 'text-slate-500')}>
-                  {isAll ? '전체' : CARE_SHORT[id] ?? c!.label}
+                  {isForYou ? '맞춤' : isAll ? '전체' : CARE_SHORT[id] ?? c!.label}{isMine && ' 💜'}
                 </span>
               </button>
             )
@@ -924,6 +1111,16 @@ export default function NutritionPage() {
 
       {/* ── Feed ── */}
       <div className="max-w-lg mx-auto">
+        {filter === 'foryou' && (
+          <div className="flex items-center gap-2 mx-3 my-2 px-3.5 py-2.5 rounded-2xl"
+            style={{ background: 'linear-gradient(135deg,#fff1f5,#f5f0ff)', border: '1px solid rgba(244,63,117,0.12)' }}>
+            <Sparkles className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <p className="flex-1 min-w-0 text-[12px] text-slate-600 leading-snug">
+              <span className="font-bold">{myCare.map(id => CARE_SHORT[id] ?? CARE_BY_ID[id]?.label).filter(Boolean).join(' · ')}</span> 케어카드에 맞는 글을 먼저 보여드려요
+            </p>
+            <Link href="/onboarding" className="text-[11px] font-bold text-rose-500 flex-shrink-0">수정</Link>
+          </div>
+        )}
         {feed.length === 0 ? (
           <div className="text-center py-20">
             <p className="text-4xl mb-3">{query ? '🔍' : '📭'}</p>
@@ -941,7 +1138,8 @@ export default function NutritionPage() {
               currentUserId={user?.userId}
               currentUserName={authorName} currentUserEmoji={authorEmoji}
               onLike={handleLike} onSave={handleSave}
-              onDelete={handleDelete} onAddComment={handleAddComment} />
+              onDelete={handleDelete} onAddComment={handleAddComment}
+              analyzing={analyzingIds.has(post.id)} onAnalyze={handleAnalyze} />
           ))
         )}
       </div>

@@ -2,24 +2,73 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Brain } from 'lucide-react'
+import { Check, Brain, Sparkles, RotateCcw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
+import {
+  INTAKE_STEPS, scoreCareCards, autoSelectCareCards, saveIntake, loadIntake,
+  type CareRecommendation,
+} from '@/lib/care-recommend'
 
 export default function OnboardingPage() {
   const router   = useRouter()
   const { user, saveUser, startSession, ready } = useAuth()
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // 처음 가입한 사용자는 "뭐가 불편하세요?" 문진부터, 케어카드를 이미 고른 사용자(설정에서 재선택)는 카드 화면부터
+  const [phase, setPhase]       = useState<'intake' | 'cards' | null>(null)
+  const [stepIdx, setStepIdx]   = useState(0)
+  const [answers, setAnswers]   = useState<Set<string>>(new Set())
+  const [recs, setRecs]         = useState<CareRecommendation[]>([])
 
   useEffect(() => {
-    if (ready && !user) router.replace('/signup')
-    if (ready && user && user.careTypes.length > 0) {
+    if (!ready) return
+    if (!user) { router.replace('/signup'); return }
+    if (phase !== null) return
+    const prevIntake = loadIntake()
+    setAnswers(new Set(prevIntake))
+    setRecs(scoreCareCards(prevIntake))
+    if (user.careTypes.length > 0) {
       setSelected(new Set(user.careTypes))
+      setPhase('cards')
+    } else {
+      setPhase('intake')
     }
-  }, [ready, user, router])
+  }, [ready, user, router, phase])
 
-  if (!ready || !user) return null
+  if (!ready || !user || phase === null) return null
+
+  if (phase === 'intake') {
+    return (
+      <IntakeScreen
+        userName={user.name}
+        stepIdx={stepIdx}
+        answers={answers}
+        onToggle={id => setAnswers(prev => {
+          const next = new Set(prev)
+          next.has(id) ? next.delete(id) : next.add(id)
+          return next
+        })}
+        onBack={() => setStepIdx(i => Math.max(0, i - 1))}
+        onNext={() => {
+          if (stepIdx + 1 < INTAKE_STEPS.length) { setStepIdx(i => i + 1); return }
+          const ids = Array.from(answers)
+          const scored = scoreCareCards(ids)
+          saveIntake(ids)
+          setRecs(scored)
+          setSelected(new Set(autoSelectCareCards(scored)))
+          setPhase('cards')
+          window.scrollTo(0, 0)
+        }}
+      />
+    )
+  }
+
+  const recById = Object.fromEntries(recs.map(r => [r.id, r]))
+  const autoPicked = new Set(autoSelectCareCards(recs))
+  // 추천 카드를 위로 올려서 보여줘요
+  const orderedCards = [...CARE_CASES].sort((a, b) =>
+    (recById[b.id]?.score ?? 0) - (recById[a.id]?.score ?? 0))
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -48,16 +97,36 @@ export default function OnboardingPage() {
           }}>
           <Brain className="w-6 h-6 text-rose-300" />
         </div>
-        <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-800 mb-2">
-          {user.name}님, 어떤 건강에<br />집중하고 싶으신가요?
-        </h1>
-        <p className="text-sm text-slate-400">해당하는 항목을 모두 선택해주세요<br />LUDIA가 맞춤 분석을 제공합니다</p>
+        {recs.length > 0 ? (
+          <>
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-800 mb-2">
+              {user.name}님께 꼭 맞는<br />케어카드를 골라봤어요
+            </h1>
+            <p className="text-sm text-slate-400">
+              답변을 바탕으로 루디아가 먼저 선택해 두었어요<br />
+              필요한 카드는 더 추가하거나 빼도 괜찮아요
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-800 mb-2">
+              {user.name}님, 어떤 건강에<br />집중하고 싶으신가요?
+            </h1>
+            <p className="text-sm text-slate-400">해당하는 항목을 모두 선택해주세요<br />LUDIA가 맞춤 분석을 제공합니다</p>
+          </>
+        )}
+        <button onClick={() => { setStepIdx(0); setPhase('intake') }}
+          className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-rose-400">
+          <RotateCcw className="w-3 h-3" /> 불편한 점 {recs.length > 0 ? '다시 답하기' : '답하고 추천받기'}
+        </button>
       </div>
 
       {/* Care case grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-2xl mb-8">
-        {CARE_CASES.map(({ id, label, desc, icon: Icon, gradient, glow, border, bg }) => {
+        {orderedCards.map(({ id, label, desc, icon: Icon, gradient, glow, border, bg }) => {
           const active = selected.has(id)
+          const rec = recById[id]
+          const recommended = autoPicked.has(id)
           return (
             <button key={id} onClick={() => toggle(id)}
               className={cn(
@@ -84,8 +153,19 @@ export default function OnboardingPage() {
                 style={{ background: gradient, boxShadow: `0 4px 14px ${glow}` }}>
                 <Icon className="w-5 h-5 text-white" />
               </div>
+              {recommended && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full mb-1.5 text-white"
+                  style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
+                  <Sparkles className="w-2.5 h-2.5" /> 루디아 추천
+                </span>
+              )}
               <p className="font-semibold text-slate-800 text-sm leading-tight mb-1">{label}</p>
               <p className="text-[11px] text-slate-400 leading-relaxed">{desc}</p>
+              {rec && (
+                <p className="text-[11px] font-medium text-rose-500 leading-relaxed mt-1.5">
+                  “{rec.reasons[0]}”{rec.reasons.length > 1 && ` 외 ${rec.reasons.length - 1}개`} 답변과 관련 있어요
+                </p>
+              )}
             </button>
           )
         })}
@@ -114,8 +194,88 @@ export default function OnboardingPage() {
             {selected.size}개 선택 완료 · LUDIA 시작하기 →
           </button>
           <p className="text-[11px] text-slate-300 text-center mt-2">
-            언제든지 설정에서 변경할 수 있어요
+            선택한 케어카드로 피드·모임을 먼저 추천해 드려요 · 설정에서 언제든 변경할 수 있어요
           </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── "요즘 뭐가 불편하세요?" 문진 ──────────────────────────────────── */
+function IntakeScreen({ userName, stepIdx, answers, onToggle, onBack, onNext }: {
+  userName: string
+  stepIdx: number
+  answers: Set<string>
+  onToggle: (id: string) => void
+  onBack: () => void
+  onNext: () => void
+}) {
+  const step = INTAKE_STEPS[stepIdx]
+  const picked = step.options.filter(o => answers.has(o.id)).length
+  const isLast = stepIdx + 1 >= INTAKE_STEPS.length
+
+  return (
+    <div className="min-h-[100dvh] flex flex-col px-5 py-8 sm:py-12 max-w-xl mx-auto w-full">
+      {stepIdx === 0 && (
+        <div className="mb-5 px-4 py-3.5 rounded-2xl text-sm text-slate-600 leading-relaxed"
+          style={{ background: 'rgba(255,255,255,0.75)', border: '1px solid rgba(168,85,247,0.15)' }}>
+          <p className="font-semibold text-purple-600 mb-1">반가워요, {userName}님!</p>
+          몇 가지만 알려주시면 <span className="font-semibold text-purple-600">꼭 맞는 케어카드</span>를 루디아가 골라드릴게요.
+        </div>
+      )}
+
+      {/* 진행 바 */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-2">
+          <span className="text-xs text-slate-500">루디아가 {userName}님을 알아가는 중이에요 💜</span>
+          <span className="text-xs font-semibold text-purple-500">{stepIdx + 1} / {INTAKE_STEPS.length}</span>
+        </div>
+        <div className="h-2 bg-rose-100 rounded-full overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${((stepIdx + 1) / INTAKE_STEPS.length) * 100}%`, background: 'linear-gradient(90deg, #f43f75, #a855f7)' }} />
+        </div>
+      </div>
+
+      <div className="flex-1 rounded-3xl p-6 mb-4"
+        style={{
+          background: 'rgba(255,255,255,0.88)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.95)',
+          boxShadow: '0 8px 40px rgba(158,18,57,0.08)',
+        }}>
+        <h2 className="text-[18px] font-semibold text-slate-800 leading-snug mb-1">{step.title}</h2>
+        <p className="text-xs text-slate-400 mb-5">{step.subtitle}</p>
+        <div className="flex flex-wrap gap-2">
+          {step.options.map(o => {
+            const sel = answers.has(o.id)
+            return (
+              <button key={o.id} onClick={() => onToggle(o.id)}
+                className={cn(
+                  'px-3.5 py-2.5 rounded-full text-sm font-medium transition-all border active:scale-95',
+                  sel ? 'text-white border-transparent' : 'bg-white text-slate-600 border-slate-100 hover:border-purple-200',
+                )}
+                style={sel ? { background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 2px 12px rgba(168,85,247,0.3)' } : {}}>
+                <span className="mr-1">{o.emoji}</span>{o.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <div className="space-y-2.5 pb-4">
+        <button onClick={onNext}
+          className="w-full py-3.5 rounded-2xl text-sm font-semibold text-white transition-all active:scale-95"
+          style={{ background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 4px 20px rgba(168,85,247,0.3)' }}>
+          {isLast ? '케어카드 추천받기 ✨' : picked > 0 ? `${picked}개 선택 · 다음 →` : '다음 →'}
+        </button>
+        <div className="flex">
+          {stepIdx > 0 && (
+            <button onClick={onBack} className="flex-1 py-2.5 text-sm text-slate-400 hover:text-slate-500">← 이전</button>
+          )}
+          {picked === 0 && !isLast && (
+            <button onClick={onNext} className="flex-1 py-2.5 text-sm text-slate-400 hover:text-slate-500">해당 없어요</button>
+          )}
         </div>
       </div>
     </div>

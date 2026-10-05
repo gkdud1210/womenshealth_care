@@ -45,7 +45,7 @@ export default function LoginPage() {
     }
 
     startSession()
-    router.push('/calendar')
+    router.push('/nutrition')
   }
 
   function handleGuest() {

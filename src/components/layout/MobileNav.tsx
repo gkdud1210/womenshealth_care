@@ -3,13 +3,12 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  CalendarHeart, Microscope,
+  Microscope,
   Settings, ShoppingBag, Apple, Users, ChefHat
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
-  { href: '/calendar',   icon: CalendarHeart,   label: '캘린더' },
   { href: '/diagnostic', icon: Microscope,      label: '진단' },
   { href: '/nutrition',  icon: Apple,           label: '헬스피드' },
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 호출', highlight: true },
