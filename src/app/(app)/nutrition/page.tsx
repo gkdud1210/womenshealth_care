@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Link from 'next/link'
-import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search, Sparkles, Flame, Loader2, ChevronDown } from 'lucide-react'
+import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search, Sparkles, Flame, Loader2, ChevronDown, LayoutGrid, Rows3, Images, ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
@@ -44,6 +44,7 @@ interface SnsPost {
 const POSTS_KEY  = 'ludia_sns_v5'
 const LIKES_KEY  = 'ludia_sns_likes_v5'
 const SAVES_KEY  = 'ludia_sns_saves_v5'
+const VIEW_KEY   = 'ludia_sns_view_v1'
 
 const SEED: SnsPost[] = [
   {
@@ -923,6 +924,85 @@ function WriteModal({
 
 // ── Main page ──────────────────────────────────────────────────────────────
 
+// ── Album view ─────────────────────────────────────────────────────────────
+
+type FeedView = 'album' | 'list'
+
+function loadView(): FeedView {
+  try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'album' } catch { return 'album' }
+}
+function saveView(v: FeedView) { try { localStorage.setItem(VIEW_KEY, v) } catch {} }
+
+/** 앨범처럼 '오늘 · 이번 주 · 이번 달 · 지난 달…'로 묶어요. */
+function albumPeriod(iso: string): { key: string; label: string } {
+  const d = new Date(iso)
+  const now = new Date()
+  const days = (now.getTime() - d.getTime()) / 86400000
+  if (d.toDateString() === now.toDateString()) return { key: 'today', label: '오늘' }
+  if (days < 7) return { key: 'week', label: '이번 주' }
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) return { key: 'month', label: '이번 달' }
+  const label = d.getFullYear() === now.getFullYear() ? `${d.getMonth() + 1}월` : `${d.getFullYear()}년 ${d.getMonth() + 1}월`
+  return { key: `${d.getFullYear()}-${d.getMonth()}`, label }
+}
+
+function AlbumTile({ post, onOpen }: { post: SnsPost; onOpen: () => void }) {
+  const images = post.images?.length ? post.images : post.image ? [post.image] : []
+  const cover = images[0]
+  const kcal = post.nutrition?.isFood ? Math.round(post.nutrition.total.calories) : null
+  return (
+    <button onClick={onOpen} className="relative aspect-square overflow-hidden bg-slate-100 active:opacity-80 transition-opacity">
+      {cover ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={cover} alt={post.title} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2"
+          style={{ background: post.coverGradient ?? 'linear-gradient(135deg,#fce7f3,#ede9fe)' }}>
+          <span className="text-3xl leading-none">{post.coverEmoji ?? (post.type === 'recipe' ? '🍳' : '💡')}</span>
+          <span className="text-[10.5px] font-bold text-slate-700 text-center leading-tight line-clamp-2">{post.title}</span>
+        </div>
+      )}
+      {images.length > 1 && (
+        <Images className="absolute top-1.5 right-1.5 w-4 h-4 text-white drop-shadow" />
+      )}
+      {cover && (
+        <div className="absolute inset-x-0 bottom-0 px-1.5 pt-4 pb-1 text-left"
+          style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)' }}>
+          <p className="text-[10.5px] font-bold text-white truncate">{post.title}</p>
+        </div>
+      )}
+      {kcal !== null && (
+        <span className="absolute top-1.5 left-1.5 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold text-white"
+          style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <Flame className="w-2.5 h-2.5 text-orange-300" />{kcal.toLocaleString()}
+        </span>
+      )}
+    </button>
+  )
+}
+
+function AlbumGrid({ sections, onOpen }: {
+  sections: { key: string; label: string; posts: SnsPost[] }[]
+  onOpen: (id: string) => void
+}) {
+  return (
+    <div className="pb-2">
+      {sections.map(sec => (
+        <section key={sec.key} className="mb-3">
+          <div className="flex items-baseline gap-1.5 px-4 pt-3 pb-2">
+            <h2 className="text-[14px] font-bold text-slate-800">{sec.label}</h2>
+            <span className="text-[11px] text-slate-400">{sec.posts.length}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-0.5">
+            {sec.posts.map(p => <AlbumTile key={p.id} post={p} onOpen={() => onOpen(p.id)} />)}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+// ── Page ───────────────────────────────────────────────────────────────────
+
 export default function NutritionPage() {
   const { user } = useAuth()
   const [posts,     setPosts]      = useState<SnsPost[]>([])
@@ -932,6 +1012,9 @@ export default function NutritionPage() {
   const [query,     setQuery]      = useState('')
   const [showWrite, setShowWrite]  = useState(false)
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
+  const [view,      setView]       = useState<FeedView>('album')
+  const [openPostId, setOpenPostId] = useState<string | null>(null)
+  const filterFromUrl = useRef(false)
 
   const authorName  = user?.nickname || user?.name || '나'
   const authorEmoji = AUTHOR_EMOJIS[Math.abs(authorName.charCodeAt(0)) % AUTHOR_EMOJIS.length]
@@ -940,12 +1023,16 @@ export default function NutritionPage() {
     setPosts(loadPosts())
     setLiked(loadLikes())
     setSaved(loadSaves())
+    setView(loadView())
+    // 케어 메뉴에서 넘어온 경우 (?care=weight_metabolic) 해당 케어카드 피드를 보여줘요
+    const care = new URLSearchParams(window.location.search).get('care')
+    if (care && CARE_BY_ID[care]) { setFilter(care); filterFromUrl.current = true }
   }, [])
 
   // 내 케어카드(온보딩 문진으로 자동 선택 + 직접 수정)가 있으면 '맞춤' 피드를 기본으로 보여줘요
   const myCare = user?.careTypes ?? []
   const hasMyCare = myCare.length > 0
-  useEffect(() => { if (hasMyCare) setFilter('foryou') }, [hasMyCare])
+  useEffect(() => { if (hasMyCare && !filterFromUrl.current) setFilter('foryou') }, [hasMyCare])
   const matchesMyCare = (p: SnsPost) => p.tags.some(t => myCare.includes(t))
   const chipIds = hasMyCare
     ? ['foryou', 'all', ...myCare, ...CARE_CASES.map(c => c.id).filter(id => !myCare.includes(id))]
@@ -972,6 +1059,27 @@ export default function NutritionPage() {
              p.authorName.toLowerCase().includes(q) ||
              p.tags.some(t => careMeta(t).label.toLowerCase().includes(q))
     })
+
+  const albumSections = (() => {
+    if (filter === 'foryou') {
+      const mine = feed.filter(matchesMyCare)
+      const rest = feed.filter(p => !matchesMyCare(p))
+      return [
+        { key: 'mine', label: '💜 내 케어카드 맞춤', posts: mine },
+        { key: 'rest', label: '다른 글 둘러보기', posts: rest },
+      ].filter(s => s.posts.length > 0)
+    }
+    const out: { key: string; label: string; posts: SnsPost[] }[] = []
+    for (const p of feed) {
+      const { key, label } = albumPeriod(p.createdAt)
+      const sec = out.find(s => s.key === key)
+      if (sec) sec.posts.push(p); else out.push({ key, label, posts: [p] })
+    }
+    return out
+  })()
+  const openPost = posts.find(p => p.id === openPostId) ?? null
+
+  function changeView(v: FeedView) { setView(v); saveView(v) }
 
   const handleLike = useCallback((id: string) => {
     setLiked(prev => {
@@ -1048,10 +1156,21 @@ export default function NutritionPage() {
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
           <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아피드</h1>
-          <button onClick={() => setShowWrite(true)}
-            className="p-1.5 rounded-full hover:bg-slate-50 transition-colors">
-            <Plus className="w-6 h-6 text-slate-800" strokeWidth={2.5} />
-          </button>
+          <div className="flex items-center gap-1">
+            <div className="flex items-center p-0.5 rounded-full bg-slate-100 mr-1">
+              {([['album', LayoutGrid, '앨범'], ['list', Rows3, '목록']] as const).map(([v, Icon, label]) => (
+                <button key={v} onClick={() => changeView(v)} aria-label={`${label}으로 보기`}
+                  className={cn('w-8 h-7 rounded-full flex items-center justify-center transition-all',
+                    view === v ? 'bg-white shadow-sm text-rose-500' : 'text-slate-400')}>
+                  <Icon className="w-4 h-4" />
+                </button>
+              ))}
+            </div>
+            <button onClick={() => setShowWrite(true)}
+              className="p-1.5 rounded-full hover:bg-slate-50 transition-colors">
+              <Plus className="w-6 h-6 text-slate-800" strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
         {/* Search bar */}
@@ -1131,6 +1250,8 @@ export default function NutritionPage() {
               {query ? '다른 검색어나 #해시태그를 입력해보세요' : '+ 버튼을 눌러 첫 번째 레시피를 공유해보세요!'}
             </p>
           </div>
+        ) : view === 'album' ? (
+          <AlbumGrid sections={albumSections} onOpen={setOpenPostId} />
         ) : (
           feed.map(post => (
             <PostCard key={post.id} post={post}
@@ -1143,6 +1264,27 @@ export default function NutritionPage() {
           ))
         )}
       </div>
+
+      {/* ── Album → post detail ── */}
+      {openPost && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" style={{ background: '#fafafa' }}>
+          <div className="sticky top-0 z-10 bg-white border-b border-slate-100">
+            <div className="flex items-center gap-3 px-4 py-3 max-w-lg mx-auto">
+              <button onClick={() => setOpenPostId(null)} className="p-1"><ArrowLeft className="w-5 h-5 text-slate-700" /></button>
+              <p className="flex-1 text-[15px] font-bold text-slate-900 truncate">{openPost.title}</p>
+            </div>
+          </div>
+          <div className="max-w-lg mx-auto pt-2 pb-24">
+            <PostCard post={openPost}
+              liked={liked.has(openPost.id)} saved={saved.has(openPost.id)}
+              currentUserId={user?.userId}
+              currentUserName={authorName} currentUserEmoji={authorEmoji}
+              onLike={handleLike} onSave={handleSave}
+              onDelete={id => { handleDelete(id); setOpenPostId(null) }} onAddComment={handleAddComment}
+              analyzing={analyzingIds.has(openPost.id)} onAnalyze={handleAnalyze} />
+          </div>
+        </div>
+      )}
 
       {/* ── Write modal ── */}
       {showWrite && (
