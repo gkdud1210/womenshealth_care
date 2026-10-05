@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import {
   Star, X, ShoppingBag, Trash2, PenLine, ImagePlus, Sparkles,
   Droplets, Shield, Leaf, Wind, Heart, Zap, Search, ShieldCheck,
-  Salad, UtensilsCrossed, Flame, Soup,
+  Salad, UtensilsCrossed, Flame, Soup, Settings,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -814,9 +815,16 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
-      <div className="mb-4">
-        <h1 className="font-display text-2xl font-semibold text-slate-800">루디아샵</h1>
-        <p className="text-sm text-slate-400 mt-0.5">진단 결과 기반으로 큐레이션된 제품</p>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-slate-800">루디아샵</h1>
+          <p className="text-sm text-slate-400 mt-0.5">진단 결과 기반으로 큐레이션된 제품</p>
+        </div>
+        <Link href="/settings" aria-label="설정"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-slate-500 bg-white/80 border border-rose-100 shadow-sm transition-all hover:text-rose-500 hover:border-rose-200 active:scale-95 shrink-0">
+          <Settings className="w-4 h-4" />
+          설정
+        </Link>
       </div>
 
       {/* Ingredient Safety Search Banner */}

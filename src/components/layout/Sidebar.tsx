@@ -15,7 +15,6 @@ const navItems = [
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 호출' },
   { href: '/community',  icon: Users,           label: '루디아 모임' },
   { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
-  { href: '/settings',   icon: Settings,        label: '설정' },
 ]
 
 export function Sidebar() {
@@ -48,6 +47,7 @@ export function Sidebar() {
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto scrollbar-hide">
         {navItems.map(({ href, icon: Icon, label }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
+            || (href === '/shop' && pathname.startsWith('/settings'))
           return (
             <Link
               key={href}
