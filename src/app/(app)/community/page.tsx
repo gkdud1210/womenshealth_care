@@ -17,24 +17,39 @@ import {
 } from '@/data/meetupData'
 import {
   ANY, ONLINE_CODE, COUNTRIES_BY_CONTINENT,
-  getCountry, getRegion, getCity, placeLabel, searchPlaces,
+  getCountry, getRegion, getCity, placeLabel, searchPlaces, flagOf,
   type Country, type Region, type PlaceRef,
 } from '@/data/regionData'
 import GroupChat from '@/components/community/GroupChat'
+import FacilityExplorer from '@/components/community/FacilityExplorer'
+import type { MapLocation } from '@/components/community/PlaceMap'
+import { coordsOf } from '@/data/regionCoords'
 import {
   CHAT_KEY, loadChats, saveChats, loadChatReads, saveChatReads, appendMessage, roomMessages, unreadCount,
   type ChatMessage, type ChatRooms, type ChatReadMap,
 } from '@/lib/meetup-chat'
 
 // 지도(Leaflet)는 브라우저에서만 동작해서 필요할 때 불러와요
-const MeetupMap = dynamic(() => import('@/components/community/MeetupMap'), {
+const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
   ssr: false,
   loading: () => (
     <div className="fixed inset-0 z-[45] flex items-center justify-center bg-white">
       <p className="text-sm text-slate-400">지도를 불러오는 중…</p>
     </div>
   ),
-})
+}) as typeof import('@/components/community/PlaceMap').default
+
+/** 모임은 도시 단위로 지도에 찍혀요 */
+function locateGroup(g: MeetupGroup): MapLocation | null {
+  if (g.place.country === ONLINE_CODE) return null
+  const ll = coordsOf(g.place)
+  if (!ll) return null
+  return {
+    key: `${g.place.country}/${g.place.city}`, lat: ll[0], lng: ll[1], country: g.place.country,
+    label: placeLabel(g.place, { short: true, withFlag: false }),
+    title: `${flagOf(g.place.country)} ${placeLabel(g.place, { withFlag: false })}`,
+  }
+}
 
 // ── Storage ────────────────────────────────────────────────────────────────
 
@@ -880,7 +895,7 @@ export default function CommunityPage() {
   const [groups, setGroups] = useState<MeetupGroup[]>([])
   const [posts, setPosts] = useState<MeetupPost[]>([])
   const [liked, setLiked] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'explore' | 'mine'>('explore')
+  const [tab, setTab] = useState<'explore' | 'places' | 'mine'>('explore')
   const [categoryFilter, setCategoryFilter] = useState<MeetupCategory | 'all'>('all')
   const [placeFilter, setPlaceFilter] = useState<PlaceFilter>(ALL_PLACES)
   const [homePlace, setHomePlace] = useState<PlaceRef | null>(null)
@@ -1069,7 +1084,7 @@ export default function CommunityPage() {
         </div>
 
         <div className="flex px-4 max-w-lg mx-auto border-b border-slate-100">
-          {([{ key: 'explore', label: '모임 찾기' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
+          {([{ key: 'explore', label: '모임 찾기' }, { key: 'places', label: '시설 찾기' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className="flex-1 py-2.5 text-sm font-bold relative"
               style={{ color: tab === t.key ? '#e11d5a' : '#94a3b8' }}>
@@ -1151,6 +1166,16 @@ export default function CommunityPage() {
         )}
       </div>
 
+      {tab === 'places' && (
+        <FacilityExplorer
+          place={placeFilter.country === ONLINE_CODE ? ALL_PLACES : placeFilter}
+          placeText={placeFilter.country === ONLINE_CODE ? '전 세계' : filterLabel(placeFilter)}
+          isMember={!!user && !user.userId.startsWith('guest_')}
+          onPickPlace={() => setShowFilterPicker(true)}
+          onClearPlace={() => setPlaceFilter(ALL_PLACES)}
+          onShowGroups={c => { setCategoryFilter(c); setTab('explore') }} />
+      )}
+
       {tab === 'explore' ? (
         <div className="max-w-lg mx-auto px-4 py-3">
           {recCategories.length > 0 && categoryFilter === 'all' && !query && (
@@ -1211,7 +1236,7 @@ export default function CommunityPage() {
             </>
           )}
         </div>
-      ) : (
+      ) : tab === 'mine' ? (
         <div className="max-w-lg mx-auto px-4 py-4">
           {myGroups.length === 0 ? (
             <div className="text-center py-20">
@@ -1225,7 +1250,7 @@ export default function CommunityPage() {
             ))
           )}
         </div>
-      )}
+      ) : null}
 
       {showCreate && (
         <CreateGroupModal
@@ -1238,18 +1263,28 @@ export default function CommunityPage() {
         <LocationPicker mode="filter"
           initial={placeFilter.country === ANY ? null : { country: placeFilter.country, region: placeFilter.region, city: placeFilter.city }}
           onClose={() => setShowFilterPicker(false)}
-          onOpenMap={() => setShowMap(true)}
+          onOpenMap={tab === 'places' ? undefined : () => setShowMap(true)}
           onSelect={p => setPlaceFilter(f => p
             ? { ...f, country: p.country, region: p.region, city: p.city }
             : { ...f, country: ANY, region: ANY, city: ANY })} />
       )}
 
       {showMap && (
-        <MeetupMap
-          groups={mapGroups}
+        <PlaceMap<MeetupGroup>
+          title="🗺️ 지도로 모임 찾기"
+          items={mapGroups}
+          locate={locateGroup}
+          hint="확대하면 지역·도시별로 나뉘어 보여요"
+          emptyText="조건에 맞는 지역 모임이 없어요"
+          countText={n => `모임 ${n}개`}
+          extraList={{
+            label: `🌐 온라인 모임 ${mapGroups.filter(g => g.place.country === ONLINE_CODE).length}개`,
+            title: '🌐 온라인 모임',
+            items: mapGroups.filter(g => g.place.country === ONLINE_CODE),
+          }}
           hidden={!!openGroup || !!chatGroup}
           onClose={() => setShowMap(false)}
-          renderGroup={g => (
+          renderItem={g => (
             <GroupCard group={g} joined={g.memberIds.includes(currentUserId)}
               recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
           )} />
