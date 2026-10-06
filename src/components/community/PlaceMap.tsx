@@ -4,14 +4,14 @@
 //
 // 멀리서 보면 가까운 장소끼리 묶여 숫자로 보이고, 확대할수록 나라 → 지역 → 도시 → 장소 단위로
 // 나뉘어요. 핀을 누르면 그곳 항목 목록이 아래에서 올라와요.
-// osmNearby 를 켜면 OpenStreetMap 에 등록된 실제 주변 운동 시설도 불러올 수 있어요.
+// osm 을 넘기면 OpenStreetMap 에 등록된 실제 주변 운동 시설도 불러올 수 있어요.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { X, LocateFixed, Loader2 } from 'lucide-react'
 import { flagOf } from '@/data/regionData'
-import { fetchOsmFacilities, osmDirectionsUrl, type OsmFacility } from '@/lib/osm-facilities'
+import { osmDirectionsUrl, type Bounds, type OsmFacility } from '@/lib/osm-facilities'
 
 export interface MapLocation {
   key: string       // 같은 key 끼리 한 핀으로 묶여요 (모임은 도시, 시설은 시설 하나)
@@ -106,7 +106,7 @@ function osmPopup(f: OsmFacility): string {
 
 export default function PlaceMap<T>({
   title, items, locate, renderItem, markerBadge, extraList, hint, emptyText, countText = n => `${n}곳`,
-  osmNearby = false, hidden = false, onClose,
+  osm = null, toolbar, filterKey = '', hidden = false, onClose,
 }: {
   title: string
   items: T[]
@@ -120,7 +120,12 @@ export default function PlaceMap<T>({
   emptyText?: string
   /** 목록 시트 제목 옆 개수 표시 */
   countText?: (n: number) => string
-  osmNearby?: boolean
+  /** 지도 영역 안의 실제 시설을 불러오는 함수. key 가 바뀌면(예: 종목 변경) 다시 불러와요 */
+  osm?: { key: string; fetch: (b: Bounds) => Promise<OsmFacility[]> } | null
+  /** 지도 위쪽에 붙는 필터 영역 (예: 종목 칩) */
+  toolbar?: ReactNode
+  /** 필터가 바뀐 걸 알려주는 값 — 바뀌면 걸러진 장소가 다 보이게 다시 맞춰요 */
+  filterKey?: string
   hidden?: boolean               // 상세 화면을 보는 동안 지도 상태를 유지한 채 숨겨요
   onClose: () => void
 }) {
@@ -186,7 +191,42 @@ export default function PlaceMap<T>({
     }
   }, [])
 
-  // 처음 열릴 때 항목이 있는 곳이 다 보이게 맞춰요
+  const osmRef = useRef(osm)
+  osmRef.current = osm
+
+  const loadOsm = useCallback(async () => {
+    const map = mapRef.current, layer = osmLayerRef.current, source = osmRef.current
+    if (!map || !layer || !source) return
+    setOsmState({ status: 'loading', count: 0 })
+    try {
+      const b = map.getBounds()
+      const list = await source.fetch({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() })
+      if (osmRef.current?.key !== source.key) return   // 불러오는 사이 종목이 바뀌었어요
+      layer.clearLayers()
+      for (const f of list) {
+        L.marker([f.lat, f.lng], { icon: osmIcon(f) }).bindPopup(osmPopup(f)).addTo(layer)
+      }
+      setOsmState({ status: 'done', count: list.length })
+    } catch {
+      if (osmRef.current?.key === source.key) setOsmState({ status: 'error', count: 0 })
+    }
+  }, [])
+
+  // 필터(종목)가 바뀌면: 동네를 보고 있으면 그 자리에서 실제 시설을 다시 찾고,
+  // 아니면 걸러진 등록 장소가 다 보이게 지도를 다시 맞춰요
+  const prevFilterKey = useRef(filterKey)
+  useEffect(() => {
+    if (prevFilterKey.current === filterKey) return
+    prevFilterKey.current = filterKey
+    setSelectedKey(null)
+    osmLayerRef.current?.clearLayers()
+    setOsmState({ status: 'idle', count: 0 })
+    const map = mapRef.current
+    if (map && osmRef.current && map.getZoom() >= OSM_MIN_ZOOM) loadOsm()
+    else fittedRef.current = false
+  }, [filterKey, loadOsm])
+
+  // 처음 열릴 때 (또는 필터가 바뀐 뒤) 항목이 있는 곳이 다 보이게 맞춰요
   useEffect(() => {
     const map = mapRef.current
     if (!map || fittedRef.current || points.length === 0) return
@@ -227,23 +267,6 @@ export default function PlaceMap<T>({
     setOsmState(s => (s.status === 'done' || s.status === 'error' ? { status: 'idle', count: s.count } : s))
   }, [viewTick])
 
-  const loadOsm = useCallback(async () => {
-    const map = mapRef.current, layer = osmLayerRef.current
-    if (!map || !layer) return
-    setOsmState({ status: 'loading', count: 0 })
-    try {
-      const b = map.getBounds()
-      const list = await fetchOsmFacilities({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() })
-      layer.clearLayers()
-      for (const f of list) {
-        L.marker([f.lat, f.lng], { icon: osmIcon(f) }).bindPopup(osmPopup(f)).addTo(layer)
-      }
-      setOsmState({ status: 'done', count: list.length })
-    } catch {
-      setOsmState({ status: 'error', count: 0 })
-    }
-  }, [])
-
   const locateMe = () => {
     const map = mapRef.current
     if (!map) return
@@ -260,6 +283,8 @@ export default function PlaceMap<T>({
         </button>
       </div>
 
+      {toolbar && <div className="flex-shrink-0 border-b border-slate-100">{toolbar}</div>}
+
       <div className="relative flex-1 min-h-0">
         <div ref={containerRef} className="absolute inset-0 z-0" style={{ background: '#aad3df' }} />
 
@@ -268,7 +293,7 @@ export default function PlaceMap<T>({
             {hint && (
               <p className="px-3 py-1.5 rounded-full text-[11.5px] font-semibold text-slate-600 bg-white/90 shadow-sm">{hint}</p>
             )}
-            {osmNearby && (
+            {osm && (
               zoom < OSM_MIN_ZOOM ? (
                 <p className="px-3 py-1.5 rounded-full text-[11px] font-semibold text-slate-500 bg-white/90 shadow-sm">
                   동네까지 확대하면 주변 실제 시설도 찾을 수 있어요

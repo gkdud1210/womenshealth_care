@@ -11,12 +11,12 @@ import {
   Search, X, MapPin, Clock, ChevronRight, Map as MapIcon, Navigation, BadgePercent, Footprints, Users,
 } from 'lucide-react'
 import {
-  FACILITIES, FACILITY_TYPE_META, ALL_FACILITY_TYPES, formatPrice, discountRate,
+  FACILITIES, FACILITY_TYPE_META, ALL_FACILITY_TYPES, formatPrice, discountRate, facilityActivities,
   type Facility, type FacilityType,
 } from '@/data/facilityData'
-import { CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
+import { CATEGORY_GROUPS, CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
 import { ANY, flagOf, placeLabel, type PlaceRef } from '@/data/regionData'
-import { osmDirectionsUrl } from '@/lib/osm-facilities'
+import { fetchOsmFacilities, osmDirectionsUrl, osmSupportsSport, type Bounds } from '@/lib/osm-facilities'
 import type { MapLocation } from '@/components/community/PlaceMap'
 
 const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
@@ -27,6 +27,42 @@ const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
     </div>
   ),
 }) as typeof import('@/components/community/PlaceMap').default
+
+// 지도에서 고를 수 있는 종목 — 등록 시설에서 할 수 있거나 실제 시설 찾기가 되는 종목만, 종목 분류 순서대로
+const MAP_SPORTS: MeetupCategory[] = (() => {
+  const registered = new Set(FACILITIES.flatMap(facilityActivities))
+  return CATEGORY_GROUPS.flatMap(g => g.sections.flatMap(s => s.categories))
+    .filter(c => registered.has(c) || osmSupportsSport(c))
+})()
+
+/** 목록에서 고른 시설 종류 → 지도를 열 때 처음 선택할 종목 */
+function sportForType(t: FacilityType | 'all'): MeetupCategory | 'all' {
+  if (t === 'all' || t === 'sports_center') return 'all'
+  return FACILITY_TYPE_META[t].categories[0]
+}
+
+function SportChips({ value, onChange }: { value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void }) {
+  return (
+    <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2.5">
+      <button onClick={() => onChange('all')}
+        className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
+        style={value === 'all' ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
+        🏠 모든 종목
+      </button>
+      {MAP_SPORTS.map(c => {
+        const meta = CATEGORY_META[c]
+        const on = value === c
+        return (
+          <button key={c} onClick={() => onChange(c)}
+            className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
+            style={on ? { background: meta.bg, borderColor: meta.color, color: meta.color } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
+            {meta.emoji} {meta.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
 function matchesPlace(f: Facility, p: PlaceRef): boolean {
   if (p.country === ANY) return true
@@ -187,7 +223,7 @@ function FacilityDetail({ f, isMember, onClose, onShowGroups }: {
           <div>
             <p className="text-[11.5px] font-bold text-slate-500 mb-1.5">여기서 할 수 있는 모임</p>
             <div className="flex flex-wrap gap-1.5">
-              {meta.categories.map(c => (
+              {facilityActivities(f).map(c => (
                 <button key={c} onClick={() => onShowGroups(c)}
                   className="flex items-center gap-1 text-[11.5px] font-semibold px-2.5 py-1 rounded-full border"
                   style={{ background: CATEGORY_META[c].bg, borderColor: CATEGORY_META[c].color, color: CATEGORY_META[c].color }}>
@@ -231,19 +267,35 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const [mapSport, setMapSport] = useState<MeetupCategory | 'all'>('all')
 
   // 종류·제휴·검색 조건 (지도는 지역을 직접 고르니까 지역 조건은 빼요)
-  const topicFiltered = useMemo(() => {
+  const searched = useMemo(() => {
     const q = query.trim().toLowerCase()
     return FACILITIES
-      .filter(f => type === 'all' || f.type === type)
       .filter(f => !partnerOnly || !!f.ludia)
       .filter(f => !q || `${f.name} ${f.description} ${f.address} ${placeLabel(f.place)} ${FACILITY_TYPE_META[f.type].label}`.toLowerCase().includes(q))
       // 제휴 할인 시설을 먼저
       .sort((a, b) => Number(!!b.ludia) - Number(!!a.ludia))
-  }, [type, partnerOnly, query])
+  }, [partnerOnly, query])
 
-  const list = useMemo(() => topicFiltered.filter(f => matchesPlace(f, place)), [topicFiltered, place])
+  const list = useMemo(
+    () => searched.filter(f => (type === 'all' || f.type === type) && matchesPlace(f, place)),
+    [searched, type, place],
+  )
+
+  // 지도: 고른 종목을 할 수 있는 곳은 시설 종류와 상관없이 다 보여줘요 (예: 배드민턴 → 배드민턴장 + 스포츠센터)
+  const mapItems = useMemo(
+    () => mapSport === 'all' ? searched : searched.filter(f => facilityActivities(f).includes(mapSport)),
+    [searched, mapSport],
+  )
+  const osm = useMemo(
+    () => osmSupportsSport(mapSport)
+      ? { key: mapSport, fetch: (b: Bounds) => fetchOsmFacilities(b, mapSport) }
+      : null,
+    [mapSport],
+  )
+  const openMap = () => { setMapSport(sportForType(type)); setShowMap(true) }
   const opened = FACILITIES.find(f => f.id === openId) ?? null
   const placeIsSet = place.country !== ANY
 
@@ -281,7 +333,7 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
             style={partnerOnly ? { background: 'rgba(244,63,117,0.12)', color: '#e11d5a' } : { background: '#f1f5f9', color: '#475569' }}>
             <BadgePercent className="w-3.5 h-3.5" /> 할인
           </button>
-          <button onClick={() => setShowMap(true)}
+          <button onClick={openMap}
             className="flex items-center gap-1 px-3 py-2 rounded-2xl text-[12.5px] font-bold flex-shrink-0"
             style={{ background: 'rgba(99,102,241,0.1)', color: '#4f46e5' }}>
             <MapIcon className="w-3.5 h-3.5" /> 지도
@@ -323,7 +375,7 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
           <div className="text-center py-16">
             <p className="text-4xl mb-3">🗺️</p>
             <p className="text-sm text-slate-400 font-medium">이 조건에 맞는 등록 시설이 아직 없어요</p>
-            <button onClick={() => setShowMap(true)} className="mt-3 text-xs font-bold text-indigo-500">
+            <button onClick={openMap} className="mt-3 text-xs font-bold text-indigo-500">
               지도에서 주변 실제 시설 찾아보기
             </button>
           </div>
@@ -338,12 +390,14 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
       {showMap && (
         <PlaceMap<Facility>
           title="🗺️ 지도로 시설 찾기"
-          items={topicFiltered}
+          items={mapItems}
           locate={locate}
           markerBadge={badge}
+          toolbar={<SportChips value={mapSport} onChange={setMapSport} />}
+          filterKey={mapSport}
           hint="핀을 누르면 이용료·할인 정보를 볼 수 있어요"
-          emptyText="조건에 맞는 등록 시설이 없어요"
-          osmNearby
+          emptyText={mapSport === 'all' ? '조건에 맞는 등록 시설이 없어요' : `등록된 ${CATEGORY_META[mapSport].label} 시설이 아직 없어요`}
+          osm={osm}
           onClose={() => setShowMap(false)}
           renderItem={f => <FacilityCard f={f} isMember={isMember} onOpen={() => setOpenId(f.id)} />}
         />

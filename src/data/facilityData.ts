@@ -56,11 +56,18 @@ export interface Facility {
   /** 루디아 회원 혜택 (제휴 시설) */
   ludia?: { memberAmount: number | null; perk: string }
   amenities: string[]
+  /** 이 시설에서 할 수 있는 종목 (없으면 시설 종류의 기본 종목) */
+  activities?: MeetupCategory[]
   description: string
   /** 코스형 장소의 거리 */
   distanceKm?: number
   /** 예시 데이터 (실제 제휴 전) */
   sample?: boolean
+}
+
+/** 이 시설에서 할 수 있는 종목 */
+export function facilityActivities(f: Facility): MeetupCategory[] {
+  return f.activities ?? FACILITY_TYPE_META[f.type].categories
 }
 
 export function formatPrice(amount: number | null, currency: FacilityPrice['currency']): string {
@@ -84,6 +91,7 @@ export const FACILITIES: Facility[] = [
     address: '서울 영등포구 여의동로 330', hours: '24시간', distanceKm: 8.4,
     price: { amount: null, unit: '', currency: 'KRW' },
     amenities: ['강변 러닝 코스', '화장실', '자전거 대여', '편의점'],
+    activities: ['running', 'walking', 'cycling'],
     description: '한강을 따라 평평하게 이어지는 러닝·산책 코스. 저녁 러닝크루가 많이 모여요.',
   },
   {
@@ -108,6 +116,7 @@ export const FACILITIES: Facility[] = [
     address: '서울 송파구 올림픽로 424', hours: '05:00 – 22:00', distanceKm: 5.0,
     price: { amount: null, unit: '', currency: 'KRW' },
     amenities: ['완만한 언덕 코스', '화장실', '음수대'],
+    activities: ['running', 'walking'],
     description: '몽촌토성을 따라 도는 순환 코스. 적당한 오르막이 있어 인터벌 러닝에 좋아요.',
   },
   {
@@ -127,6 +136,7 @@ export const FACILITIES: Facility[] = [
     price: { amount: 9000, unit: '1회 자유이용', currency: 'KRW' },
     ludia: { memberAmount: 6500, perk: '첫 방문 1회 무료 체험' },
     amenities: ['실내 수영장', '배드민턴 코트 6면', '헬스장', '샤워실', '주차'],
+    activities: ['swimming', 'badminton', 'gym'],
     description: '수영·배드민턴·헬스를 한 곳에서. 여성 전용 샤워실이 따로 있어요.',
   },
   {
@@ -163,6 +173,7 @@ export const FACILITIES: Facility[] = [
     price: { amount: 30000, unit: '그룹 수업 1회', currency: 'KRW' },
     ludia: { memberAmount: 22000, perk: '골반 교정 클래스 첫 수업 50%' },
     amenities: ['기구 필라테스', '소도구 요가', '매트 제공'],
+    activities: ['yoga', 'pilates'],
     description: '골반·자세 교정에 집중한 소규모 수업. 루디아 자세 교정 케어카드와 연계돼요.',
   },
   {
@@ -199,6 +210,7 @@ export const FACILITIES: Facility[] = [
     address: 'Queens, NY', hours: '06:00 – 01:00', distanceKm: 5.0,
     price: { amount: null, unit: '', currency: 'USD' },
     amenities: ['호수 둘레 러닝 코스', '테니스 센터', '화장실'],
+    activities: ['running', 'walking', 'tennis'],
     description: '뉴욕 퀸즈의 큰 공원. 호수를 도는 평지 코스가 러닝 모임에 좋아요.',
   },
   {
@@ -208,6 +220,7 @@ export const FACILITIES: Facility[] = [
     price: { amount: 15, unit: '1회 이용', currency: 'USD' },
     ludia: { memberAmount: 10, perk: '요가 클래스 첫 달 20% 할인' },
     amenities: ['체육관', '요가룸', '수영장', '피클볼 코트'],
+    activities: ['yoga', 'swimming', 'gym'],
     description: '어바인 한인 여성 모임이 자주 쓰는 다목적 센터.',
   },
   {
@@ -216,6 +229,7 @@ export const FACILITIES: Facility[] = [
     address: 'Vancouver, BC', hours: '24시간', distanceKm: 9.0,
     price: { amount: null, unit: '', currency: 'CAD' },
     amenities: ['해안 산책로', '자전거 도로 분리', '화장실'],
+    activities: ['walking', 'running', 'cycling'],
     description: '바다를 따라 공원을 한 바퀴 도는 산책·러닝 코스.',
   },
   {
@@ -224,6 +238,7 @@ export const FACILITIES: Facility[] = [
     address: '東京都新宿区', hours: '09:00 – 22:00',
     price: { amount: 600, unit: '1회 이용', currency: 'JPY' },
     amenities: ['체육관', '수영장', '트레이닝룸'],
+    activities: ['swimming', 'badminton', 'gym'],
     description: '구립 스포츠센터. 저렴하게 수영과 배드민턴을 즐길 수 있어요.',
   },
   {
@@ -233,6 +248,7 @@ export const FACILITIES: Facility[] = [
     price: { amount: 30, unit: '그룹 수업 1회', currency: 'AUD' },
     ludia: { memberAmount: 24, perk: '워홀·유학생 10회권 추가 할인' },
     amenities: ['리포머', '매트', '한국어 강사'],
+    activities: ['pilates'],
     description: '한국어 수업이 있는 필라테스 스튜디오.',
   },
   {
