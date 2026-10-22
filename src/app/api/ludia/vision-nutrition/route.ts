@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { MINERALS_PROMPT_SHAPE, parseMinerals } from '@/lib/minerals'
 
 // 정적 배포(output: 'export')에는 API 라우트가 없어요 — 이 엔드포인트는 dev 서버에서만 응답하고,
 // 클라이언트는 실패 시 src/lib/meal-analysis.ts의 로컬 태그 기반 추정으로 자동 폴백해요.
@@ -14,6 +15,7 @@ interface ParsedAnalysis {
   protein: number
   carb: number
   fat: number
+  minerals: unknown
   dietPattern: 'home' | 'delivery' | 'processed' | 'unclear'
   dietPatternNote: string
   assessment: string
@@ -70,13 +72,14 @@ export async function POST(req: Request) {
   "protein": 숫자,
   "carb": 숫자,
   "fat": 숫자,
+  "minerals": ${MINERALS_PROMPT_SHAPE},
   "dietPattern": "home" | "delivery" | "processed" | "unclear",
   "dietPatternNote": "그렇게 판단한 짧은 이유 (예: 일회용 배달 용기와 튀김이 보여요)",
   "assessment": "사용자의 케어 관심사에 맞춘 2~3문장의 따뜻하고 구체적인 평가 (한국어)",
   "addSuggestions": ["이 식사에 추가하면 좋을 것 1~2개"],
   "removeSuggestions": ["줄이면 좋을 것, 없으면 빈 배열"]
 }
-칼로리·영양소는 사진에 보이는 양을 기준으로 합리적으로 추정하세요. 음식을 알아볼 수 없으면 foods를 빈 배열로 두고 assessment에 그 사실을 안내하세요.
+칼로리·영양소는 사진에 보이는 양을 기준으로 합리적으로 추정하세요. 미네랄은 이 끼니 전체 합계를 일반적인 식품 성분표 수준으로 추정하고, 철분·칼슘이 부족하면 addSuggestions에 보충할 음식을 넣어주세요. 음식을 알아볼 수 없으면 foods를 빈 배열로 두고 assessment에 그 사실을 안내하세요.
 
 dietPattern 판단 기준: 일회용 배달 용기·플라스틱 포장·프랜차이즈 로고·과도한 튀김/소스가 보이면 "delivery", 인스턴트·즉석식품·통조림처럼 보이면 "processed", 집에서 직접 조리한 반찬·밥상 구성이면 "home", 사진만으로 판단하기 어려우면 "unclear"로 표시하세요.`
 
@@ -98,6 +101,7 @@ dietPattern 판단 기준: 일회용 배달 용기·플라스틱 포장·프랜�
       protein: parsed.protein ?? undefined,
       carb: parsed.carb ?? undefined,
       fat: parsed.fat ?? undefined,
+      minerals: parseMinerals(parsed.minerals),
       dietPattern: (['home', 'delivery', 'processed', 'unclear'] as const).includes(parsed.dietPattern as 'home')
         ? parsed.dietPattern : 'unclear',
       dietPatternNote: parsed.dietPatternNote ?? undefined,

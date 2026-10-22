@@ -36,6 +36,8 @@ import {
   recommendMealProducts, buildManualResult,
   DIET_PATTERN_META, type MealAnalysisResult, type DietPattern,
 } from '@/lib/meal-analysis'
+import { MINERAL_DAILY, MINERAL_KEYS, MINERAL_META, parseMinerals, type Minerals } from '@/lib/minerals'
+import MineralBars from '@/components/nutrition/MineralBars'
 import type { ShopProduct } from '@/data/shopProducts'
 
 /** 선택한 케어카드 중 첫 번째 카드의 세부 체질을(홍채+BMI+문진 기반) 분류해요.
@@ -171,6 +173,7 @@ async function callVisionApi(
       foods: data.foods ?? [],
       totalCalories: data.totalCalories ?? 0,
       protein: data.protein, carb: data.carb, fat: data.fat,
+      minerals: parseMinerals(data.minerals),
       dietPattern: data.dietPattern ?? 'unclear',
       dietPatternNote: data.dietPatternNote,
       assessment: data.assessment ?? '',
@@ -273,6 +276,7 @@ function MealResultView({ entry, mealProfile }: { entry: MealEntry; mealProfile:
             {entry.fat !== undefined && <span>지방 <b className="text-slate-700">{Math.round(entry.fat)}g</b></span>}
           </div>
         )}
+        {entry.minerals && <MineralBars minerals={entry.minerals} title="이 끼니 미네랄" className="mt-3" />}
       </div>
 
       {entry.foods.length > 0 && (
@@ -850,6 +854,18 @@ function WeeklyNutritionSummary({ logs, mealProfile }: { logs: MealLogs; mealPro
   const avgCarb = avg(e => e.carb)
   const avgFat = avg(e => e.fat)
 
+  // 미네랄 일평균 — 미네랄이 있는 기록만으로 계산해요 (예전 기록에는 없어요)
+  const mineralEntries = entries.filter(e => e.minerals)
+  const mineralDays = new Set(weekKeys.filter(k => MEAL_ORDER.some(m => logs[k]?.[m]?.minerals))).size
+  const avgMinerals: Minerals | null = mineralDays === 0 ? null : MINERAL_KEYS.reduce((acc, k) => ({
+    ...acc, [k]: mineralEntries.reduce((sum, e) => sum + (e.minerals?.[k] ?? 0), 0) / mineralDays,
+  }), {} as Minerals)
+  // 하루 권장량의 70%에 못 미치는 미네랄 (생리로 부족해지기 쉬운 철분을 먼저)
+  const lowMinerals = avgMinerals
+    ? MINERAL_KEYS.filter(k => avgMinerals[k] < MINERAL_DAILY[k] * 0.7)
+        .sort((a, b) => Number(b === 'iron') - Number(a === 'iron'))
+    : []
+
   // 아주 단순한 가이드라인 — 정밀한 영양 처방이 아니라 대략적인 경향 파악용이에요.
   const proteinLow = avgProtein !== null && avgProtein < 45
   const boostHint = mealProfile.boost[0]
@@ -900,6 +916,19 @@ function WeeklyNutritionSummary({ logs, mealProfile }: { logs: MealLogs; mealPro
           <div className="h-full rounded-full transition-all" style={{ width: `${deliveryRatio}%`, background: deliveryHigh ? '#ea580c' : '#94a3b8' }} />
         </div>
       </div>
+
+      {avgMinerals && (
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <MineralBars minerals={avgMinerals} title="미네랄 (일평균)" note={`미네랄 기록 ${mineralDays}일 기준`} className="!bg-slate-50" />
+          {lowMinerals.length > 0 && (
+            <p className="text-[11.5px] text-slate-500 mt-2 leading-relaxed">
+              💡 최근 {lowMinerals.map(k => MINERAL_META[k].label).join('·')}이 권장량보다 부족한 편이에요.
+              {lowMinerals.includes('iron') && ' 생리 기간엔 철분이 더 빠져나가니 붉은 살코기·시금치·두부를 챙겨주세요.'}
+              {!lowMinerals.includes('iron') && lowMinerals.includes('calcium') && ' 우유·요거트·멸치·두부로 칼슘을 채워보세요.'}
+            </p>
+          )}
+        </div>
+      )}
 
       {(proteinLow || boostHint || deliveryHigh) && (
         <p className="text-[11.5px] text-slate-500 mt-3 pt-3 border-t border-slate-100 leading-relaxed">

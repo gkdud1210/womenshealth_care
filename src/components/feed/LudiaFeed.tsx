@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
 import { analyzeFeedPost, DAILY_REFERENCE, type FeedNutrition } from '@/lib/feed-nutrition'
+import MineralBars from '@/components/nutrition/MineralBars'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -648,7 +649,9 @@ export function PostCard({
 
 // ── Nutrition panel ────────────────────────────────────────────────────────
 
-const MACROS: { key: keyof FeedNutrition['total']; label: string; unit: string; color: string }[] = [
+type MacroKey = Exclude<keyof FeedNutrition['total'], 'calories' | 'minerals'>
+
+const MACROS: { key: MacroKey; label: string; unit: string; color: string }[] = [
   { key: 'protein',  label: '단백질',  unit: 'g',  color: '#f43f75' },
   { key: 'carb',     label: '탄수화물', unit: 'g',  color: '#f59e0b' },
   { key: 'fat',      label: '지방',    unit: 'g',  color: '#a855f7' },
@@ -713,6 +716,9 @@ function NutritionPanel({ nutrition, reanalyzing, onReanalyze, onClose }: {
               )
             })}
           </div>
+
+          {/* 미네랄 */}
+          {total.minerals && <MineralBars minerals={total.minerals} className="mt-3" />}
 
           {/* 메뉴별 내역 */}
           <div className="mt-3 space-y-1">

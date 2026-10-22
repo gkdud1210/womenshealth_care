@@ -7,6 +7,10 @@
  */
 
 import { ludiaApiUrl } from '@/lib/ludia-api'
+import { MINERAL_DAILY, MINERAL_KEYS, mineralsFrom, parseMinerals, type Minerals } from '@/lib/minerals'
+
+/** 미네랄 분석 전에 저장된 게시물에는 없어요 */
+export type FeedMinerals = Minerals
 
 export interface FeedNutritionItem {
   name: string
@@ -18,6 +22,7 @@ export interface FeedNutritionItem {
   sugar: number
   sodium: number   // mg
   caffeine: number // mg
+  minerals?: FeedMinerals
 }
 
 export interface FeedNutritionTotal {
@@ -28,6 +33,7 @@ export interface FeedNutritionTotal {
   sugar: number
   sodium: number
   caffeine: number
+  minerals?: FeedMinerals
 }
 
 export interface FeedNutrition {
@@ -111,12 +117,48 @@ const FOOD_DB: DbRow[] = [
   r(['토스트'], '토스트', '🍞', 330, 12, 38, 14, 8, 600),
 ]
 
+// 메뉴별 미네랄 대략값 [칼슘, 철분, 마그네슘, 칼륨, 아연] (mg, FOOD_DB 와 같은 1인분/1잔 기준)
+const MINERAL_DB: Record<string, [number, number, number, number, number]> = {
+  '바닐라 라떼': [300, 0.3, 40, 450, 1.2], '카라멜 마키아토': [300, 0.3, 40, 450, 1.2], '돌체 라떼': [330, 0.3, 40, 480, 1.3],
+  '콜드브루': [5, 0.1, 15, 200, 0.05], '아메리카노': [5, 0.1, 15, 180, 0.05], '카페 라떼': [330, 0.2, 45, 500, 1.3],
+  '카푸치노': [240, 0.2, 35, 380, 1], '에스프레소': [1, 0.1, 24, 35, 0], '말차 라떼': [300, 1, 50, 500, 1.3],
+  '프라푸치노': [200, 0.4, 30, 330, 0.8], '버블 밀크티': [120, 0.8, 20, 200, 0.5], '과일 스무디': [60, 0.6, 40, 550, 0.3],
+  '에이드': [10, 0.1, 5, 80, 0.1], '핫초코': [280, 1.5, 70, 550, 1.3],
+  '크로플': [30, 1.2, 12, 90, 0.5], '크루아상': [20, 1.2, 10, 70, 0.4], '소금빵': [15, 1, 10, 60, 0.4],
+  '베이글': [20, 3, 25, 100, 0.9], '마카롱': [10, 0.3, 10, 40, 0.1], '티라미수': [90, 1, 15, 150, 0.6],
+  '치즈케이크': [70, 0.6, 8, 110, 0.5], '조각 케이크': [50, 1, 10, 100, 0.4], '쿠키': [15, 1, 8, 70, 0.3],
+  '스콘': [90, 1.5, 12, 100, 0.4], '와플': [150, 2.5, 15, 150, 0.6], '도넛': [30, 1.3, 12, 80, 0.4],
+  '빙수': [250, 1.5, 40, 500, 1], '아이스크림': [120, 0.2, 12, 200, 0.6], '구움과자': [15, 0.6, 4, 40, 0.2],
+  '샐러드': [80, 2, 50, 600, 1.2], '포케': [70, 3, 90, 900, 2.5], '샌드위치': [150, 3, 40, 400, 2],
+  '햄버거': [150, 4.5, 45, 500, 5], '피자 2조각': [400, 4, 50, 450, 3.5], '파스타': [100, 3.5, 70, 450, 2.5],
+  '리조또': [150, 1.5, 40, 350, 2], '스테이크': [20, 4.5, 45, 700, 9], '초밥 10pc': [40, 2.5, 60, 500, 2],
+  '라멘': [60, 2.5, 50, 500, 2.5], '라면': [30, 1.5, 30, 250, 1], '마라탕': [150, 5, 80, 800, 3],
+  '떡볶이': [50, 2, 30, 300, 1], '치킨 반마리': [40, 3, 70, 900, 5], '삼겹살 1인분': [10, 1.5, 30, 500, 3.5],
+  '비빔밥': [90, 4, 90, 600, 3], '김밥 1줄': [70, 2, 45, 350, 1.8], '돈가스': [40, 2.5, 40, 500, 3],
+  '쌀국수': [50, 3, 40, 500, 3], '덮밥': [50, 3, 50, 500, 4], '브런치 플레이트': [120, 3.5, 40, 600, 3],
+  '요거트볼': [250, 2, 80, 550, 1.8], '아보카도 토스트': [50, 2, 55, 700, 1.5], '토스트': [80, 2, 25, 200, 1.2],
+}
+
+function mineralsOf(name: string): FeedMinerals | undefined {
+  const m = MINERAL_DB[name]
+  return m ? mineralsFrom(m) : undefined
+}
+
 function emptyTotal(): FeedNutritionTotal {
   return { calories: 0, protein: 0, carb: 0, fat: 0, sugar: 0, sodium: 0, caffeine: 0 }
 }
 
+/** 미네랄 정보가 있는 메뉴만 더해요 — 하나도 없으면 undefined */
+function sumMinerals(items: FeedNutritionItem[]): FeedMinerals | undefined {
+  const withM = items.filter(i => i.minerals)
+  if (withM.length === 0) return undefined
+  const t: FeedMinerals = { calcium: 0, iron: 0, magnesium: 0, potassium: 0, zinc: 0 }
+  for (const i of withM) for (const k of MINERAL_KEYS) t[k] += i.minerals![k]
+  return t
+}
+
 export function sumItems(items: FeedNutritionItem[]): FeedNutritionTotal {
-  return items.reduce((t, i) => ({
+  const total = items.reduce((t, i) => ({
     calories: t.calories + i.calories,
     protein:  t.protein  + i.protein,
     carb:     t.carb     + i.carb,
@@ -125,11 +167,14 @@ export function sumItems(items: FeedNutritionItem[]): FeedNutritionTotal {
     sodium:   t.sodium   + i.sodium,
     caffeine: t.caffeine + i.caffeine,
   }), emptyTotal())
+  const minerals = sumMinerals(items)
+  return minerals ? { ...total, minerals } : total
 }
 
 /** 1일 권장량(성인 여성 기준 대략값) — 퍼센트 바 표시에 써요. */
-export const DAILY_REFERENCE: FeedNutritionTotal = {
+export const DAILY_REFERENCE: Required<FeedNutritionTotal> = {
   calories: 2000, protein: 55, carb: 300, fat: 54, sugar: 50, sodium: 2000, caffeine: 400,
+  minerals: MINERAL_DAILY,
 }
 
 /** 사진 분석이 불가능할 때 캡션 텍스트의 음식 키워드로 추정해요. */
@@ -143,7 +188,7 @@ export function estimateFromCaption(caption: string): FeedNutrition {
     // 같은 글자를 두 번 세지 않도록 (예: '바닐라라떼' 매칭 후 '라떼' 중복 방지)
     rest = rest.split(hit.toLowerCase().replace(/\s+/g, '')).join('|')
     const { keys: _keys, ...item } = row
-    items.push(item)
+    items.push({ ...item, minerals: mineralsOf(item.name) })
   }
   const total = sumItems(items)
   const isFood = items.length > 0
@@ -196,6 +241,7 @@ async function callFeedVisionApi(images: string[], caption: string): Promise<Fee
       emoji: typeof i.emoji === 'string' ? i.emoji : undefined,
       calories: num(i.calories), protein: num(i.protein), carb: num(i.carb), fat: num(i.fat),
       sugar: num(i.sugar), sodium: num(i.sodium), caffeine: num(i.caffeine),
+      minerals: parseMinerals(i.minerals),
     }))
     const total = sumItems(items)
     return {

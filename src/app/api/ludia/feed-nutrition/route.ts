@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { GoogleGenerativeAI } from '@google/generative-ai'
+import { MINERALS_PROMPT_SHAPE } from '@/lib/minerals'
 
 // 루디아피드 게시물 사진(음식·카페)의 칼로리·영양성분 분석.
 // 정적 배포(output: 'export')에는 API 라우트가 없어요 — dev 서버에서만 응답하고,
@@ -57,11 +58,13 @@ ${caption ? `게시물 캡션(메뉴명·양 힌트로 참고): """${caption}"""
     "fat": 숫자(g),
     "sugar": 숫자(g),
     "sodium": 숫자(mg),
-    "caffeine": 숫자(mg, 없으면 0)
+    "caffeine": 숫자(mg, 없으면 0),
+    "minerals": ${MINERALS_PROMPT_SHAPE}
   }],
   "summary": "전체 구성을 1~2문장으로 따뜻하게 요약 (한국어)",
   "tip": "여성 건강 관점의 짧고 구체적인 한 줄 조언 (한국어)"
 }
+미네랄은 재료와 양을 바탕으로 일반적인 식품 성분표 수준으로 추정하세요. 철분·칼슘이 부족하거나 풍부한 구성이면 tip에서 짚어주세요.
 음식이나 음료가 전혀 보이지 않으면 isFood를 false, items를 빈 배열로 두고 summary에 그 사실을 안내하세요.`
 
     const result = await model.generateContent([prompt, ...images])

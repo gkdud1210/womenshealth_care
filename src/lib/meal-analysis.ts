@@ -7,8 +7,9 @@
  */
 
 import { SHOP_PRODUCTS, type ShopProduct } from '@/data/shopProducts'
+import { addMinerals, emptyMinerals, mineralsFrom, type Minerals } from '@/lib/minerals'
 import {
-  mealTargetKcal, FOOD_TAGS,
+  mealTargetKcal, FOOD_TAGS, PORTION_SCALE,
   type MealType, type Portion, type CareMealProfile,
 } from '@/data/mealWellness'
 
@@ -34,6 +35,8 @@ export interface MealAnalysisResult {
   protein?: number
   carb?: number
   fat?: number
+  /** 미네랄 (mg) — 미네랄 분석 전에 저장된 기록에는 없어요 */
+  minerals?: Minerals
   dietPattern: DietPattern
   dietPatternNote?: string
   assessment: string
@@ -61,7 +64,8 @@ export function recommendMealProducts(profile: CareMealProfile, limit = 2): Shop
 
 export function estimateFromTags(
   selections: { tagId: string; portion: Portion }[],
-): { foods: MealFood[]; totalCalories: number; protein: number; carb: number; fat: number } {
+): { foods: MealFood[]; totalCalories: number; protein: number; carb: number; fat: number; minerals: Minerals } {
+  let minerals = emptyMinerals()
   let totalCalories = 0
   let protein = 0
   let carb = 0
@@ -75,9 +79,10 @@ export function estimateFromTags(
     protein += tag.protein[sel.portion]
     carb += tag.carb[sel.portion]
     fat += tag.fat[sel.portion]
+    minerals = addMinerals(minerals, mineralsFrom(tag.minerals), PORTION_SCALE[sel.portion])
     foods.push({ name: `${tag.emoji} ${tag.label} · ${sel.portion}`, calories: kcal })
   }
-  return { foods, totalCalories, protein, carb, fat }
+  return { foods, totalCalories, protein, carb, fat, minerals }
 }
 
 // ── 케어카드 맞춤 평가 문구 (AI 실패 시 로컬 생성에도, UI 보조 텍스트에도 사용) ──
@@ -116,7 +121,7 @@ export function buildManualResult(
   profile: CareMealProfile,
   dietPattern: DietPattern = 'unclear',
 ): MealAnalysisResult {
-  const { foods, totalCalories, protein, carb, fat } = estimateFromTags(selections)
+  const { foods, totalCalories, protein, carb, fat, minerals } = estimateFromTags(selections)
   const { assessment, addSuggestions, removeSuggestions } = buildLocalAssessment(mealType, totalCalories, profile)
-  return { foods, totalCalories, protein, carb, fat, dietPattern, assessment, addSuggestions, removeSuggestions, source: 'manual' }
+  return { foods, totalCalories, protein, carb, fat, minerals, dietPattern, assessment, addSuggestions, removeSuggestions, source: 'manual' }
 }
