@@ -5,10 +5,11 @@
 // 스포츠센터·수영장·코트·걷기 코스·공유 주방 같은 장소를 이용료, 루디아 회원 할인과 함께 보여줘요.
 // 목록과 지도 두 가지로 볼 수 있고, 지도에서는 OpenStreetMap 의 실제 주변 시설도 찾아볼 수 있어요.
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Search, X, MapPin, Clock, ChevronRight, Map as MapIcon, Navigation, BadgePercent, Footprints, Users,
+  Car, Backpack, Info,
 } from 'lucide-react'
 import {
   FACILITIES, FACILITY_TYPE_META, ALL_FACILITY_TYPES, formatPrice, discountRate, facilityActivities,
@@ -18,6 +19,10 @@ import { CATEGORY_GROUPS, CATEGORY_META, type MeetupCategory } from '@/data/meet
 import { ANY, flagOf, placeLabel, type PlaceRef } from '@/data/regionData'
 import { fetchOsmFacilities, osmDirectionsUrl, osmSupportsSport, type Bounds } from '@/lib/osm-facilities'
 import type { MapLocation } from '@/components/community/PlaceMap'
+import FacilityReviews, { RatingBadge, TopKeywords } from '@/components/community/FacilityReviews'
+import {
+  addReview, loadReviews, removeReview, saveReviews, type FacilityReview, type ReviewMap,
+} from '@/lib/facility-reviews'
 
 const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
   ssr: false,
@@ -77,6 +82,9 @@ function PriceLine({ f, isMember, large = false }: { f: Facility; isMember: bool
   const { amount, unit, currency } = f.price
   const rate = discountRate(f)
   const regular = formatPrice(amount, currency)
+  if (f.price.inquire) {
+    return <span className={`${large ? 'text-base' : 'text-[12.5px]'} font-bold text-slate-500`}>요금 전화 문의</span>
+  }
   if (amount === null) {
     return <span className={`${large ? 'text-base' : 'text-[12.5px]'} font-bold text-emerald-600`}>무료 · 누구나 이용</span>
   }
@@ -105,7 +113,9 @@ function PriceLine({ f, isMember, large = false }: { f: Facility; isMember: bool
 
 // ── 시설 카드 ──────────────────────────────────────────────────────────────
 
-export function FacilityCard({ f, isMember, onOpen }: { f: Facility; isMember: boolean; onOpen: () => void }) {
+export function FacilityCard({ f, isMember, reviews = [], onOpen }: {
+  f: Facility; isMember: boolean; reviews?: FacilityReview[]; onOpen: () => void
+}) {
   const meta = FACILITY_TYPE_META[f.type]
   return (
     <button onClick={onOpen}
@@ -139,7 +149,13 @@ export function FacilityCard({ f, isMember, onOpen }: { f: Facility; isMember: b
           {f.sample && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">예시 정보</span>
           )}
+          {reviews.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-[10.5px] text-slate-400">
+              <RatingBadge reviews={reviews} /> 리뷰 {reviews.length}
+            </span>
+          )}
         </div>
+        {reviews.length > 0 && <div className="mt-1.5"><TopKeywords reviews={reviews} /></div>}
       </div>
     </button>
   )
@@ -147,8 +163,12 @@ export function FacilityCard({ f, isMember, onOpen }: { f: Facility; isMember: b
 
 // ── 시설 상세 ──────────────────────────────────────────────────────────────
 
-function FacilityDetail({ f, isMember, onClose, onShowGroups }: {
-  f: Facility; isMember: boolean; onClose: () => void; onShowGroups: (c: MeetupCategory) => void
+function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteReview, onClose, onShowGroups }: {
+  f: Facility; isMember: boolean
+  reviews: FacilityReview[]; userId: string
+  onAddReview: (rating: number, text: string, images: string[], keywords: string[]) => boolean
+  onDeleteReview: (reviewId: string) => void
+  onClose: () => void; onShowGroups: (c: MeetupCategory) => void
 }) {
   const meta = FACILITY_TYPE_META[f.type]
   return (
@@ -192,6 +212,23 @@ function FacilityDetail({ f, isMember, onClose, onShowGroups }: {
                 )}
               </div>
             )}
+            {f.monthly && (
+              <div className="mt-2.5 pt-2.5 border-t border-slate-200/70 space-y-1">
+                <div className="flex items-baseline justify-between">
+                  <span className="text-[12.5px] text-slate-500">월 이용권 (성인)</span>
+                  <span className="text-[14px] font-bold text-slate-800">{formatPrice(f.monthly.adult, f.price.currency)}</span>
+                </div>
+                {(f.monthly.youth || f.monthly.child) && (
+                  <p className="text-[11.5px] text-slate-500 text-right">
+                    {[
+                      f.monthly.youth && `청소년 ${formatPrice(f.monthly.youth, f.price.currency)}`,
+                      f.monthly.child && `어린이 ${formatPrice(f.monthly.child, f.price.currency)}`,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                {f.monthly.note && <p className="text-[11.5px] text-slate-500">{f.monthly.note}</p>}
+              </div>
+            )}
             {f.ludia && (
               <p className="mt-2.5 text-[12px] font-semibold text-violet-600">🎁 {f.ludia.perk}</p>
             )}
@@ -207,7 +244,19 @@ function FacilityDetail({ f, isMember, onClose, onShowGroups }: {
             <p className="flex items-start gap-2"><MapPin className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />{f.address}</p>
             <p className="flex items-start gap-2"><Clock className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />{f.hours}</p>
             {f.distanceKm && <p className="flex items-start gap-2"><Footprints className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />코스 길이 약 {f.distanceKm}km</p>}
+            {f.parking && <p className="flex items-start gap-2"><Car className="w-4 h-4 text-slate-400 flex-shrink-0 mt-0.5" />{f.parking}</p>}
           </div>
+
+          {f.supplies && f.supplies.length > 0 && (
+            <div>
+              <p className="flex items-center gap-1 text-[11.5px] font-bold text-slate-500 mb-1.5"><Backpack className="w-3.5 h-3.5" />준비물</p>
+              <div className="flex flex-wrap gap-1.5">
+                {f.supplies.map(s => (
+                  <span key={s} className="text-[11.5px] px-2.5 py-1 rounded-full bg-sky-50 text-sky-700">{s}</span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {f.amenities.length > 0 && (
             <div>
@@ -219,6 +268,18 @@ function FacilityDetail({ f, isMember, onClose, onShowGroups }: {
               </div>
             </div>
           )}
+
+          {f.notes && f.notes.length > 0 && (
+            <div>
+              <p className="flex items-center gap-1 text-[11.5px] font-bold text-slate-500 mb-1.5"><Info className="w-3.5 h-3.5" />이용 안내</p>
+              <ul className="space-y-1 text-[12px] text-slate-600 leading-snug">
+                {f.notes.map(n => <li key={n} className="flex gap-1.5"><span className="text-slate-300">•</span>{n}</li>)}
+              </ul>
+            </div>
+          )}
+
+          <FacilityReviews facility={f} reviews={reviews} userId={userId}
+            onAdd={onAddReview} onDelete={onDeleteReview} />
 
           <div>
             <p className="text-[11.5px] font-bold text-slate-500 mb-1.5">여기서 할 수 있는 모임</p>
@@ -254,10 +315,13 @@ function FacilityDetail({ f, isMember, onClose, onShowGroups }: {
 
 // ── 시설 찾기 탭 ───────────────────────────────────────────────────────────
 
-export default function FacilityExplorer({ place, placeText, isMember, onPickPlace, onClearPlace, onShowGroups }: {
+export default function FacilityExplorer({ place, placeText, isMember, userId, userName, onPickPlace, onClearPlace, onShowGroups }: {
   place: PlaceRef                 // 모임 찾기와 같은 지역 필터를 써요
   placeText: string
   isMember: boolean
+  /** 리뷰 작성자 */
+  userId: string
+  userName: string
   onPickPlace: () => void
   onClearPlace: () => void
   onShowGroups: (c: MeetupCategory) => void
@@ -268,6 +332,26 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
   const [openId, setOpenId] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
   const [mapSport, setMapSport] = useState<MeetupCategory | 'all'>('all')
+  const [reviews, setReviews] = useState<ReviewMap>({})
+
+  useEffect(() => { setReviews(loadReviews()) }, [])
+
+  const handleAddReview = useCallback((facilityId: string, rating: number, text: string, images: string[], keywords: string[]) => {
+    const next = addReview(reviews, {
+      id: `rv_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+      facilityId, authorId: userId, authorName: userName,
+      rating, text, images, keywords, createdAt: new Date().toISOString(),
+    })
+    if (!saveReviews(next)) return false
+    setReviews(next)
+    return true
+  }, [reviews, userId, userName])
+
+  const handleDeleteReview = useCallback((facilityId: string, reviewId: string) => {
+    const next = removeReview(reviews, facilityId, reviewId)
+    saveReviews(next)
+    setReviews(next)
+  }, [reviews])
 
   // 종류·제휴·검색 조건 (지도는 지역을 직접 고르니까 지역 조건은 빼요)
   const searched = useMemo(() => {
@@ -382,7 +466,7 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
         ) : (
           <>
             <p className="text-[11.5px] text-slate-400 mb-2 px-1">{list.length}곳</p>
-            {list.map(f => <FacilityCard key={f.id} f={f} isMember={isMember} onOpen={() => setOpenId(f.id)} />)}
+            {list.map(f => <FacilityCard key={f.id} f={f} isMember={isMember} reviews={reviews[f.id]} onOpen={() => setOpenId(f.id)} />)}
           </>
         )}
       </div>
@@ -399,12 +483,16 @@ export default function FacilityExplorer({ place, placeText, isMember, onPickPla
           emptyText={mapSport === 'all' ? '조건에 맞는 등록 시설이 없어요' : `등록된 ${CATEGORY_META[mapSport].label} 시설이 아직 없어요`}
           osm={osm}
           onClose={() => setShowMap(false)}
-          renderItem={f => <FacilityCard f={f} isMember={isMember} onOpen={() => setOpenId(f.id)} />}
+          renderItem={f => <FacilityCard f={f} isMember={isMember} reviews={reviews[f.id]} onOpen={() => setOpenId(f.id)} />}
         />
       )}
 
       {opened && (
-        <FacilityDetail f={opened} isMember={isMember} onClose={() => setOpenId(null)}
+        <FacilityDetail f={opened} isMember={isMember}
+          reviews={reviews[opened.id] ?? []} userId={userId}
+          onAddReview={(rating, text, images, keywords) => handleAddReview(opened.id, rating, text, images, keywords)}
+          onDeleteReview={id => handleDeleteReview(opened.id, id)}
+          onClose={() => setOpenId(null)}
           onShowGroups={c => { setOpenId(null); setShowMap(false); onShowGroups(c) }} />
       )}
     </>

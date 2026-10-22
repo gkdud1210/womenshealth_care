@@ -1171,6 +1171,8 @@ export default function CommunityPage() {
           place={placeFilter.country === ONLINE_CODE ? ALL_PLACES : placeFilter}
           placeText={placeFilter.country === ONLINE_CODE ? '전 세계' : filterLabel(placeFilter)}
           isMember={!!user && !user.userId.startsWith('guest_')}
+          userId={currentUserId}
+          userName={currentUserName}
           onPickPlace={() => setShowFilterPicker(true)}
           onClearPlace={() => setPlaceFilter(ALL_PLACES)}
           onShowGroups={c => { setCategoryFilter(c); setTab('explore') }} />

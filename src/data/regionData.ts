@@ -58,7 +58,7 @@ export const COUNTRIES: Country[] = [
       { id: 'incheon', label: '인천', cities: [c('songdo', '송도'), c('bupyeong', '부평'), c('cheongna', '청라'), c('guwol', '구월·남동')] },
       { id: 'busan', label: '부산', cities: [c('haeundae', '해운대'), c('seomyeon', '서면'), c('gwangalli', '광안리'), c('nampo', '남포·중구')] },
       { id: 'daegu', label: '대구', cities: [c('suseong', '수성구'), c('dalseo', '달서구'), c('jung-daegu', '중구')] },
-      { id: 'daejeon', label: '대전·세종', cities: [c('yuseong', '유성구'), c('seo-daejeon', '서구'), c('sejong', '세종시')] },
+      { id: 'daejeon', label: '대전·세종', cities: [c('yuseong', '유성구'), c('seo-daejeon', '서구'), c('jung-daejeon', '중구'), c('dong-daejeon', '동구'), c('daedeok', '대덕구'), c('sejong', '세종시')] },
       { id: 'gwangju', label: '광주', cities: [c('sangmu', '상무지구'), c('cheomdan', '첨단지구')] },
       { id: 'ulsan', label: '울산', cities: [c('nam-ulsan', '남구'), c('ulju', '울주군')] },
       { id: 'gangwon', label: '강원', cities: [c('chuncheon', '춘천'), c('gangneung', '강릉'), c('sokcho', '속초'), c('wonju', '원주')] },
