@@ -22,6 +22,7 @@ import {
 } from '@/data/regionData'
 import GroupChat from '@/components/community/GroupChat'
 import FacilityExplorer from '@/components/community/FacilityExplorer'
+import WorkoutLog from '@/components/community/WorkoutLog'
 import type { MapLocation } from '@/components/community/PlaceMap'
 import { coordsOf } from '@/data/regionCoords'
 import {
@@ -895,7 +896,7 @@ export default function CommunityPage() {
   const [groups, setGroups] = useState<MeetupGroup[]>([])
   const [posts, setPosts] = useState<MeetupPost[]>([])
   const [liked, setLiked] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'explore' | 'places' | 'mine'>('explore')
+  const [tab, setTab] = useState<'explore' | 'places' | 'workout' | 'mine'>('explore')
   const [categoryFilter, setCategoryFilter] = useState<MeetupCategory | 'all'>('all')
   const [placeFilter, setPlaceFilter] = useState<PlaceFilter>(ALL_PLACES)
   const [homePlace, setHomePlace] = useState<PlaceRef | null>(null)
@@ -1084,7 +1085,7 @@ export default function CommunityPage() {
         </div>
 
         <div className="flex px-4 max-w-lg mx-auto border-b border-slate-100">
-          {([{ key: 'explore', label: '모임 찾기' }, { key: 'places', label: '시설 찾기' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
+          {([{ key: 'explore', label: '모임 찾기' }, { key: 'places', label: '시설 찾기' }, { key: 'workout', label: '운동 기록' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className="flex-1 py-2.5 text-sm font-bold relative"
               style={{ color: tab === t.key ? '#e11d5a' : '#94a3b8' }}>
@@ -1176,6 +1177,11 @@ export default function CommunityPage() {
           onPickPlace={() => setShowFilterPicker(true)}
           onClearPlace={() => setPlaceFilter(ALL_PLACES)}
           onShowGroups={c => { setCategoryFilter(c); setTab('explore') }} />
+      )}
+
+      {tab === 'workout' && (
+        <WorkoutLog myGroups={myGroups}
+          onShare={(groupId, text) => handleSubmitActivity(groupId, text, undefined)} />
       )}
 
       {tab === 'explore' ? (
