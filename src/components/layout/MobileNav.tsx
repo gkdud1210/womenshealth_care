@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 
 const NAV_ITEMS = [
   { href: '/diagnostic', icon: Microscope,      label: '진단' },
-  { href: '/care',       icon: HeartPulse,      label: '케어' },
+  { href: '/care',       icon: HeartPulse,      label: '루디아피드' },
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 호출', highlight: true },
   { href: '/community',  icon: Users,           label: '모임' },
   { href: '/shop',       icon: ShoppingBag,     label: '샵' },

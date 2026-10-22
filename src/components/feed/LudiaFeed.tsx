@@ -1,7 +1,7 @@
 'use client'
 
 // 루디아피드 — 게시물 데이터·카드·앨범·글쓰기를 모아둔 공용 모듈.
-// 케어 메뉴(src/app/(app)/care)의 케어카드 상세 화면에서 케어카드별 피드를 앨범으로 보여줄 때 써요.
+// 루디아피드 메뉴(src/app/(app)/care)에서 전체 피드와 케어카드별 피드를 보여줄 때 써요.
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, Check, Search, Sparkles, Flame, Loader2, ChevronDown, LayoutGrid, Rows3, Images, ArrowLeft } from 'lucide-react'
@@ -46,7 +46,7 @@ export interface SnsPost {
 const POSTS_KEY  = 'ludia_sns_v5'
 const LIKES_KEY  = 'ludia_sns_likes_v5'
 const SAVES_KEY  = 'ludia_sns_saves_v5'
-const VIEW_KEY   = 'ludia_sns_view_v1'
+const VIEW_KEY   = 'ludia_sns_view_v2'  // v2: 루디아피드 화면은 처음에 목록으로 보여줘요
 
 const SEED: SnsPost[] = [
   {
@@ -929,8 +929,12 @@ export function WriteModal({
 
 export type FeedView = 'album' | 'list'
 
-export function loadView(): FeedView {
-  try { return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'album' } catch { return 'album' }
+/** 저장된 보기 방식 — 아직 고른 적 없으면 fallback */
+export function loadView(fallback: FeedView = 'album'): FeedView {
+  try {
+    const v = localStorage.getItem(VIEW_KEY)
+    return v === 'list' || v === 'album' ? v : fallback
+  } catch { return fallback }
 }
 export function saveView(v: FeedView) { try { localStorage.setItem(VIEW_KEY, v) } catch {} }
 
