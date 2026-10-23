@@ -21,7 +21,7 @@ export const CITY_COORDS: Record<string, [number, number]> = {
   'KR/nampo': [35.0979, 129.0306],
   'KR/suseong': [35.8582, 128.6306], 'KR/dalseo': [35.8299, 128.5327], 'KR/jung-daegu': [35.8693, 128.6062],
   'KR/yuseong': [36.3622, 127.3561], 'KR/seo-daejeon': [36.3553, 127.3838], 'KR/jung-daejeon': [36.3258, 127.4214], 'KR/dong-daejeon': [36.3119, 127.4548], 'KR/daedeok': [36.3466, 127.4156], 'KR/sejong': [36.4800, 127.2890],
-  'KR/sangmu': [35.1520, 126.8490], 'KR/cheomdan': [35.2190, 126.8470],
+  'KR/sangmu': [35.1520, 126.8490], 'KR/cheomdan': [35.2190, 126.8470], 'KR/dong-gwangju': [35.1460, 126.9232], 'KR/seo-gwangju': [35.1520, 126.8899], 'KR/nam-gwangju': [35.1330, 126.9025], 'KR/buk-gwangju': [35.1740, 126.9120], 'KR/gwangsan': [35.1395, 126.7937],
   'KR/nam-ulsan': [35.5439, 129.3300], 'KR/ulju': [35.5622, 129.1427],
   'KR/chuncheon': [37.8813, 127.7298], 'KR/gangneung': [37.7519, 128.8761], 'KR/sokcho': [38.2070, 128.5918],
   'KR/wonju': [37.3422, 127.9202],
