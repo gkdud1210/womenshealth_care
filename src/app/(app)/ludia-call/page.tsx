@@ -38,6 +38,13 @@ import {
 } from '@/lib/meal-analysis'
 import { MINERAL_DAILY, MINERAL_KEYS, MINERAL_META, parseMinerals, type Minerals } from '@/lib/minerals'
 import MineralBars from '@/components/nutrition/MineralBars'
+import StageCoach, { StatusChips } from '@/components/health/StageCoach'
+import { useCycleData } from '@/hooks/useCycleData'
+import {
+  resolveLifeStatus, buildCoaching, adjustKcalRange, loadLifeFlags, saveLifeFlags, loadCycleMode,
+  type Coaching, type LifeFlags, type RecentActivity,
+} from '@/lib/life-stage'
+import { loadWorkouts, inRange, startOfWeek, totals } from '@/lib/workout-log'
 import type { ShopProduct } from '@/data/shopProducts'
 
 /** 선택한 케어카드 중 첫 번째 카드의 세부 체질을(홍채+BMI+문진 기반) 분류해요.
@@ -152,6 +159,21 @@ function careLabelsOf(careTypes: string[], subtypeLabel?: string): string {
   const labels = careTypes.map(id => CARE_CASES.find(c => c.id === id)?.label).filter((x): x is string => !!x)
   const base = labels.length ? labels.join(' · ') : '일반 건강'
   return subtypeLabel ? `${base} (세부 체질: ${subtypeLabel})` : base
+}
+
+/** 최근 7일 수면(캘린더 일일 기록)과 이번 주 운동 시간(운동 기록) */
+function loadRecentActivity(): RecentActivity {
+  let avgSleep: number | undefined
+  let sleepDays = 0
+  try {
+    const daily = JSON.parse(localStorage.getItem('ludia_daily_logs_v1') || '{}') as Record<string, { sleepHours?: number }>
+    const hours = last7Keys().map(k => daily[k]?.sleepHours).filter((h): h is number => typeof h === 'number' && h > 0)
+    sleepDays = hours.length
+    if (hours.length) avgSleep = hours.reduce((a, b) => a + b, 0) / hours.length
+  } catch {}
+  const now = new Date()
+  const weekMinutes = totals(inRange(loadWorkouts(), startOfWeek(now), new Date(now.getTime() + 86400000))).minutes
+  return { avgSleep, sleepDays, weekMinutes }
 }
 
 /** dev 서버에서만 응답하는 비전 분석 API. 정적 배포에서는 실패 → 클라이언트가 수동 선택으로 자동 전환해요. */
@@ -580,7 +602,7 @@ function AskLudiaCard() {
 
 // ── Daily summary ──────────────────────────────────────────────────────
 
-function DailySummary({ dayLog, mealProfile, subtypeLabel }: { dayLog: DayLog; mealProfile: CareMealProfile; subtypeLabel?: string }) {
+function DailySummary({ dayLog, mealProfile, subtypeLabel, coaching }: { dayLog: DayLog; mealProfile: CareMealProfile; subtypeLabel?: string; coaching: Coaching }) {
   const total = MEAL_ORDER.reduce((sum, m) => sum + (dayLog[m]?.totalCalories ?? 0), 0)
   const [lo, hi] = mealProfile.dailyKcal
   const pct = Math.min(100, Math.round((total / hi) * 100))
@@ -602,6 +624,7 @@ function DailySummary({ dayLog, mealProfile, subtypeLabel }: { dayLog: DayLog; m
           🔎 진단 기반 체질 반영 중 · {subtypeLabel}
         </p>
       )}
+      <StatusChips coaching={coaching} />
     </div>
   )
 }
@@ -972,10 +995,43 @@ export default function LudiaCallPage() {
     () => (dataReady ? getPrimarySubtype(careTypes, data, onboarding, dietOverrides) : null),
     [dataReady, data, careTypes, onboarding, dietOverrides],
   )
-  const mealProfile = useMemo(
-    () => refineMealProfileWithSubtype(resolveMealProfile(careTypes), primarySubtype),
-    [careTypes, primarySubtype],
-  )
+  // 지금 나의 상태(주기·임신·완경 + 케어 모드) → 영양·식단·운동·수면 코칭
+  const cycle = useCycleData()
+  const [lifeFlags, setLifeFlags] = useState<LifeFlags>({})
+  const [cycleMode, setCycleMode] = useState<{ mode: string; pregnancyLMP?: string }>({ mode: 'normal' })
+  const [intake, setIntake] = useState<string[]>([])
+  const [recent, setRecent] = useState<RecentActivity>({ sleepDays: 0, weekMinutes: 0 })
+  useEffect(() => {
+    setLifeFlags(loadLifeFlags())
+    setCycleMode(loadCycleMode())
+    setIntake(loadIntake())
+    setRecent(loadRecentActivity())
+  }, [])
+  const lifeStatus = useMemo(() => resolveLifeStatus({
+    cycleMode: cycleMode.mode, pregnancyLMP: cycleMode.pregnancyLMP,
+    phase: cycle.phase, cycleDay: cycle.cycleDay, hasCycleData: cycle.hasRealData,
+    careTypes, intake, flags: lifeFlags,
+  }), [cycleMode, cycle.phase, cycle.cycleDay, cycle.hasRealData, careTypes, intake, lifeFlags])
+  const coaching = useMemo(() => {
+    const entries = MEAL_ORDER.map(m => todayLog[m]).filter((e): e is MealEntry => !!e)
+    const withMinerals = entries.filter(e => e.minerals)
+    return buildCoaching(lifeStatus, {
+      kcal: entries.reduce((s, e) => s + e.totalCalories, 0),
+      protein: entries.reduce((s, e) => s + (e.protein ?? 0), 0),
+      minerals: withMinerals.length
+        ? MINERAL_KEYS.reduce((acc, k) => ({ ...acc, [k]: withMinerals.reduce((s, e) => s + (e.minerals?.[k] ?? 0), 0) }), {} as Minerals)
+        : undefined,
+      mealsLogged: entries.length,
+    }, recent)
+  }, [lifeStatus, todayLog, recent])
+  const updateLifeFlags = useCallback((patch: LifeFlags) => {
+    setLifeFlags(prev => { const next = { ...prev, ...patch }; saveLifeFlags(next); return next })
+  }, [])
+
+  const mealProfile = useMemo(() => {
+    const p = refineMealProfileWithSubtype(resolveMealProfile(careTypes), primarySubtype)
+    return { ...p, dailyKcal: adjustKcalRange(p.dailyKcal, coaching), focus: coaching.focusOverride ?? p.focus }
+  }, [careTypes, primarySubtype, coaching])
   const careLabel = useMemo(
     () => careLabelsOf(careTypes, primarySubtype?.label),
     [careTypes, primarySubtype],
@@ -1033,7 +1089,13 @@ export default function LudiaCallPage() {
           <AskLudiaCard />
           <SymptomCheckCard onOpen={() => setShowSymptomCheck(true)} />
         </div>
-        <DailySummary dayLog={todayLog} mealProfile={mealProfile} subtypeLabel={primarySubtype?.label} />
+        <DailySummary dayLog={todayLog} mealProfile={mealProfile} subtypeLabel={primarySubtype?.label} coaching={coaching} />
+        <StageCoach coaching={coaching} onFlags={updateLifeFlags}
+          flags={{
+            ttc: lifeStatus.modes.includes('ttc'),
+            diet: lifeStatus.modes.includes('diet'),
+            ttcAvailable: lifeStatus.body !== 'pregnancy' && lifeStatus.body !== 'menopause',
+          }} />
 
         <div className="space-y-2">
           <p className="text-[11.5px] font-bold text-slate-500 px-0.5">오늘의 식단</p>
