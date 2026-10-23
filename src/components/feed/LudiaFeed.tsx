@@ -28,7 +28,7 @@ export interface SnsPost {
   authorEmoji: string
   authorVerified?: boolean
   createdAt: string
-  type: 'recipe' | 'tip'
+  type: PostType
   title: string
   content: string
   image?: string   // 하위 호환용 (단일 이미지 기존 게시글)
@@ -40,6 +40,28 @@ export interface SnsPost {
   saved?: boolean
   comments: SnsComment[]
   nutrition?: FeedNutrition // 사진 속 음식·음료 칼로리/영양성분 분석 결과
+  /** 자세·영법 영상 — 유튜브 링크 또는 mp4 등 영상 파일 주소 */
+  video?: string
+  /** 운동 글의 종목 (예: 수영, 테니스) */
+  sport?: string
+}
+
+export type PostType = 'recipe' | 'tip' | 'exercise'
+
+export const POST_TYPE_META: Record<PostType, { label: string; emoji: string; bg: string; color: string; border: string; soft: string }> = {
+  recipe:   { label: '레시피',   emoji: '🍳', bg: 'rgba(234,179,8,0.15)',  color: '#a16207', border: '#ca8a04', soft: '#fefce8' },
+  tip:      { label: '팁',       emoji: '💡', bg: 'rgba(59,130,246,0.12)', color: '#1d4ed8', border: '#2563eb', soft: '#eff6ff' },
+  exercise: { label: '운동·자세', emoji: '🏃‍♀️', bg: 'rgba(16,185,129,0.14)', color: '#047857', border: '#059669', soft: '#ecfdf5' },
+}
+
+/** 유튜브 주소면 embed 주소로, 영상 파일이면 그대로 — 알 수 없는 주소는 null */
+export function parseVideo(url: string): { kind: 'youtube'; src: string } | { kind: 'file'; src: string } | null {
+  const u = url.trim()
+  if (!/^https?:\/\//i.test(u)) return null
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/)
+  if (yt) return { kind: 'youtube', src: `https://www.youtube-nocookie.com/embed/${yt[1]}` }
+  if (/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(u)) return { kind: 'file', src: u }
+  return null
 }
 
 // ── Storage ────────────────────────────────────────────────────────────────
@@ -48,6 +70,108 @@ const POSTS_KEY  = 'ludia_sns_v5'
 const LIKES_KEY  = 'ludia_sns_likes_v5'
 const SAVES_KEY  = 'ludia_sns_saves_v5'
 const VIEW_KEY   = 'ludia_sns_view_v2'  // v2: 루디아피드 화면은 처음에 목록으로 보여줘요
+
+// ── 운동·자세 피드 (수영 영법, 테니스·골프·배드민턴 자세, 러닝·근력) ─────────────
+// 영상은 글쓴이가 유튜브 링크나 영상 파일 주소를 붙이면 카드 위에 바로 재생돼요.
+const H = 3600000
+const EXERCISE_SEED: SnsPost[] = [
+  {
+    id: 'ex-swim-free', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - H * 2).toISOString(),
+    type: 'exercise', sport: '수영', title: '자유형 호흡, 고개를 들지 말고 돌리세요',
+    content: '자유형이 금방 숨찬 이유는 대부분 호흡 자세예요 🏊‍♀️\n\n✅ 핵심 3가지\n① 고개는 드는 게 아니라 몸통과 함께 옆으로 굴려요. 한쪽 눈과 입이 수면 위로 나올 만큼만.\n② 물속에서는 코로 "음—" 하고 계속 내쉬고, 고개를 돌렸을 때 입으로 짧게 들이마셔요.\n③ 호흡하는 동안 반대쪽 팔은 앞으로 길게 뻗어 두어야 몸이 가라앉지 않아요.\n\n🚫 자주 하는 실수\n• 숨을 참았다가 한 번에 내쉬기 → 들이마실 시간이 부족해요\n• 정면을 보며 고개 들기 → 다리가 가라앉아요\n\n🏋️ 연습법: 킥판 잡고 한 팔 자유형 25m × 4회, 3스트로크마다 양쪽 번갈아 호흡',
+    coverEmoji: '🏊‍♀️', coverGradient: 'linear-gradient(135deg,#e0f2fe,#7dd3fc)',
+    tags: ['musculoskeletal_lymph', 'weight_metabolic'], likes: 356,
+    comments: [
+      { id: 'ex-c1', authorName: '수린이', authorEmoji: '🐠', text: '코로 계속 내쉬는 거 하니까 25m 처음으로 안 쉬고 갔어요!', createdAt: new Date(Date.now() - H).toISOString() },
+    ],
+  },
+  {
+    id: 'ex-swim-breast', authorId: 'user-ex1', authorName: '새벽수영러', authorEmoji: '🐸',
+    createdAt: new Date(Date.now() - H * 9).toISOString(),
+    type: 'exercise', sport: '수영', title: '평영 발차기, 무릎이 아프다면 꼭 보세요',
+    content: '평영 발차기 하다가 무릎 안쪽이 시큰했는데 자세를 고치고 나아졌어요 🐸\n\n① 발뒤꿈치를 엉덩이 쪽으로 당길 때 무릎은 골반 너비 정도만 벌려요 (너무 넓으면 무릎 부담↑)\n② 발목을 꺾어 발바닥이 바깥을 보게 한 뒤\n③ 발바닥으로 물을 뒤로 밀며 다리를 모아요 — 원을 그리듯\n④ 다 모은 뒤 1초 쭉 뻗어 미끄러지기(글라이드)\n\n💡 "당기고–꺾고–차고–쉬고" 4박자로 세면서 연습하면 쉬워요\n⚠️ 무릎 통증이 계속되면 평영 대신 자유형·배영으로 바꾸고 쉬어 주세요',
+    coverEmoji: '🐸', coverGradient: 'linear-gradient(135deg,#ccfbf1,#5eead4)',
+    tags: ['musculoskeletal_lymph'], likes: 188,
+    comments: [],
+  },
+  {
+    id: 'ex-swim-back', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - H * 20).toISOString(),
+    type: 'exercise', sport: '수영', title: '배영 — 굽은 등·거북목에 좋은 영법',
+    content: '책상 앞에 오래 앉는 분께 배영을 추천해요. 가슴이 열리고 등 뒤 근육을 써요 🌊\n\n① 귀가 물에 잠기게 머리를 뒤로 기대고, 시선은 천장\n② 배꼽을 살짝 끌어올려 엉덩이가 가라앉지 않게\n③ 팔은 새끼손가락부터 입수, 물속에서 허벅지 쪽으로 밀어내기\n④ 발차기는 무릎이 아니라 허벅지에서 시작, 수면을 살짝 끓이듯\n\n💡 처음엔 킥판을 가슴에 안고 발차기만 연습해요\n⚠️ 임신 중기 이후에는 오래 누운 자세가 불편할 수 있어 짧게 끊어서 해요',
+    coverEmoji: '🌊', coverGradient: 'linear-gradient(135deg,#dbeafe,#93c5fd)',
+    tags: ['posture_correction', 'musculoskeletal_lymph'], likes: 241,
+    comments: [],
+  },
+  {
+    id: 'ex-tennis-forehand', authorId: 'user-ex2', authorName: '테니스3년차', authorEmoji: '🎾',
+    createdAt: new Date(Date.now() - H * 14).toISOString(),
+    type: 'exercise', sport: '테니스', title: '포핸드가 자꾸 뜰 때 — 유닛 턴부터',
+    content: '포핸드가 네트를 넘어 멀리 날아가거나 손목이 아프다면, 팔보다 몸통 회전을 먼저 보세요 🎾\n\n① 유닛 턴: 공이 오면 라켓만 빼지 말고 어깨·골반을 함께 옆으로 돌려요\n② 왼손(오른손잡이 기준)은 공을 가리키며 앞에 두기 — 회전 축이 돼요\n③ 공은 몸 앞쪽, 앞발보다 살짝 앞에서 맞히기\n④ 팔로우는 반대 어깨 위로 감아 올리기 (와이퍼처럼)\n\n🚫 손목으로 덮어 치기 → 테니스 엘보 원인\n💡 랠리 전에 섀도 스윙 20회로 몸통 회전 감 잡기',
+    coverEmoji: '🎾', coverGradient: 'linear-gradient(135deg,#ecfccb,#bef264)',
+    tags: ['posture_correction'], likes: 173,
+    comments: [
+      { id: 'ex-c2', authorName: '라린이', authorEmoji: '🌱', text: '왼손으로 공 가리키기 하니까 타이밍이 맞기 시작했어요', createdAt: new Date(Date.now() - H * 10).toISOString() },
+    ],
+  },
+  {
+    id: 'ex-tennis-serve', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - H * 30).toISOString(),
+    type: 'exercise', sport: '테니스', title: '어깨 안 다치는 서브 — 토스와 트로피 자세',
+    content: '서브는 어깨 부상이 가장 많은 동작이에요. 팔 힘보다 다리와 토스가 먼저예요 🎾\n\n① 토스: 손바닥에 공을 올리고 팔을 쭉 편 채 들어 올리며 손을 펴서 놓기 (손목 튕기지 않기)\n② 공은 앞발 앞, 머리 위 약간 오른쪽(오른손잡이)\n③ 트로피 자세: 무릎을 굽히고, 라켓 든 팔꿈치는 어깨 높이, 왼팔은 공을 향해\n④ 다리를 펴며 위로 뻗어 가장 높은 지점에서 맞히기\n\n⚠️ 어깨가 찌릿하면 그날은 서브 연습을 멈추고, 밴드로 회전근 강화부터\n💡 준비운동: 밴드 외회전 15회 × 2세트',
+    coverEmoji: '🏆', coverGradient: 'linear-gradient(135deg,#fef9c3,#fde047)',
+    tags: ['posture_correction', 'musculoskeletal_lymph'], likes: 129,
+    comments: [],
+  },
+  {
+    id: 'ex-golf-address', authorId: 'user-ex3', authorName: '골린이탈출', authorEmoji: '⛳',
+    createdAt: new Date(Date.now() - H * 26).toISOString(),
+    type: 'exercise', sport: '골프', title: '어드레스만 바꿔도 허리가 덜 아파요',
+    content: '라운드 다녀오면 허리가 아팠는데, 프로님이 어드레스부터 고쳐 주셨어요 ⛳\n\n① 발은 어깨너비, 무릎은 살짝만 굽히기\n② 허리를 숙이는 게 아니라 고관절(골반)을 접어 상체를 기울여요 — 엉덩이가 뒤로 빠지는 느낌\n③ 등은 곧게, 팔은 어깨에서 힘 빼고 자연스럽게 떨어뜨리기\n④ 체중은 발 앞꿈치와 뒤꿈치 사이 가운데\n\n🚫 등을 둥글게 말기 → 스윙 때 허리가 비틀려요\n💡 거울 옆에서 클럽을 등에 대고 머리·등·엉덩이가 클럽에 닿게 연습',
+    coverEmoji: '⛳', coverGradient: 'linear-gradient(135deg,#dcfce7,#86efac)',
+    tags: ['posture_correction'], likes: 152,
+    comments: [],
+  },
+  {
+    id: 'ex-golf-swing', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - H * 44).toISOString(),
+    type: 'exercise', sport: '골프', title: '백스윙은 팔이 아니라 몸통으로',
+    content: '팔로만 들어 올리는 백스윙은 힘도 안 실리고 어깨·팔꿈치에 무리가 가요 🏌️‍♀️\n\n① 테이크어웨이: 손·팔·어깨가 이루는 삼각형을 유지한 채 몸통과 함께 출발\n② 백스윙 톱: 등이 목표 반대쪽을 볼 만큼 어깨 회전, 골반은 그보다 적게\n③ 다운스윙: 골반이 먼저 목표 쪽으로 돌아오고 팔은 따라오기\n④ 피니시: 체중은 왼발(오른손잡이)에, 오른발은 뒤꿈치가 들린 채\n\n💡 집에서: 수건을 양 겨드랑이에 끼고 하프 스윙 — 수건이 떨어지면 팔만 쓴 거예요\n🧘 스윙 전 흉추 회전 스트레칭 10회',
+    coverEmoji: '🏌️‍♀️', coverGradient: 'linear-gradient(135deg,#d1fae5,#6ee7b7)',
+    tags: ['posture_correction', 'musculoskeletal_lymph'], likes: 117,
+    comments: [],
+  },
+  {
+    id: 'ex-badminton-clear', authorId: 'user-ex4', authorName: '배드민턴동호회', authorEmoji: '🏸',
+    createdAt: new Date(Date.now() - H * 18).toISOString(),
+    type: 'exercise', sport: '배드민턴', title: '하이클리어가 코트 끝까지 안 갈 때',
+    content: '클리어가 중간에 떨어진다면 팔 힘이 아니라 준비 자세와 회전이 문제예요 🏸\n\n① 셔틀콕이 오면 오른발을 뒤로 빼며 몸을 옆으로 (가슴이 옆줄을 보게)\n② 왼손은 셔틀콕을 가리키며 높이 들기\n③ 라켓은 등 뒤로 떨어뜨렸다가, 팔꿈치가 먼저 앞으로 나오며 채찍처럼\n④ 맞는 순간 전완을 안쪽으로 돌리기(회내) — 손목을 꺾는 게 아니에요\n\n💡 그립은 악수하듯 느슨하게 쥐었다가 맞는 순간만 꽉\n⚠️ 어깨가 아프면 스윙 크기를 줄이고 하체 이동을 먼저 연습',
+    coverEmoji: '🏸', coverGradient: 'linear-gradient(135deg,#fae8ff,#f0abfc)',
+    tags: ['weight_metabolic', 'posture_correction'], likes: 97,
+    comments: [],
+  },
+  {
+    id: 'ex-running-form', authorId: 'ludia', authorName: '루디아', authorEmoji: '💜', authorVerified: true,
+    createdAt: new Date(Date.now() - H * 38).toISOString(),
+    type: 'exercise', sport: '러닝', title: '무릎 덜 아픈 러닝 자세 4가지',
+    content: '러닝 시작하고 무릎·정강이가 아프다면 보폭부터 줄여 보세요 🏃‍♀️\n\n① 발은 몸 바로 아래에 착지 — 앞으로 멀리 뻗으면 브레이크가 걸려요\n② 보폭은 짧게, 발걸음은 빠르게 (1분에 170회 전후를 목표로)\n③ 상체는 발목부터 살짝 앞으로 기울이고 시선은 10~20m 앞\n④ 팔은 90도로 굽혀 앞뒤로, 어깨는 내리고 주먹은 가볍게\n\n💡 처음엔 "1분 달리기 + 2분 걷기" × 8회부터\n🩸 생리 기간·황체기 후반엔 속도를 낮추고 대화 가능한 강도로',
+    coverEmoji: '🏃‍♀️', coverGradient: 'linear-gradient(135deg,#ffe4e6,#fda4af)',
+    tags: ['weight_metabolic', 'musculoskeletal_lymph'], likes: 284,
+    comments: [
+      { id: 'ex-c3', authorName: '런린이', authorEmoji: '👟', text: '보폭 줄이니까 정강이 통증이 사라졌어요 신기해요', createdAt: new Date(Date.now() - H * 30).toISOString() },
+    ],
+  },
+  {
+    id: 'ex-squat-form', authorId: 'user-ex5', authorName: 'PT받는중', authorEmoji: '🏋️‍♀️',
+    createdAt: new Date(Date.now() - H * 52).toISOString(),
+    type: 'exercise', sport: '헬스', title: '스쿼트할 때 무릎이 안으로 모인다면',
+    content: '트레이너님께 제일 많이 지적받은 스쿼트 자세 정리해요 🏋️‍♀️\n\n① 발은 골반~어깨너비, 발끝은 살짝 바깥으로 (15~30도)\n② 앉을 때 엉덩이를 뒤로 빼며 의자에 앉듯이\n③ 무릎은 두 번째 발가락 방향으로 — 안으로 모이지 않게 바깥으로 밀어요\n④ 발바닥 전체(특히 뒤꿈치)로 바닥을 밀며 일어나기\n\n🚫 무릎이 안으로 모이면(무릎 내반) 무릎 인대에 부담이 커요\n💡 무릎 위에 미니밴드를 걸고 밴드를 벌리듯 연습하면 금방 잡혀요\n🦵 엉덩이(중둔근) 강화: 사이드 라잉 레그레이즈 15회 × 3세트',
+    coverEmoji: '🏋️‍♀️', coverGradient: 'linear-gradient(135deg,#ede9fe,#c4b5fd)',
+    tags: ['weight_metabolic', 'posture_correction'], likes: 198,
+    comments: [],
+  },
+]
 
 const SEED: SnsPost[] = [
   {
@@ -281,13 +405,23 @@ const SEED: SnsPost[] = [
     tags: ['organ_monitoring'], likes: 209,
     comments: [],
   },
+  ...EXERCISE_SEED,
 ]
 
 function loadPosts(): SnsPost[] {
   if (typeof window === 'undefined') return []
   try {
     const s = localStorage.getItem(POSTS_KEY)
-    if (s) return JSON.parse(s)
+    if (s) {
+      // 새로 추가된 기본 글(예: 운동·자세 피드)은 기존 사용자에게도 넣어줘요
+      const saved = JSON.parse(s) as SnsPost[]
+      const have = new Set(saved.map(p => p.id))
+      const added = SEED.filter(p => !have.has(p.id))
+      if (added.length === 0) return saved
+      const merged = [...saved, ...added]
+      localStorage.setItem(POSTS_KEY, JSON.stringify(merged))
+      return merged
+    }
     localStorage.setItem(POSTS_KEY, JSON.stringify(SEED))
     return SEED
   } catch { return SEED }
@@ -392,6 +526,8 @@ export function PostCard({
   const allImages = post.images?.length ? post.images : post.image ? [post.image] : []
   const hasImages = allImages.length > 0
   const nutrition = post.nutrition
+  const typeMeta = POST_TYPE_META[post.type] ?? POST_TYPE_META.tip
+  const video = post.video ? parseVideo(post.video) : null
 
   // 분석이 끝나면 결과 패널을 바로 펼쳐 보여줘요
   const wasAnalyzing = useRef(analyzing)
@@ -426,8 +562,8 @@ export function PostCard({
               </span>
             )}
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: post.type === 'recipe' ? 'rgba(234,179,8,0.15)' : 'rgba(59,130,246,0.12)', color: post.type === 'recipe' ? '#a16207' : '#1d4ed8' }}>
-              {post.type === 'recipe' ? '🍳 레시피' : '💡 팁'}
+              style={{ background: typeMeta.bg, color: typeMeta.color }}>
+              {typeMeta.emoji} {post.sport ?? typeMeta.label}
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
@@ -479,8 +615,20 @@ export function PostCard({
         )}
       </div>
 
+      {/* ── 자세·영법 영상 ── */}
+      {video && (
+        <div className="w-full bg-black" style={{ aspectRatio: '16/9' }}>
+          {video.kind === 'youtube' ? (
+            <iframe src={video.src} title={post.title} className="w-full h-full" loading="lazy"
+              allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowFullScreen />
+          ) : (
+            <video src={video.src} controls playsInline preload="metadata" className="w-full h-full" />
+          )}
+        </div>
+      )}
+
       {/* ── Image carousel ── */}
-      {(hasImages || post.coverEmoji) && (
+      {(hasImages || (post.coverEmoji && !video)) && (
         <div className="w-full relative overflow-hidden"
           style={{
             background: hasImages ? '#111' : post.coverGradient ?? 'linear-gradient(135deg,#fce7f3,#ede9fe)',
@@ -772,7 +920,10 @@ export function WriteModal({
 }) {
   const [images,    setImages]    = useState<string[]>([])
   const [content,   setContent]   = useState('')
-  const [type,      setType]      = useState<'recipe' | 'tip'>('recipe')
+  const [type,      setType]      = useState<PostType>('recipe')
+  const [videoUrl,  setVideoUrl]  = useState('')
+  const [sport,     setSport]     = useState('')
+  const videoOk = videoUrl.trim() === '' || parseVideo(videoUrl) !== null
   const [tags,      setTags]      = useState<string[]>(defaultTags)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -799,13 +950,15 @@ export function WriteModal({
   }
 
   function submit() {
-    if (!content.trim()) return
+    if (!content.trim() || !videoOk) return
     const firstLine = content.split('\n')[0].slice(0, 50)
     onSubmit({
       authorId: 'me', authorName, authorEmoji,
       type, title: firstLine, content: content.trim(),
       images: images.length > 0 ? images : undefined,
-      coverEmoji: type === 'recipe' ? '🍽️' : '💡',
+      video: videoUrl.trim() || undefined,
+      sport: type === 'exercise' && sport.trim() ? sport.trim().slice(0, 12) : undefined,
+      coverEmoji: type === 'recipe' ? '🍽️' : type === 'exercise' ? '🏃‍♀️' : '💡',
       coverGradient: tags[0] ? CARE_BY_ID[tags[0]]?.gradient : 'linear-gradient(135deg,#fce7f3,#ede9fe)',
       tags,
     })
@@ -820,7 +973,7 @@ export function WriteModal({
           <X className="w-6 h-6 text-slate-600" />
         </button>
         <p className="text-base font-bold text-slate-800">새 게시물</p>
-        <button onClick={submit} disabled={!content.trim()}
+        <button onClick={submit} disabled={!content.trim() || !videoOk}
           className="text-sm font-bold text-rose-500 disabled:text-slate-300">
           공유
         </button>
@@ -891,17 +1044,48 @@ export function WriteModal({
           <div>
             <p className="text-xs font-bold text-slate-500 mb-2">종류</p>
             <div className="flex gap-2">
-              {(['recipe', 'tip'] as const).map(t => (
-                <button key={t} onClick={() => setType(t)}
-                  className="flex-1 py-2.5 rounded-2xl text-sm font-semibold transition-all border"
-                  style={type === t
-                    ? { background: t === 'recipe' ? '#fefce8' : '#eff6ff', borderColor: t === 'recipe' ? '#ca8a04' : '#2563eb', color: t === 'recipe' ? '#a16207' : '#1d4ed8' }
-                    : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }
-                  }>
-                  {t === 'recipe' ? '🍳 레시피' : '💡 팁·경험'}
-                </button>
-              ))}
+              {(['recipe', 'tip', 'exercise'] as const).map(t => {
+                const m = POST_TYPE_META[t]
+                return (
+                  <button key={t} onClick={() => setType(t)}
+                    className="flex-1 py-2.5 rounded-2xl text-sm font-semibold transition-all border"
+                    style={type === t
+                      ? { background: m.soft, borderColor: m.border, color: m.color }
+                      : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }
+                    }>
+                    {m.emoji} {t === 'tip' ? '팁·경험' : m.label}
+                  </button>
+                )
+              })}
             </div>
+          </div>
+
+          {/* 운동 종목 */}
+          {type === 'exercise' && (
+            <div>
+              <p className="text-xs font-bold text-slate-500 mb-2">종목</p>
+              <div className="flex flex-wrap gap-1.5">
+                {['수영', '테니스', '골프', '배드민턴', '러닝', '헬스', '요가', '필라테스'].map(sp => (
+                  <button key={sp} onClick={() => setSport(prev => prev === sp ? '' : sp)}
+                    className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-all"
+                    style={sport === sp
+                      ? { background: POST_TYPE_META.exercise.soft, borderColor: POST_TYPE_META.exercise.border, color: POST_TYPE_META.exercise.color }
+                      : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
+                    {sp}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 영상 링크 */}
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-2">영상 <span className="font-normal text-slate-400">(선택 · 유튜브 링크나 영상 파일 주소)</span></p>
+            <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} inputMode="url"
+              placeholder="https://youtu.be/..."
+              className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border outline-none"
+              style={{ borderColor: videoOk ? '#e2e8f0' : '#f87171' }} />
+            {!videoOk && <p className="text-[11px] text-red-500 mt-1">유튜브 주소나 .mp4 같은 영상 파일 주소를 넣어주세요</p>}
           </div>
 
           {/* Tags */}
@@ -968,7 +1152,7 @@ function AlbumTile({ post, onOpen }: { post: SnsPost; onOpen: () => void }) {
       ) : (
         <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2"
           style={{ background: post.coverGradient ?? 'linear-gradient(135deg,#fce7f3,#ede9fe)' }}>
-          <span className="text-3xl leading-none">{post.coverEmoji ?? (post.type === 'recipe' ? '🍳' : '💡')}</span>
+          <span className="text-3xl leading-none">{post.coverEmoji ?? (POST_TYPE_META[post.type] ?? POST_TYPE_META.tip).emoji}</span>
           <span className="text-[10.5px] font-bold text-slate-700 text-center leading-tight line-clamp-2">{post.title}</span>
         </div>
       )}
