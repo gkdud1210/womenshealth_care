@@ -60,9 +60,27 @@ interface Props {
   side: 'left' | 'right'
   scanDate?: string
   overallScore?: number
+  /** 진단 기록의 구역 점수 — 주면 지도 색과 소견이 그 기록에 맞춰 바뀌어요 */
+  zoneScores?: { thyroid?: number; skin?: number }
 }
 
-export function IrisAnalysisView({ side, scanDate, overallScore = 67 }: Props) {
+/** 기록 점수로 구역 밀도를 옮겨요 — 기준 지도(점수 67)에서 점수 차이만큼 더하고 빼요 */
+function zonesFor(overallScore: number, zoneScores?: Props['zoneScores']): IrisZone[] {
+  if (!zoneScores) return IRIS_ZONES
+  const shift = overallScore - 67
+  return IRIS_ZONES.map(z => {
+    const density = Math.max(10, Math.min(95, Math.round(
+      z.name === 'Thyroid' && zoneScores.thyroid != null ? zoneScores.thyroid
+        : z.name === 'Skin' && zoneScores.skin != null ? zoneScores.skin
+          : z.density + shift)))
+    const status: IrisZone['status'] = density < 40 ? 'critical' : density < 55 ? 'low' : z.name === 'Thyroid' && density > 70 ? 'elevated' : 'normal'
+    return { ...z, density, status }
+  })
+}
+
+export function IrisAnalysisView({ side, scanDate, overallScore = 67, zoneScores }: Props) {
+  const zones = zonesFor(overallScore, zoneScores)
+  const zonesSig = zones.map(z => z.status).join(',')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hoveredZone, setHoveredZone] = useState<IrisZone | null>(null)
   const [animated, setAnimated] = useState(false)
@@ -115,7 +133,7 @@ export function IrisAnalysisView({ side, scanDate, overallScore = 67 }: Props) {
     ctx.fill()
 
     // Draw zone segments
-    IRIS_ZONES.forEach(zone => {
+    zones.forEach(zone => {
       const colors = STATUS_COLORS[zone.status]
       drawArcSegment(ctx, cx, cy, r, zone.radius[0], zone.radius[1],
         zone.startAngle, zone.endAngle, colors.fill, colors.stroke)
@@ -171,9 +189,9 @@ export function IrisAnalysisView({ side, scanDate, overallScore = 67 }: Props) {
     })
     ctx.restore()
 
-  }, [animated])
+  }, [animated, zonesSig]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const lowZones = IRIS_ZONES.filter(z => z.status !== 'normal')
+  const lowZones = zones.filter(z => z.status !== 'normal')
 
   return (
     <div className="flex flex-col items-center">

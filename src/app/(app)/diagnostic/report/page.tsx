@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, Save, Scan, RadioTower } from 'lucide-react'
 import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
+import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
+import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
+import { Eye } from 'lucide-react'
 import { useDiagnosticHistory, type DiagnosticSession } from '@/lib/diagnosticHistory'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 import { useEditableOnboardingProfile } from '@/lib/onboarding-profile'
@@ -86,6 +89,29 @@ export default function DiagnosticReportPage() {
         <div className="mb-4 px-4 py-2.5 rounded-xl text-xs font-medium text-center"
           style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', color: '#059669' }}>
           진단 기록에 저장했어요. 과거 진단 기록에서 언제든 다시 볼 수 있어요.
+        </div>
+      )}
+
+      {session && (
+        <div className="space-y-4 mb-4">
+          {/* 홍채 구역 분석 지도 — 이 기록의 점수로 그려요 */}
+          <div className="glass-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Eye className="w-4 h-4 text-purple-500" />
+              <h3 className="text-sm font-semibold text-slate-700">홍채 구역 분석</h3>
+              <span className="ml-auto text-[10.5px] text-slate-400">장기 지도 기준 구역별 상태</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {(['left', 'right'] as const).map(side => (
+                <IrisAnalysisView key={`${session.id}-${side}`} side={side}
+                  scanDate={`${new Date(session.createdAt).getMonth() + 1}/${new Date(session.createdAt).getDate()}`}
+                  overallScore={side === 'left' ? session.data.iris.leftScore : session.data.iris.rightScore}
+                  zoneScores={{ thyroid: session.data.iris.thyroidZone, skin: session.data.iris.skinZone }} />
+              ))}
+            </div>
+          </div>
+
+          <DiagnosticTrends sessions={sessions} highlightId={session.id} />
         </div>
       )}
 

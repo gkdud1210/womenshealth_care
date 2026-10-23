@@ -3,9 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen } from 'lucide-react'
+import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen, Sparkles } from 'lucide-react'
 import { useDiagnosticHistory, groupSessionsByYear, type DiagnosticSession } from '@/lib/diagnosticHistory'
 import { buildScore } from '@/components/diagnostic/DiagnosticReport'
+import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
+import { useOnboardingProfile } from '@/lib/onboarding-profile'
 
 type View = 'home' | 'history'
 
@@ -39,6 +41,9 @@ function SessionCard({ session, onDelete }: { session: DiagnosticSession; onDele
           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold" style={{ background: src.bg, color: src.color }}>
             {src.label}
           </span>
+          {session.demo && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">예시</span>
+          )}
           <span className="text-[10px] text-slate-400">
             HRV {session.data.biosignal.hrv}ms · 홍채 {Math.round((session.data.iris.leftScore + session.data.iris.rightScore) / 2)}점
           </span>
@@ -57,7 +62,10 @@ function SessionCard({ session, onDelete }: { session: DiagnosticSession; onDele
 export default function DiagnosticPage() {
   const router = useRouter()
   const [view, setView] = useState<View>('home')
-  const { sessions, ready, removeSession } = useDiagnosticHistory()
+  const { sessions, ready, removeSession, addSampleSessions } = useDiagnosticHistory()
+  const onboarding = useOnboardingProfile()
+  const hasDemo = sessions.some(s => s.demo)
+  const loadSamples = () => addSampleSessions({ answers: onboarding.answers, careTypes: onboarding.careTypes })
 
   /* ── Landing: action cards ── */
   if (view === 'home') {
@@ -169,6 +177,16 @@ export default function DiagnosticPage() {
             style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)' }}>
             <ScanEye className="w-3.5 h-3.5" /> 새 진단 시작하기
           </Link>
+          <button onClick={loadSamples}
+            className="mt-3 flex items-center gap-1 text-xs font-semibold text-purple-500">
+            <Sparkles className="w-3.5 h-3.5" /> 예시 기록으로 둘러보기
+          </button>
+        </div>
+      )}
+
+      {ready && sessions.length >= 2 && (
+        <div className="mb-6">
+          <DiagnosticTrends sessions={sessions} />
         </div>
       )}
 
@@ -186,6 +204,20 @@ export default function DiagnosticPage() {
           </div>
         ))}
       </div>
+
+      {ready && sessions.length > 0 && (
+        <div className="flex justify-center gap-4 mt-8">
+          <button onClick={loadSamples} className="flex items-center gap-1 text-xs font-semibold text-purple-500">
+            <Sparkles className="w-3.5 h-3.5" /> {hasDemo ? '예시 기록 다시 만들기' : '예시 기록 추가하기'}
+          </button>
+          {hasDemo && (
+            <button onClick={() => sessions.filter(s => s.demo).forEach(s => removeSession(s.id))}
+              className="text-xs font-semibold text-slate-400">
+              예시 기록 지우기
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
