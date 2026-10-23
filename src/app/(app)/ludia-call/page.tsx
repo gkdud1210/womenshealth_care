@@ -1012,7 +1012,7 @@ export default function LudiaCallPage() {
               <ChefHat className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 호출</h1>
+              <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 헬스</h1>
               <p className="text-[11.5px] text-slate-400">사진 한 장으로 받는 AI 웰니스 코칭</p>
             </div>
             <Link href="/ludia-call/calendar"

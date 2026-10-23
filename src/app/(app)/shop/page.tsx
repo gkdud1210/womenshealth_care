@@ -787,7 +787,7 @@ export default function ShopPage() {
   const [showIngredientSearch, setShowIngredientSearch] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  // 다른 페이지(예: 루디아 호출 식단 분석)에서 특정 상품으로 바로 연결
+  // 다른 페이지(예: 루디아 헬스 식단 분석)에서 특정 상품으로 바로 연결
   useEffect(() => {
     try {
       const id = new URLSearchParams(window.location.search).get('product')

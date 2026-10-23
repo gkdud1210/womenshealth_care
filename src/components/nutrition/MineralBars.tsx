@@ -1,4 +1,4 @@
-// 미네랄 5가지를 하루 권장량 대비 막대로 보여줘요 (루디아피드 영양 분석 · 루디아 호출 식단 분석 공용)
+// 미네랄 5가지를 하루 권장량 대비 막대로 보여줘요 (루디아피드 영양 분석 · 루디아 헬스 식단 분석 공용)
 
 import { MINERAL_DAILY, MINERAL_KEYS, MINERAL_META, fmtMg, type Minerals } from '@/lib/minerals'
 

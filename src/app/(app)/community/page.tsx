@@ -1074,7 +1074,7 @@ export default function CommunityPage() {
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
           <div>
-            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 모임</h1>
+            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 크루</h1>
             <p className="text-[11.5px] text-slate-400">어느 나라에 있든, 함께 움직여요</p>
           </div>
           {tab === 'explore' && (

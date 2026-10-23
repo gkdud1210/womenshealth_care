@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { LudiaVoice } from '@/components/voice/LudiaVoice'
 
 // 대시보드('/')의 LudiaVoice와 동일한 채팅 엔진을 그대로 재사용해요.
-// 차이는 뒤로가기 목적지뿐 — 여기서는 "루디아 호출" 허브(/ludia-call)로 돌아가요.
+// 차이는 뒤로가기 목적지뿐 — 여기서는 "루디아 헬스" 허브(/ludia-call)로 돌아가요.
 
 const MOCK_LAST_PERIOD = new Date(2026, 3, 8)
 const CYCLE_LENGTH = 28

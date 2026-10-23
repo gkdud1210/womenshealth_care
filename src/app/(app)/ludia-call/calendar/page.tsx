@@ -133,7 +133,7 @@ export default function CalendarPage() {
 
       {/* ── Header ── */}
       <div className="flex items-center gap-2.5 mb-4">
-        <Link href="/ludia-call" aria-label="루디아 호출로 돌아가기"
+        <Link href="/ludia-call" aria-label="루디아 헬스로 돌아가기"
           className="w-8 h-8 -ml-1 rounded-full flex items-center justify-center flex-none hover:bg-rose-50 transition-colors">
           <ChevronLeft className="w-5 h-5 text-slate-500" />
         </Link>

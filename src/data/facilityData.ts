@@ -160,7 +160,7 @@ export const FACILITIES: Facility[] = [
     place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.4946, lng: 127.0571,
     address: '서울 강남구 대치동 일대', hours: '06:00 – 23:00',
     price: { amount: 20000, unit: '코트 1시간', currency: 'KRW' },
-    ludia: { memberAmount: 15000, perk: '루디아 모임 단체 예약 시 셔틀콕 제공' },
+    ludia: { memberAmount: 15000, perk: '루디아 크루 단체 예약 시 셔틀콕 제공' },
     amenities: ['코트 8면', '라켓 대여', '샤워실'],
     description: '천장이 높은 배드민턴 전용 구장. 주말 오전 루디아 배드민턴 모임이 열려요.',
   },

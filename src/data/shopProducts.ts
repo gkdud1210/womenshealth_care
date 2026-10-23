@@ -473,7 +473,7 @@ export const SHOP_PRODUCTS: ShopProduct[] = [
     ],
   },
 
-  // ── Meal & Subscription (루디아 호출 식단 분석 추천용) ────────────────────
+  // ── Meal & Subscription (루디아 헬스 식단 분석 추천용) ────────────────────
 
   {
     id: 'ludia_salad_subscription',
