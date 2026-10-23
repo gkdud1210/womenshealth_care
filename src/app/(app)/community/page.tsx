@@ -29,6 +29,7 @@ import {
   CHAT_KEY, loadChats, saveChats, loadChatReads, saveChatReads, appendMessage, roomMessages, unreadCount,
   type ChatMessage, type ChatRooms, type ChatReadMap,
 } from '@/lib/meetup-chat'
+import { CollapsiblePicker, sportPickGroups } from '@/components/community/CollapsiblePicker'
 
 // 지도(Leaflet)는 브라우저에서만 동작해서 필요할 때 불러와요
 const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
@@ -382,45 +383,11 @@ function CategoryBrowser({ value, onSelect, onClose, recommended = [], allowAll 
 function CategoryChips({ value, onChange, recommended = [] }: {
   value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void; recommended?: MeetupCategory[]
 }) {
-  const [showAll, setShowAll] = useState(false)
-  // 내 케어카드에 맞는 종목 몇 개만 바로 보여주고, 나머지는 전체 종목 보기 창에서 골라요
-  const quick = recommended.slice(0, 4)
-  const shown = value !== 'all' && !quick.includes(value) ? [value, ...quick] : quick
+  // 처음엔 [전체 ▾] 하나만 — 누르면 내 케어카드에 맞는 추천 종목, 또는 전체 종목을 펼쳐 골라요
   return (
-    <>
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3">
-        <button onClick={() => setShowAll(true)}
-          className="flex-shrink-0 flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-          style={{ background: '#fff', borderColor: '#fda4af', color: '#e11d5a' }}>
-          <LayoutGrid className="w-3.5 h-3.5" /> 전체 종목 보기
-        </button>
-        <button onClick={() => onChange('all')}
-          className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-          style={value === 'all'
-            ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' }
-            : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-          🏠 전체
-        </button>
-        {shown.map(c => {
-          const meta = CATEGORY_META[c]
-          const on = value === c
-          const rec = recommended.includes(c)
-          return (
-            <button key={c} onClick={() => onChange(c)}
-              className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-              style={on
-                ? { background: meta.bg, borderColor: meta.color, color: meta.color }
-                : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-              {meta.emoji} {meta.label}{rec && ' 💜'}
-            </button>
-          )
-        })}
-      </div>
-      {showAll && (
-        <CategoryBrowser value={value} onSelect={onChange} onClose={() => setShowAll(false)}
-          recommended={recommended} allowAll />
-      )}
-    </>
+    <CollapsiblePicker className="px-4 pb-3" value={value} onChange={onChange}
+      groups={sportPickGroups()} allLabel="전체 종목" mine={recommended} mineLabel="추천 종목"
+      storageKey="ludia_meetup_only_rec_v1" />
   )
 }
 

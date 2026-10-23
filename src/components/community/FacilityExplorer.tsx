@@ -23,6 +23,7 @@ import FacilityReviews, { RatingBadge, TopKeywords } from '@/components/communit
 import {
   addReview, loadReviews, removeReview, saveReviews, type FacilityReview, type ReviewMap,
 } from '@/lib/facility-reviews'
+import { CollapsiblePicker, sportPickGroups } from '@/components/community/CollapsiblePicker'
 
 const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
   ssr: false,
@@ -48,24 +49,8 @@ function sportForType(t: FacilityType | 'all'): MeetupCategory | 'all' {
 
 function SportChips({ value, onChange }: { value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void }) {
   return (
-    <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 py-2.5">
-      <button onClick={() => onChange('all')}
-        className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-        style={value === 'all' ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-        🏠 모든 종목
-      </button>
-      {MAP_SPORTS.map(c => {
-        const meta = CATEGORY_META[c]
-        const on = value === c
-        return (
-          <button key={c} onClick={() => onChange(c)}
-            className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-            style={on ? { background: meta.bg, borderColor: meta.color, color: meta.color } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-            {meta.emoji} {meta.label}
-          </button>
-        )
-      })}
-    </div>
+    <CollapsiblePicker className="px-4 py-2.5" value={value} onChange={onChange}
+      groups={sportPickGroups(MAP_SPORTS)} allLabel="모든 종목" hint="종목을 고르면 그 종목을 할 수 있는 곳만 보여줘요" />
   )
 }
 
@@ -425,24 +410,9 @@ export default function FacilityExplorer({ place, placeText, isMember, userId, u
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4 pb-3 max-w-lg mx-auto">
-        <button onClick={() => setType('all')}
-          className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-          style={type === 'all' ? { background: '#1e293b', borderColor: '#1e293b', color: '#fff' } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-          🏠 전체
-        </button>
-        {ALL_FACILITY_TYPES.map(t => {
-          const meta = FACILITY_TYPE_META[t]
-          const on = type === t
-          return (
-            <button key={t} onClick={() => setType(t)}
-              className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all"
-              style={on ? { background: meta.bg, borderColor: meta.color, color: meta.color } : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }}>
-              {meta.emoji} {meta.label}
-            </button>
-          )
-        })}
-      </div>
+      <CollapsiblePicker className="px-4 pb-3 max-w-lg mx-auto" value={type} onChange={setType}
+        hint="시설 종류를 고르면 그 종류만 보여줘요"
+        groups={[{ options: ALL_FACILITY_TYPES.map(t => ({ id: t, ...FACILITY_TYPE_META[t] })) }]} />
 
       <div className="max-w-lg mx-auto px-4 py-3 border-t border-slate-100" style={{ background: '#fafafa' }}>
         <div className="flex items-center gap-2 mb-3 px-3.5 py-2.5 rounded-2xl"
