@@ -2,8 +2,9 @@
 
 import { useCallback, useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X, Activity, ChevronRight, ChevronLeft } from 'lucide-react'
+import { CalendarHeart, Sparkles, Trash2, ChevronDown, Check, X, Activity, ChevronRight, ChevronLeft, Flame } from 'lucide-react'
 import { HealthCalendar } from '@/components/calendar/HealthCalendar'
+import { CalorieCalendar } from '@/components/calendar/CalorieCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { usePersistedLogs } from '@/hooks/usePersistedLogs'
 import { CYCLE_MODES, CYCLE_MODE_MAP } from '@/data/cycleModes'
@@ -27,6 +28,7 @@ export default function CalendarPage() {
   const [lmpDate,       setLmpDate]       = useState('')
   const [eddDate,       setEddDate]       = useState('')
   const [dateInputMode, setDateInputMode] = useState<'lmp' | 'edd'>('lmp')
+  const [view, setView] = useState<'health' | 'calorie'>('health')
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const today    = useMemo(() => new Date(), [])
@@ -286,15 +288,34 @@ export default function CalendarPage() {
         </div>
       )}
 
+      {/* ── Calendar view toggle ── */}
+      <div className="flex p-1 mb-3 rounded-2xl bg-slate-100/80">
+        {([
+          { id: 'health',  label: '건강 캘린더',  icon: CalendarHeart },
+          { id: 'calorie', label: '칼로리 캘린더', icon: Flame },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button key={id} onClick={() => setView(id)}
+            className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-all',
+              view === id ? 'bg-white text-rose-500 shadow-sm' : 'text-slate-400')}>
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Calendar ── */}
-      <HealthCalendar
-        logs={logs}
-        cycleLength={CYCLE_LENGTH}
-        periodLength={PERIOD_LENGTH}
-        onLogSave={handleLogSave}
-        userName={user?.name ?? '님'}
-        cycleMode={user?.cycleMode}
-      />
+      {view === 'health' ? (
+        <HealthCalendar
+          logs={logs}
+          cycleLength={CYCLE_LENGTH}
+          periodLength={PERIOD_LENGTH}
+          onLogSave={handleLogSave}
+          userName={user?.name ?? '님'}
+          cycleMode={user?.cycleMode}
+        />
+      ) : (
+        <CalorieCalendar />
+      )}
 
       {/* ── Mode change confirm dialog ── */}
       {pendingMode && (() => {
