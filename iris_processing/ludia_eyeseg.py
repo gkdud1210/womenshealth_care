@@ -6,7 +6,7 @@ LUDIA LAB '자동 경계 찾기' + '동공 소견' — ludia-health에서 가져
   경계: 동공 = 동공 소견 방식(밝기 경계 + 타원), 홍채 = 모델 홍채 영역에 맞춘 원(일부가 눈꺼풀에 가려도)
   분석 영역: 홍채 원 안 ∧ 동공 밖 ∧ 눈꺼풀·반사광 아님 — 병소는 이 안에서만
   동공 소견: 동공 오른쪽(사진 기준, 두 눈 모두) 척추 구간 경추 12~1시 반 · 흉추 1시 반~4시 반 · 요추 4시 반~6시가
-             안쪽으로 납작/바깥으로 불룩한지 + 동공 바로 바깥 회색 이중 테(위 고리)
+             안쪽으로 납작/바깥으로 불룩한지 + 검은 동공 바로 겉 테두리에 붙은 회색 테(위 고리, 2026-11-12 원장 기준)
 
 설치·교체: python3 scripts/import_ludia_model.py --eyeseg ~/ludia-health/ai-engine/data/lab_exports/eyeseg_export.zip
 연구·웰니스 참고용 후보이며 의료 진단이 아니다.
@@ -85,14 +85,16 @@ def _pupil_findings(rgb: np.ndarray, geo) -> Optional[dict]:
         spine_text = f"동공 척추 구간에서 {parts} 일그러짐이 보입니다. {care}의 자세와 좌우 균형을 살펴보세요."
     else:
         spine_text = "동공 척추 구간(경추·흉추·요추)에서 뚜렷한 일그러짐은 보이지 않습니다."
-    ring_text = {"strong": "동공 바로 바깥에 회색 이중 테(위 고리)가 뚜렷합니다 — 위 기능이 약해진 신호로 봅니다. 식사 속도·자극적인 음식을 살펴보세요.",
-                 "candidate": "동공 바로 바깥에 회색 이중 테(위 고리) 후보가 보입니다 — 소화가 편한지 살펴보세요.",
-                 "none": "동공 바깥 위 고리는 보이지 않습니다."}[r.get("level") or "none"]
+    ring_text = {"strong": "검은 동공 바로 겉 테두리에 회색빛 테(위 고리)가 뚜렷합니다 — 위가 약하고 위염 가능성이 높은 신호로 봅니다. 맵고 짠 음식·과식·빈속 커피를 줄이고 따뜻한 음식을 천천히 드세요.",
+                 "candidate": "검은 동공 바로 겉 테두리에 회색빛 테(위 고리) 후보가 보입니다 — 속쓰림·더부룩함이 있는지 살펴보세요.",
+                 "none": "동공 테두리에 붙은 회색 테(위 고리)는 보이지 않습니다."}[r.get("level") or "none"]
+    if r.get("blurry"):
+        ring_text = "사진이 흐려 동공 테두리의 회색 테(위 고리)는 판단하지 않았습니다 — 초점을 맞춰 다시 찍으면 볼 수 있어요."
     return {"ok": True,
             "spine": {"level": p["spine_level"], "levelLabel": _LEVEL[p["spine_level"]], "where": p.get("spine_where"),
                       "segments": segs, "text": spine_text},
             "shape": {"level": p["shape_level"], "levelLabel": _LEVEL[p["shape_level"]]},
-            "gastricRing": {"level": r.get("level") or "none", "levelLabel": _LEVEL[r.get("level") or "none"],
+            "gastricRing": {"level": r.get("level") or "none", "levelLabel": "흐려서 판단 안 함" if r.get("blurry") else _LEVEL[r.get("level") or "none"],
                             "arc": r.get("arc"), "text": ring_text},
             "note": "동공 소견은 사진 기준 오른쪽(두 눈 모두)을 척추로 봅니다 — 12시 경추 · 3시 흉추 · 6시 요추. 후보 표시이며 진단이 아닙니다."}
 
