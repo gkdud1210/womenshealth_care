@@ -181,18 +181,10 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         return
       }
 
-      // 서비스 자체에 연결되지 않으면 데모 데이터
+      // 서버에 연결되지 않으면 가짜(데모) 점수를 결과처럼 보여 주지 않고 알린다 — 데모 점수는 리포트에도 안 남아 혼란만 줬다
       if (!data) {
-        const eyeData: EyeData = {
-          score:        rng(58, 88),
-          skinZone:     rng(42, 78),
-          thyroidZone:  rng(62, 88),
-          annotatedImg: null,
-          isReal:       false,
-        }
-        if (eyeStep === 'right') setRightData(eyeData)
-        else                     setLeftData(eyeData)
-        setPhase('done')
+        setUploadErr('홍채 분석 서버에 연결할 수 없습니다. 분석 서버(LUDIA)가 꺼져 있을 수 있어요 — 잠시 뒤 다시 시도해 주세요.')
+        setPhase('idle')
         return
       }
 
