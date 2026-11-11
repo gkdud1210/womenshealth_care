@@ -19,6 +19,7 @@ RUN --mount=type=secret,id=HF_TOKEN,mode=0444,required=true \
 snapshot_download(open('/run/secrets/MODEL_REPO').read().strip(), token=open('/run/secrets/HF_TOKEN').read().strip(), local_dir='/app/_models')" \
     && mkdir -p /app/models /app/iris_processing/models \
     && mv /app/_models/ludia_lab /app/models/ludia_lab \
+    && mv /app/_models/ludia_eyeseg /app/models/ludia_eyeseg \
     && mv /app/_models/mobile_sam.pt /app/iris_processing/models/mobile_sam.pt \
     && rm -rf /app/_models
 

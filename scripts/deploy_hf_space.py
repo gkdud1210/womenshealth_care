@@ -1,7 +1,7 @@
 """
 홍채 분석 서비스를 Hugging Face Spaces(무료 CPU)에 배포한다.
 
-  1) 비공개 모델 저장소 <user>/ludia-iris-models 에 모델 업로드 (models/ludia_lab, mobile_sam.pt)
+  1) 비공개 모델 저장소 <user>/ludia-iris-models 에 모델 업로드 (models/ludia_lab, models/ludia_eyeseg, mobile_sam.pt)
   2) Docker Space <user>/ludia-iris-service 생성, 빌드용 시크릿(HF_TOKEN, MODEL_REPO) 등록
   3) 서비스 코드 + deploy/hf-space/ 설정 업로드 → Spaces가 자동 빌드
 
@@ -24,6 +24,8 @@ space_repo = f"{user}/ludia-iris-service"
 api.create_repo(model_repo, repo_type="model", private=True, exist_ok=True)
 api.upload_folder(repo_id=model_repo, folder_path=os.path.join(ROOT, "models", "ludia_lab"),
                   path_in_repo="ludia_lab", commit_message="LUDIA LAB lesion model")
+api.upload_folder(repo_id=model_repo, folder_path=os.path.join(ROOT, "models", "ludia_eyeseg"),
+                  path_in_repo="ludia_eyeseg", commit_message="LUDIA LAB eye segmentation (auto boundary) model")
 api.upload_file(repo_id=model_repo, path_or_fileobj=os.path.join(ROOT, "iris_processing", "models", "mobile_sam.pt"),
                 path_in_repo="mobile_sam.pt", commit_message="MobileSAM checkpoint")
 
@@ -40,6 +42,9 @@ with tempfile.TemporaryDirectory() as tmp:
     for f in os.listdir(os.path.join(ROOT, "iris_processing")):
         if f.endswith(".py"):
             shutil.copy(os.path.join(ROOT, "iris_processing", f), os.path.join(tmp, "iris_processing"))
+    # 자동 경계·동공 소견 계산 코드(ludia-health에서 복사한 패키지)
+    shutil.copytree(os.path.join(ROOT, "iris_processing", "ludia_v3"), os.path.join(tmp, "iris_processing", "ludia_v3"),
+                    ignore=shutil.ignore_patterns("__pycache__"))
     api.upload_folder(repo_id=space_repo, repo_type="space", folder_path=tmp, commit_message="Deploy iris service")
 
 host = space_repo.replace("/", "-").replace("_", "-").lower()

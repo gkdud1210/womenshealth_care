@@ -16,6 +16,7 @@ import { useDiagnosticHistory } from '@/lib/diagnosticHistory'
 import {
   LesionChips, LesionList, LesionOverlay, LesionResetButton, canSelectLesions, useLesionSelection,
 } from '@/components/diagnostic/IrisLesionViewer'
+import { PupilFindingsPanel } from '@/components/diagnostic/PupilFindingsPanel'
 
 /* ── utils ──────────────────────────────────────────────────────── */
 const rng  = (a: number, b: number) => Math.floor(a + Math.random() * (b - a))
@@ -48,6 +49,8 @@ interface EyeData {
   lesionSummary?: IrisEyeDetection['lesionSummary']
   disclaimer?: string
   model?: IrisEyeDetection['model']
+  pupilFindings?: IrisEyeDetection['pupilFindings']
+  boundarySource?: string
 }
 
 /* 주석 이미지를 리포트 기록(localStorage)에 넣을 수 있도록 축소 — 실패하면 원본 그대로 */
@@ -81,6 +84,8 @@ async function toDetection(d: EyeData): Promise<IrisEyeDetection | undefined> {
     lesionSummary: d.lesionSummary ?? [],
     model:         d.model,
     disclaimer:    d.disclaimer,
+    pupilFindings: d.pupilFindings ?? null,
+    boundarySource: d.boundarySource,
   }
 }
 
@@ -189,6 +194,8 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         lesionSummary: (data.lesionSummary as EyeData['lesionSummary']) ?? [],
         disclaimer:    data.disclaimer as string | undefined,
         model:         data.model as EyeData['model'],
+        pupilFindings: (data.pupilFindings as EyeData['pupilFindings']) ?? null,
+        boundarySource: (data.boundary as { source?: string } | undefined)?.source,
       }
       if (eyeStep === 'right') setRightData(eyeData)
       else                     setLeftData(eyeData)
@@ -542,6 +549,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
               {currentData.disclaimer && <p className="text-[10px] text-slate-400">* {currentData.disclaimer}</p>}
             </div>
           )}
+          {currentData.isReal && <PupilFindingsPanel pf={currentData.pupilFindings} />}
           {!currentData.isReal && (
             <p className="text-[10px] text-center text-slate-400">
               * 데모 모드 — 홍채 분석 서비스에 연결되지 않아 예시 값이 표시됩니다

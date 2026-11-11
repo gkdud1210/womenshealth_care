@@ -5,6 +5,7 @@ import type { IrisEyeDetection, MultimodalData } from '@/components/calendar/Lud
 import {
   LesionChips, LesionList, LesionOverlay, LesionResetButton, canSelectLesions, useLesionSelection,
 } from './IrisLesionViewer'
+import { PupilFindingsPanel } from './PupilFindingsPanel'
 
 // 홍채 스캔에서 LUDIA LAB 병소 모델이 실제로 검출한 결과(주석 이미지·병소 목록)를 리포트에 표시
 function EyeColumn({ label, d }: { label: string; d: IrisEyeDetection }) {
@@ -32,6 +33,7 @@ function EyeColumn({ label, d }: { label: string; d: IrisEyeDetection }) {
 
       <LesionChips d={d} sel={sel} onToggle={toggle} interactive={interactive} />
       <LesionList d={d} sel={sel} onToggle={toggle} interactive={interactive} />
+      <PupilFindingsPanel pf={d.pupilFindings} />
     </div>
   )
 }

@@ -39,3 +39,6 @@ iris_processing/*.png
 iris_processing/.venv/
 iris_processing/__pycache__/
 **/__pycache__/
+
+# ludia-health 분석 코드 복사본(비공개 알고리즘) — 공개 저장소에 올리지 않음. scripts/import_ludia_model.py --eyeseg 로 설치
+iris_processing/ludia_v3/

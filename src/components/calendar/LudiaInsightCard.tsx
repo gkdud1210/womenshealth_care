@@ -19,6 +19,20 @@ export interface IrisLesion {
   labelAt?: [number, number]    // 번호를 찍을 위치 (도형 안)
 }
 
+// LUDIA LAB 동공 소견 — 동공 오른쪽(사진 기준) 척추 구간 + 동공 바깥 위 고리 (iris_service pupilFindings)
+export type FindingLevel = 'none' | 'candidate' | 'strong' | 'unseen'
+export interface PupilFindings {
+  ok: boolean
+  reason?: string
+  spine?: {
+    level: FindingLevel; levelLabel: string; where: string | null; text: string
+    segments: { key: 'cervical' | 'thoracic' | 'lumbar'; name: string; level: FindingLevel; levelLabel: string
+                kind?: 'flat' | 'bulge'; kindLabel?: string; at?: string | null; atDeg?: number | null; amount?: number | null }[]
+  }
+  gastricRing?: { level: FindingLevel; levelLabel: string; arc?: number | null; text: string }
+  note?: string
+}
+
 export interface IrisEyeDetection {
   score: number
   annotatedImg: string | null   // 저장 용량을 위해 축소한 주석 이미지 (data URL) — baseImg가 없을 때만 사용
@@ -30,6 +44,8 @@ export interface IrisEyeDetection {
   lesionSummary: { key: string; label: string; count: number; color: string }[]
   model?: { runId: number; valMiou: number | null; trainImages: number | null; reliable: boolean }
   disclaimer?: string
+  pupilFindings?: PupilFindings | null
+  boundarySource?: string
 }
 
 export interface MultimodalData {

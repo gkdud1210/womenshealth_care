@@ -33,6 +33,7 @@ if IRIS_DIR not in sys.path:
 from iris_processor import IrisNormalizer  # noqa: E402
 from iris_region import clip_to_mask, exclusion_reason, eyelid_y, find_eyelids, label_point, visible_iris_mask  # noqa: E402
 from ludia_lesion import detector_error, get_detector  # noqa: E402
+import ludia_eyeseg  # noqa: E402  LUDIA LAB 자동 경계 찾기(5분류 분할) + 동공 소견
 
 # ── 앱 초기화 ──────────────────────────────────────────────────────────────────
 app = FastAPI(title="LUDIA Iris Service", version="2.0")
@@ -73,6 +74,20 @@ ZONES = [
 EYE_BASE, EYE_PER_LESION = 92, 6
 # 검증 mIoU가 이보다 낮은 모델은 "학습 데이터 부족" 경고를 붙인다 (결과를 숨기지는 않음)
 RELIABLE_VAL_MIOU = 0.35
+# 병소가 아니라 홍채 구조선 — 병소 목록·점수에서 뺀다 (자율신경환)
+STRUCTURE_KEYS = {"collarette"}
+
+
+def _lesion_miou(det) -> Optional[float]:
+    """병소 클래스만의 정확도(mIoU) — 동공·홍채(semantic)가 섞인 전체 val_miou는 병소 정확도를 부풀린다.
+    검증셋에 병소가 없으면 시험셋 값, 둘 다 없으면 None(= 학습 초기 경고)."""
+    m = det.card.get("metrics") or {}
+    les = {c["key"] for c in det.classes if c.get("kind") != "semantic" and c["key"] not in STRUCTURE_KEYS}
+    for k in ("val_iou", "test_iou"):
+        v = [x for c, x in (m.get(k) or {}).items() if c in les]
+        if v:
+            return round(float(sum(v) / len(v)), 3)
+    return None
 ZONE_BASE, ZONE_PER_LESION = 90, 14
 
 _PALETTE = [(80, 80, 255), (0, 170, 255), (255, 90, 200), (255, 200, 0), (120, 255, 120),
@@ -129,7 +144,8 @@ def _plausible(g: Optional[dict], shape) -> bool:
     return 0 <= g["cx"] < w and 0 <= g["cy"] < h and 0.1 <= ratio <= 0.75 and g["limbusR"] <= 0.75 * max(h, w)
 
 
-def _draw(bgr: np.ndarray, geom: Optional[dict], lesions: list, color_of: dict, lids: Optional[dict] = None) -> str:
+def _draw(bgr: np.ndarray, geom: Optional[dict], lesions: list, color_of: dict, lids: Optional[dict] = None,
+          lid_polys: Optional[list] = None) -> str:
     img = bgr.copy()
     h, w = img.shape[:2]
     s = min(800 / max(h, w), 1.0)
@@ -138,8 +154,17 @@ def _draw(bgr: np.ndarray, geom: Optional[dict], lesions: list, color_of: dict, 
     lw = max(2, int(round(max(img.shape[:2]) / 300)))
     if geom:
         c = (int(geom["cx"] * s), int(geom["cy"] * s))
-        cv2.circle(img, c, int(geom["limbusR"] * s), (30, 220, 90), lw, cv2.LINE_AA)
+        ic = (int(geom.get("irisCx", geom["cx"]) * s), int(geom.get("irisCy", geom["cy"]) * s))
+        cv2.circle(img, ic, int(geom["limbusR"] * s), (30, 220, 90), lw, cv2.LINE_AA)
         cv2.circle(img, c, int(geom["pupilR"] * s), (0, 200, 255), lw, cv2.LINE_AA)
+        # 분할 모델 눈꺼풀: 홍채 원 근처의 윤곽만
+        for poly in lid_polys or []:
+            P = np.asarray(poly, np.float64)
+            near = np.hypot(P[:, 0] - ic[0] / s, P[:, 1] - ic[1] / s) <= geom["limbusR"] * 1.05
+            idx = np.where(near)[0]
+            for run in np.split(idx, np.where(np.diff(idx) > 1)[0] + 1):   # 이어진 구간마다 한 선
+                if len(run) >= 2:
+                    cv2.polylines(img, [(P[run] * s).astype(np.int32)], False, (255, 80, 255), lw, cv2.LINE_AA)
         # 눈꺼풀 경계는 홍채 원과 겹치는 구간만 그린다
         for lid in (lids or {}).values():
             xs = np.linspace(geom["cx"] - geom["limbusR"], geom["cx"] + geom["limbusR"], 80)
@@ -166,6 +191,19 @@ def _draw(bgr: np.ndarray, geom: Optional[dict], lesions: list, color_of: dict, 
     return "data:image/jpeg;base64," + base64.b64encode(buf).decode()
 
 
+def _seg_reason(points: list, seg: dict) -> str:
+    """분석 영역 밖으로 버린 검출이 어디에 있었는지 — 분할 결과(눈꺼풀·반사광 / 동공 타원)로 판정."""
+    x, y = np.asarray(points, np.float64).mean(0)
+    h, w = seg["cls"].shape
+    c = int(seg["cls"][min(h - 1, max(0, int(y))), min(w - 1, max(0, int(x)))])
+    if c in (1, 4):
+        return "eyelid"
+    (px, py), (pa, pb), _ = seg["pupil_e"]
+    if np.hypot(x - px, y - py) <= max(pa, pb) / 2 * 1.05:
+        return "pupil"
+    return "outside"
+
+
 def _analyze(image_bytes: bytes, eye: str) -> dict:
     bgr = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
     if bgr is None:
@@ -175,24 +213,38 @@ def _analyze(image_bytes: bytes, eye: str) -> dict:
         return {"error": f"LUDIA 병소 모델이 설치되지 않았습니다 (models/ludia_lab) — {detector_error()}"}
 
     dets = det.predict(bgr)
-    geom = _classical_geometry(bgr)
-    if not _plausible(geom, bgr.shape):
-        geom = det.geometry_from_semantic(dets)
-        if not _plausible(geom, bgr.shape):
-            geom = None
-    lids = find_eyelids(bgr, geom) if geom else {}
-
-    # 동공 안·눈꺼풀 위·홍채 밖에 걸친 검출은 보이는 홍채 영역으로 잘라내고, 절반 이상 밖이면 버린다
     ms = min(1.0, 800 / max(bgr.shape[:2]))
-    mask = visible_iris_mask(bgr.shape, geom, lids, ms) if geom else None
+    # ① LUDIA LAB 자동 경계 찾기(분할 모델): 동공 = 동공 소견 방식, 홍채 = 영역 맞춤 원, 눈꺼풀·반사광 제외 영역
+    seg = None
+    try:
+        seg = ludia_eyeseg.analyze(bgr)
+    except Exception as e:  # 실패하면 예전 방식으로
+        print(f"[eyeseg] 실패 — 예전 경계 검출 사용: {e}")
+    lids, lid_polys = {}, None
+    if seg:
+        geom = seg["geometry"]
+        lid_polys = seg["eyelidPolys"]
+        h0, w0 = bgr.shape[:2]
+        mask = cv2.resize(seg["region"].astype(np.uint8), (int(round(w0 * ms)), int(round(h0 * ms))), interpolation=cv2.INTER_NEAREST)
+        # 12시 방향 얇은 틈 — 동공을 빙 두른 병소가 잘린 뒤 구멍 없는 다각형(C자)이 되도록 (visible_iris_mask와 같게)
+        x0 = int(round(geom["cx"] * ms)); mask[: int(round(geom["cy"] * ms)), max(0, x0 - 1):x0 + 1] = 0
+    else:
+        geom = _classical_geometry(bgr)
+        if not _plausible(geom, bgr.shape):
+            geom = det.geometry_from_semantic(dets)
+            if not _plausible(geom, bgr.shape):
+                geom = None
+        lids = find_eyelids(bgr, geom) if geom else {}
+        # 동공 안·눈꺼풀 위·홍채 밖에 걸친 검출은 보이는 홍채 영역으로 잘라내고, 절반 이상 밖이면 버린다
+        mask = visible_iris_mask(bgr.shape, geom, lids, ms) if geom else None
     excluded = {"pupil": 0, "eyelid": 0, "outside": 0}
     lesions = []
-    for d in sorted((d for d in dets if d["kind"] != "semantic"), key=lambda d: -d["confidence"]):
+    for d in sorted((d for d in dets if d["kind"] != "semantic" and d["key"] not in STRUCTURE_KEYS), key=lambda d: -d["confidence"]):
         pts = d["points"]
         if mask is not None:
             clipped = clip_to_mask(d["shape"], pts, mask, ms)
             if clipped is None:
-                excluded[exclusion_reason(pts, geom, lids)] += 1
+                excluded[_seg_reason(pts, seg) if seg else exclusion_reason(pts, geom, lids)] += 1
                 continue
             pts = clipped
         les = {**d, "id": len(lesions) + 1, "points": pts, "labelAt": label_point(d["shape"], pts)}
@@ -227,13 +279,19 @@ def _analyze(image_bytes: bytes, eye: str) -> dict:
         "iris":            {"cx": round(geom["cx"], 1), "cy": round(geom["cy"], 1), "r": round(geom["limbusR"], 1)} if geom else None,
         "organMap":        bool(det.organ_maps.get(eye)),
         "model":           {"source": "LUDIA LAB", "runId": det.card.get("run_id"), "exportedAt": det.card.get("exported_at"),
-                            "valMiou": (det.card.get("metrics") or {}).get("val_miou"),
+                            "valMiou": _lesion_miou(det),
                             "trainImages": ((det.card.get("metrics") or {}).get("n") or {}).get("train"),
-                            "reliable": ((det.card.get("metrics") or {}).get("val_miou") or 0) >= RELIABLE_VAL_MIOU,
-                            "classes": [{"key": c["key"], "label": c.get("label", c["key"])} for c in det.classes if c.get("kind") != "semantic"]},
-        "annotatedImage":  _draw(bgr, geom, lesions, color_of, lids),
+                            "reliable": (_lesion_miou(det) or 0) >= RELIABLE_VAL_MIOU,
+                            "classes": [{"key": c["key"], "label": c.get("label", c["key"])} for c in det.classes
+                                        if c.get("kind") != "semantic" and c["key"] not in STRUCTURE_KEYS]},
+        "annotatedImage":  _draw(bgr, geom, lesions, color_of, lids, lid_polys),
         # 병소 없이 홍채/동공 원만 그린 이미지 + 원본 크기 — 화면에서 병소를 골라 SVG로 겹쳐 그릴 때 사용
-        "baseImage":       _draw(bgr, geom, [], color_of, lids),
+        "baseImage":       _draw(bgr, geom, [], color_of, lids, lid_polys),
+        # LUDIA LAB 자동 경계 찾기 · 동공 소견(척추 경추·흉추·요추, 위 고리) — 분할 모델이 없으면 None
+        "boundary":        ({"source": "LUDIA LAB 자동 경계 찾기", "irisVisible": seg["irisVisible"], "pupilSource": seg["pupilSource"],
+                             "model": {k: ludia_eyeseg.meta().get(k) for k in ("trained_at", "n_images")}} if seg else
+                            {"source": "기본 원 검출", "error": ludia_eyeseg.error()}),
+        "pupilFindings":   seg["pupilFindings"] if seg else None,
         "imageSize":       {"w": int(bgr.shape[1]), "h": int(bgr.shape[0])},
         "disclaimer":      "연구용 병소 후보 검출 결과입니다. 의료 진단이 아니며 전문가 판독을 대신하지 않습니다.",
     }

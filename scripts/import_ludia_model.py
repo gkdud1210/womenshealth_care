@@ -8,6 +8,8 @@ import_ludia_model.py — ludia-health AI 엔진에서 학습된 LUDIA LAB 병�
     python3 scripts/import_ludia_model.py --run 12                      # run #12 내보내기 + 설치
     python3 scripts/import_ludia_model.py --run 12 --engine http://localhost:8765
     python3 scripts/import_ludia_model.py --zip ~/ludia-health/ai-engine/data/lab_exports/run_91234_export.zip
+    python3 scripts/import_ludia_model.py --eyeseg ~/ludia-health/ai-engine/data/lab_exports/eyeseg_export.zip
+        (자동 경계 찾기 5분류 분할 모델 + 동공 소견 계산 코드 — ludia-health에서 `python3 ai-engine/eyeseg_export.py`로 만든 묶음)
 
 설치 결과(models/ludia_lab/):
     model.onnx, model_card.json, organ_map.json(눈별 장기지도, 압축 형태), README.txt
@@ -66,13 +68,46 @@ def compact_organ_maps(maps: list) -> dict:
     return out
 
 
+EYESEG_DEST = ROOT / "models" / "ludia_eyeseg"
+CODE_DEST = ROOT / "iris_processing" / "ludia_v3"
+
+
+def install_eyeseg(zp: Path):
+    """eyeseg_export.zip → models/ludia_eyeseg/(model.onnx, meta.json) + iris_processing/ludia_v3/(계산 코드)."""
+    z = zipfile.ZipFile(zp.expanduser())
+    meta = json.loads(z.read("meta.json"))
+    print(f"자동 경계 모델: 학습 {meta.get('trained_at')} · {meta.get('n_images')}장 · ONNX 검증 오차 {meta['onnx_verify']['max_abs_diff_vs_pytorch']:.1e}")
+    tmp = EYESEG_DEST.with_name("ludia_eyeseg.tmp"); ctmp = CODE_DEST.with_name("ludia_v3.tmp")
+    for t in (tmp, ctmp):
+        shutil.rmtree(t, ignore_errors=True); t.mkdir(parents=True)
+    (tmp / "model.onnx").write_bytes(z.read("model.onnx"))
+    (tmp / "meta.json").write_bytes(z.read("meta.json"))
+    for n in z.namelist():
+        if n.startswith("ludia_v3/") and n.endswith(".py"):
+            (ctmp / Path(n).name).write_bytes(z.read(n))
+    (ctmp / "__init__.py").write_text('"""ludia-health ai-engine/ludia_v3 에서 복사한 코드 — 여기서 고치지 말고 import_ludia_model.py --eyeseg 로 교체."""\n')
+    for dst, t in ((EYESEG_DEST, tmp), (CODE_DEST, ctmp)):
+        shutil.rmtree(dst, ignore_errors=True); t.rename(dst)
+    # 설치 확인
+    sys.path.insert(0, str(ROOT / "iris_processing"))
+    import numpy as np
+    import ludia_eyeseg
+    ludia_eyeseg.predict_mask(np.zeros((480, 640, 3), np.uint8))
+    print(f"✅ 설치 완료: {EYESEG_DEST.relative_to(ROOT)}, {CODE_DEST.relative_to(ROOT)} — iris_service.py 를 재시작하세요.")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", type=int, help="LUDIA LAB 학습 run 번호 (AI 엔진에서 내보내기)")
     ap.add_argument("--zip", type=Path, help="이미 만든 내보내기 묶음 run_<id>_export.zip (엔진 불필요)")
     ap.add_argument("--organ-map", type=Path, help="get_iris_organ_map 응답 JSON 파일 (엔진 없이 장기지도 설치)")
     ap.add_argument("--engine", default="http://localhost:8765")
+    ap.add_argument("--eyeseg", type=Path, help="자동 경계 찾기 묶음 eyeseg_export.zip")
     a = ap.parse_args()
+    if a.eyeseg:
+        install_eyeseg(a.eyeseg)
+        if not a.run and not a.zip:
+            return
     if not a.run and not a.zip:
         ap.error("--run 또는 --zip 중 하나가 필요합니다")
     eng = a.engine.rstrip("/")
