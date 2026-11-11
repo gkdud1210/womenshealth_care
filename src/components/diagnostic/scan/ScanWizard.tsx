@@ -71,6 +71,21 @@ function shrinkDataUrl(src: string, maxDim = 480, quality = 0.75): Promise<strin
   })
 }
 
+/* 홍채 분석 서버 주소 — 서버가 LUDIA 원장님 Mac에서 돌고 Cloudflare 임시 주소로 열려 주소가 바뀔 수 있어,
+   스캔할 때마다 ludiahealth.com에 등록된 현재 주소를 먼저 읽는다(Mac의 tools/iris_tunnel.py가 등록). 없으면 빌드 때 값. */
+const IRIS_ENDPOINT_LOOKUP = process.env.NEXT_PUBLIC_IRIS_ENDPOINT_LOOKUP ?? 'https://ludiahealth.com/api.php?action=iris_endpoint'
+async function resolveIrisServiceUrl(): Promise<string | undefined> {
+  try {
+    const ctl = new AbortController()
+    const t = setTimeout(() => ctl.abort(), 4000)
+    const r = await fetch(IRIS_ENDPOINT_LOOKUP, { signal: ctl.signal, cache: 'no-store' })
+    clearTimeout(t)
+    const j = await r.json()
+    if (typeof j?.url === 'string' && /^https:\/\//.test(j.url)) return j.url.replace(/\/$/, '')
+  } catch { /* 조회 실패 — 빌드 때 주소로 */ }
+  return process.env.NEXT_PUBLIC_IRIS_SERVICE_URL || undefined
+}
+
 async function toDetection(d: EyeData): Promise<IrisEyeDetection | undefined> {
   if (!d.isReal) return undefined
   return {
@@ -145,7 +160,7 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       const fd = new FormData()
       fd.append('file', blob, name)
       fd.append('eye', eyeStep)
-      const irisServiceUrl = process.env.NEXT_PUBLIC_IRIS_SERVICE_URL
+      const irisServiceUrl = await resolveIrisServiceUrl()
       const endpoint = irisServiceUrl
         ? `${irisServiceUrl}/analyze/detailed`
         : '/api/iris-analyze'
