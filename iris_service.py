@@ -34,6 +34,7 @@ from iris_processor import IrisNormalizer  # noqa: E402
 from iris_region import clip_to_mask, exclusion_reason, eyelid_y, find_eyelids, label_point, visible_iris_mask  # noqa: E402
 from ludia_lesion import detector_error, get_detector  # noqa: E402
 import ludia_eyeseg  # noqa: E402  LUDIA LAB 자동 경계 찾기(5분류 분할) + 동공 소견
+import ludia_reading  # noqa: E402  LUDIA HEALTH 리포트와 같은 판독(같은 Mac의 LUDIA AI 엔진)
 
 # ── 앱 초기화 ──────────────────────────────────────────────────────────────────
 app = FastAPI(title="LUDIA Iris Service", version="2.0")
@@ -252,7 +253,20 @@ def _analyze(image_bytes: bytes, eye: str) -> dict:
         les["position"] = det.radial_position(pts, geom)
         lesions.append(les)
 
-    keys = [c["key"] for c in det.classes]
+    # ② LUDIA HEALTH 리포트와 같은 판독 — 엔진이 켜져 있으면 위의 분할 모델 병소 대신 이것을 쓴다(2026-11-11 사용자 요청)
+    reading = None
+    try:
+        reading = ludia_reading.analyze(bgr, eye, geom)
+    except Exception as e:
+        print(f"[reading] 실패 — 분할 모델 병소 사용: {e}")
+    reading_err = reading.get("error") if isinstance(reading, dict) else None
+    if reading and not reading_err:
+        lesions = []
+        for l in sorted(reading["lesions"], key=lambda l: -l["confidence"]):
+            lesions.append({**l, "id": len(lesions) + 1, "labelAt": label_point("polygon", l["points"])})
+        excluded = {"pupil": 0, "eyelid": 0, "outside": 0}
+
+    keys = [c["key"] for c in det.classes] + list(ludia_reading.CODE_LABEL)
     color_of = {k: _PALETTE[i % len(_PALETTE)] for i, k in enumerate(keys)}
     summary: dict = {}
     for l in lesions:
@@ -278,12 +292,20 @@ def _analyze(image_bytes: bytes, eye: str) -> dict:
         "pupil":           {"cx": round(geom["cx"], 1), "cy": round(geom["cy"], 1), "r": round(geom["pupilR"], 1)} if geom else None,
         "iris":            {"cx": round(geom["cx"], 1), "cy": round(geom["cy"], 1), "r": round(geom["limbusR"], 1)} if geom else None,
         "organMap":        bool(det.organ_maps.get(eye)),
-        "model":           {"source": "LUDIA LAB", "runId": det.card.get("run_id"), "exportedAt": det.card.get("exported_at"),
+        "model":           ({"source": "LUDIA HEALTH 판독 모델", "runId": None, "exportedAt": (reading.get("model") or {}).get("trained_at"),
+                             "valMiou": None, "trainImages": (reading.get("model") or {}).get("n_reports"), "reliable": True,
+                             "trainedOn": f"최종 확인 리포트 {(reading.get('model') or {}).get('n_reports')}건",
+                             "classes": [{"key": k, "label": v} for k, v in ludia_reading.CODE_LABEL.items()]}
+                            if reading and not reading_err else
+                            {"source": "LUDIA LAB", "runId": det.card.get("run_id"), "exportedAt": det.card.get("exported_at"),
                             "valMiou": _lesion_miou(det),
                             "trainImages": ((det.card.get("metrics") or {}).get("n") or {}).get("train"),
                             "reliable": (_lesion_miou(det) or 0) >= RELIABLE_VAL_MIOU,
                             "classes": [{"key": c["key"], "label": c.get("label", c["key"])} for c in det.classes
-                                        if c.get("kind") != "semantic" and c["key"] not in STRUCTURE_KEYS]},
+                                        if c.get("kind") != "semantic" and c["key"] not in STRUCTURE_KEYS]}),
+        # 홍채 전체에 걸친 소견(콜레스테롤 링·나트륨/칼슘 링 등) — LUDIA HEALTH 판독과 같음
+        "globalFindings":  (reading or {}).get("flags") if reading and not reading_err else None,
+        "readingError":    reading_err if reading_err else (None if reading else "LUDIA AI 엔진이 꺼져 있어 기본 병소 모델로 분석했습니다."),
         "annotatedImage":  _draw(bgr, geom, lesions, color_of, lids, lid_polys),
         # 병소 없이 홍채/동공 원만 그린 이미지 + 원본 크기 — 화면에서 병소를 골라 SVG로 겹쳐 그릴 때 사용
         "baseImage":       _draw(bgr, geom, [], color_of, lids, lid_polys),

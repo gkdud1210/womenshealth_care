@@ -3,7 +3,7 @@
 import { Eye } from 'lucide-react'
 import type { IrisEyeDetection, MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import {
-  LesionChips, LesionList, LesionOverlay, LesionResetButton, canSelectLesions, useLesionSelection,
+  LesionChips, LesionList, LesionOverlay, LesionResetButton, canSelectLesions, useLesionSelection, IrisGlobalFindings,
 } from './IrisLesionViewer'
 import { PupilFindingsPanel } from './PupilFindingsPanel'
 
@@ -16,7 +16,7 @@ function EyeColumn({ label, d }: { label: string; d: IrisEyeDetection }) {
     <div className="space-y-2.5 min-w-0">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-slate-700">{label}</p>
-        <span className="text-[10px] text-slate-400">점수 {d.score} · 병소 {d.lesions.length}개</span>
+        <span className="text-[10px] text-slate-400">병소 {d.lesions.length}개</span>
       </div>
 
       {interactive ? (
@@ -33,6 +33,7 @@ function EyeColumn({ label, d }: { label: string; d: IrisEyeDetection }) {
 
       <LesionChips d={d} sel={sel} onToggle={toggle} interactive={interactive} />
       <LesionList d={d} sel={sel} onToggle={toggle} interactive={interactive} />
+      <IrisGlobalFindings flags={d.globalFindings} />
       <PupilFindingsPanel pf={d.pupilFindings} />
     </div>
   )
@@ -50,7 +51,7 @@ export function IrisDetectionCard({ iris }: { iris: MultimodalData['iris'] }) {
       <div className="flex items-center gap-2">
         <Eye className="w-4 h-4 text-purple-500" />
         <h3 className="text-sm font-semibold text-slate-700">홍채 검출 결과</h3>
-        <span className="ml-auto text-[10px] text-purple-400 font-medium">LUDIA LAB 병소 모델</span>
+        <span className="ml-auto text-[10px] text-purple-400 font-medium">{any.model?.source ?? 'LUDIA'}</span>
       </div>
 
       {unreliable && any.model && (

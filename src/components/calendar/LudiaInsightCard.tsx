@@ -17,7 +17,15 @@ export interface IrisLesion {
   shape?: 'polygon' | 'polyline'
   points?: [number, number][]   // 원본 사진 픽셀 좌표
   labelAt?: [number, number]    // 번호를 찍을 위치 (도형 안)
+  // LUDIA HEALTH 판독(구역 단위) — 구역 번호·시각·이름, 위치를 색 편차 덩어리(spot)로 찾았는지 구역 전체(zone)인지
+  zone?: string
+  zoneTime?: string
+  zoneName?: string
+  located?: 'spot' | 'zone'
 }
+
+// 홍채 전체에 걸친 소견 — 콜레스테롤 링·나트륨/칼슘 링 등 (LUDIA HEALTH 판독과 같음)
+export interface IrisGlobalFinding { key: string; label: string; note?: string; score?: number | null }
 
 // LUDIA LAB 동공 소견 — 동공 오른쪽(사진 기준) 척추 구간 + 동공 바깥 위 고리 (iris_service pupilFindings)
 export type FindingLevel = 'none' | 'candidate' | 'strong' | 'unseen'
@@ -42,10 +50,12 @@ export interface IrisEyeDetection {
   excluded?: { pupil: number; eyelid: number; outside: number }
   lesions: IrisLesion[]
   lesionSummary: { key: string; label: string; count: number; color: string }[]
-  model?: { runId: number; valMiou: number | null; trainImages: number | null; reliable: boolean }
+  model?: { source?: string; runId: number | null; valMiou: number | null; trainImages: number | null; reliable: boolean; trainedOn?: string }
   disclaimer?: string
   pupilFindings?: PupilFindings | null
   boundarySource?: string
+  globalFindings?: IrisGlobalFinding[] | null
+  readingError?: string | null
 }
 
 export interface MultimodalData {

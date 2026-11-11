@@ -15,6 +15,7 @@ import { useOnboardingProfile } from '@/lib/onboarding-profile'
 import { useDiagnosticHistory } from '@/lib/diagnosticHistory'
 import {
   LesionChips, LesionList, LesionOverlay, LesionResetButton, canSelectLesions, useLesionSelection,
+  IrisGlobalFindings, ReadingSource,
 } from '@/components/diagnostic/IrisLesionViewer'
 import { PupilFindingsPanel } from '@/components/diagnostic/PupilFindingsPanel'
 
@@ -51,6 +52,8 @@ interface EyeData {
   model?: IrisEyeDetection['model']
   pupilFindings?: IrisEyeDetection['pupilFindings']
   boundarySource?: string
+  globalFindings?: IrisEyeDetection['globalFindings']
+  readingError?: string | null
 }
 
 /* 주석 이미지를 리포트 기록(localStorage)에 넣을 수 있도록 축소 — 실패하면 원본 그대로 */
@@ -101,6 +104,8 @@ async function toDetection(d: EyeData): Promise<IrisEyeDetection | undefined> {
     disclaimer:    d.disclaimer,
     pupilFindings: d.pupilFindings ?? null,
     boundarySource: d.boundarySource,
+    globalFindings: d.globalFindings ?? null,
+    readingError: d.readingError ?? null,
   }
 }
 
@@ -203,6 +208,8 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         model:         data.model as EyeData['model'],
         pupilFindings: (data.pupilFindings as EyeData['pupilFindings']) ?? null,
         boundarySource: (data.boundary as { source?: string } | undefined)?.source,
+        globalFindings: (data.globalFindings as EyeData['globalFindings']) ?? null,
+        readingError: (data.readingError as string | null | undefined) ?? null,
       }
       if (eyeStep === 'right') setRightData(eyeData)
       else                     setLeftData(eyeData)
@@ -518,41 +525,15 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       {/* ── 현재 눈 결과 점수 ── */}
       {phase==='done' && currentData && (
         <>
-          <div className="flex gap-2">
-            <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-              <div className={cn('text-2xl font-bold font-display', currentData.score>=70?'text-green-600':'text-amber-600')}>
-                {currentData.score}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">{eyeLabel} 점수</div>
-            </div>
-            <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-              <div className={cn('text-2xl font-bold font-display', currentData.skinZone>=70?'text-green-600':'text-amber-600')}>
-                {currentData.skinZone}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">피부 Zone</div>
-            </div>
-            <div className="flex-1 rounded-xl p-3 text-center" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
-              <div className={cn('text-2xl font-bold font-display', currentData.thyroidZone>=70?'text-green-600':'text-amber-600')}>
-                {currentData.thyroidZone}
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">갑상선 Zone</div>
-            </div>
-          </div>
           {currentData.isReal && currentData.lesions && (
             <div className="rounded-xl p-3 space-y-2" style={{background:'rgba(248,244,246,.8)',border:'1px solid rgba(168,85,247,.15)'}}>
               <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">
                 감지된 홍채 병소 {currentData.lesions.length}개
               </p>
-              {currentData.model && !currentData.model.reliable && (
-                <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg px-2 py-1.5">
-                  ⚠ 병소 모델이 아직 학습 초기 단계입니다
-                  {currentData.model.trainImages != null && ` (학습 사진 ${currentData.model.trainImages}장`}
-                  {currentData.model.valMiou != null && `, 검증 정확도 mIoU ${currentData.model.valMiou.toFixed(2)}`}
-                  {currentData.model.trainImages != null && ')'} — 아래 결과는 참고용으로도 신뢰하기 어렵습니다.
-                </p>
-              )}
+              <ReadingSource model={currentData.model} readingError={currentData.readingError} />
               <LesionChips d={{ lesionSummary: currentData.lesionSummary ?? [] }} sel={lesionSel.sel} onToggle={lesionSel.toggle} interactive={selectable} />
               <LesionList d={{ lesions: currentData.lesions, excluded: currentData.excluded }} sel={lesionSel.sel} onToggle={lesionSel.toggle} interactive={selectable} />
+              <IrisGlobalFindings flags={currentData.globalFindings} />
               {currentData.disclaimer && <p className="text-[10px] text-slate-400">* {currentData.disclaimer}</p>}
             </div>
           )}
@@ -569,17 +550,15 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
       {bothDone && rightData && leftData && (
         <div className="rounded-xl p-3 space-y-2" style={{background:'rgba(168,85,247,.06)',border:'1px solid rgba(168,85,247,.2)'}}>
           <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">양안 종합 분석</p>
-          <div className="grid grid-cols-2 gap-2">
-            {[['우안 밀도', rightData.score], ['좌안 밀도', leftData.score],
-              ['피부 Zone', Math.round((rightData.skinZone+leftData.skinZone)/2)],
-              ['갑상선 Zone', Math.round((rightData.thyroidZone+leftData.thyroidZone)/2)]
-            ].map(([l, v]) => (
-              <div key={String(l)} className="rounded-lg p-2 text-center" style={{background:'rgba(255,255,255,.7)'}}>
-                <div className={cn('text-lg font-bold font-display', (v as number)>=70?'text-green-600':'text-amber-600')}>{v}</div>
-                <div className="text-[10px] text-slate-500">{l}</div>
-              </div>
-            ))}
-          </div>
+          {([['우안 (오른쪽 눈)', rightData], ['좌안 (왼쪽 눈)', leftData]] as const).map(([l, d]) => (
+            <div key={l} className="rounded-lg p-2 text-xs text-slate-600" style={{background:'rgba(255,255,255,.7)'}}>
+              <span className="font-semibold text-slate-700">{l}</span>{' '}
+              {d.isReal
+                ? <>병소 {d.lesions?.length ?? 0}개{(d.lesions ?? []).length > 0 && ` — ${(d.lesions ?? []).map(x => `${x.zoneName ?? ''} ${x.label.split(' (')[0]}`.trim()).join(', ')}`}
+                    {(d.globalFindings ?? []).length > 0 && ` · ${(d.globalFindings ?? []).map(g => g.label).join(', ')}`}</>
+                : '실제 분석 결과 없음'}
+            </div>
+          ))}
         </div>
       )}
 
