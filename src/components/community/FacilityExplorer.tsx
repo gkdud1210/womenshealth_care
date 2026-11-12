@@ -16,7 +16,7 @@ import {
   type Facility, type FacilityType,
 } from '@/data/facilityData'
 import { CATEGORY_GROUPS, CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
-import { ANY, flagOf, placeLabel, type PlaceRef } from '@/data/regionData'
+import { ANY, placeLabel, type PlaceRef } from '@/data/regionData'
 import { fetchOsmFacilities, osmDirectionsUrl, osmSupportsSport, type Bounds } from '@/lib/osm-facilities'
 import type { MapLocation } from '@/components/community/PlaceMap'
 import FacilityReviews, { RatingBadge, TopKeywords } from '@/components/community/FacilityReviews'
@@ -24,6 +24,22 @@ import {
   addReview, loadReviews, removeReview, saveReviews, type FacilityReview, type ReviewMap,
 } from '@/lib/facility-reviews'
 import { CollapsiblePicker, sportPickGroups } from '@/components/community/CollapsiblePicker'
+
+// ── 내 위치 ───────────────────────────────────────────────────────────────
+
+export interface LatLng { lat: number; lng: number }
+
+/** 두 지점 사이 직선거리 (km) */
+function kmBetween(a: LatLng, b: LatLng): number {
+  const rad = (d: number) => d * Math.PI / 180
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng)
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 12742 * Math.asin(Math.sqrt(h))
+}
+
+function formatAway(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)}m` : km < 10 ? `${km.toFixed(1)}km` : `${Math.round(km)}km`
+}
 
 const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
   ssr: false,
@@ -98,8 +114,11 @@ function PriceLine({ f, isMember, large = false }: { f: Facility; isMember: bool
 
 // ── 시설 카드 ──────────────────────────────────────────────────────────────
 
-export function FacilityCard({ f, isMember, reviews = [], onOpen }: {
-  f: Facility; isMember: boolean; reviews?: FacilityReview[]; onOpen: () => void
+export function FacilityCard({ f, isMember, reviews = [], awayKm, onOpen }: {
+  f: Facility; isMember: boolean; reviews?: FacilityReview[]
+  /** 내 위치에서 떨어진 거리 (위치를 알 때만) */
+  awayKm?: number
+  onOpen: () => void
 }) {
   const meta = FACILITY_TYPE_META[f.type]
   return (
@@ -124,6 +143,11 @@ export function FacilityCard({ f, isMember, reviews = [], onOpen }: {
           <span className="flex items-center gap-0.5 font-semibold text-slate-500">
             <MapPin className="w-3 h-3" />{placeLabel(f.place, { short: true })}
           </span>
+          {awayKm !== undefined && (
+            <span className="flex items-center gap-0.5 font-semibold text-rose-500">
+              <Navigation className="w-3 h-3" />내 위치에서 {formatAway(awayKm)}
+            </span>
+          )}
           <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{f.hours}</span>
           {f.distanceKm && <span className="flex items-center gap-0.5"><Footprints className="w-3 h-3" />{f.distanceKm}km</span>}
         </div>
@@ -163,7 +187,7 @@ function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteRev
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0" style={{ background: meta.bg }}>{meta.emoji}</div>
           <div className="flex-1 min-w-0">
             <p className="text-base font-bold text-slate-900">{f.name}</p>
-            <p className="text-[12px] text-slate-400 mt-0.5">{meta.label} · {flagOf(f.place.country)} {placeLabel(f.place, { withFlag: false })}</p>
+            <p className="text-[12px] text-slate-400 mt-0.5">{meta.label} · {placeLabel(f.place, { withFlag: false })}</p>
           </div>
           <button onClick={onClose} aria-label="닫기" className="p-1 -mr-1 rounded-full hover:bg-slate-100">
             <X className="w-5 h-5 text-slate-500" />
@@ -300,16 +324,21 @@ function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteRev
 
 // ── 시설 찾기 탭 ───────────────────────────────────────────────────────────
 
-export default function FacilityExplorer({ place, placeText, isMember, userId, userName, onPickPlace, onClearPlace, onShowGroups }: {
-  place: PlaceRef                 // 모임 찾기와 같은 지역 필터를 써요
+export default function FacilityExplorer({ place, placeText, homeCenter, isMember, userId, userName, onPickPlace, onBackHome, onShowGroups, onLocated }: {
+  place: PlaceRef                 // 모임 찾기와 같은 지역 필터 (처음엔 내 동네)를 써요
   placeText: string
+  /** 내 동네 중심 좌표 — 지도가 여기서 열려요 */
+  homeCenter: [number, number] | null
   isMember: boolean
   /** 리뷰 작성자 */
   userId: string
   userName: string
   onPickPlace: () => void
-  onClearPlace: () => void
+  /** 다른 지역을 보고 있을 때 내 동네로 돌아가기 */
+  onBackHome?: () => void
   onShowGroups: (c: MeetupCategory) => void
+  /** 내 위치를 알게 되면 불러요 — 지역 필터를 지금 있는 지역으로 맞출 때 써요 */
+  onLocated?: (here: LatLng) => void
 }) {
   const [type, setType] = useState<FacilityType | 'all'>('all')
   const [partnerOnly, setPartnerOnly] = useState(false)
@@ -320,6 +349,25 @@ export default function FacilityExplorer({ place, placeText, isMember, userId, u
   const [reviews, setReviews] = useState<ReviewMap>({})
 
   useEffect(() => { setReviews(loadReviews()) }, [])
+
+  // 내 위치 — 지금 있는 곳에서 가까운 시설을 먼저 보여줘요. 위치를 허용하지 않으면 예전 순서 그대로예요.
+  const [here, setHere] = useState<LatLng | null>(null)
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return
+    let alive = true
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        if (!alive) return
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+        setHere(p)
+        onLocated?.(p)
+      },
+      () => {},
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 10 * 60_000 },
+    )
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleAddReview = useCallback((facilityId: string, rating: number, text: string, images: string[], keywords: string[]) => {
     const next = addReview(reviews, {
@@ -344,9 +392,11 @@ export default function FacilityExplorer({ place, placeText, isMember, userId, u
     return FACILITIES
       .filter(f => !partnerOnly || !!f.ludia)
       .filter(f => !q || `${f.name} ${f.description} ${f.address} ${placeLabel(f.place)} ${FACILITY_TYPE_META[f.type].label}`.toLowerCase().includes(q))
-      // 제휴 할인 시설을 먼저
-      .sort((a, b) => Number(!!b.ludia) - Number(!!a.ludia))
-  }, [partnerOnly, query])
+      // 내 위치를 알면 가까운 곳부터, 모르면 제휴 할인 시설을 먼저
+      .sort((a, b) => here
+        ? kmBetween(here, a) - kmBetween(here, b)
+        : Number(!!b.ludia) - Number(!!a.ludia))
+  }, [partnerOnly, query, here])
 
   const list = useMemo(
     () => searched.filter(f => (type === 'all' || f.type === type) && matchesPlace(f, place)),
@@ -390,11 +440,11 @@ export default function FacilityExplorer({ place, placeText, isMember, userId, u
             style={placeIsSet ? { background: 'rgba(244,63,117,0.1)', color: '#e11d5a' } : { background: '#f1f5f9', color: '#475569' }}>
             <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
             <span className="truncate">{placeText}</span>
-            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+            <span className="ml-auto text-[11px] font-semibold opacity-60 flex-shrink-0">바꾸기</span>
           </button>
-          {placeIsSet && (
-            <button onClick={onClearPlace} className="px-2.5 py-2 rounded-2xl bg-slate-100 text-slate-500 flex-shrink-0">
-              <X className="w-3.5 h-3.5" />
+          {onBackHome && (
+            <button onClick={onBackHome} className="px-3 py-2 rounded-2xl text-[12.5px] font-bold bg-slate-100 text-slate-600 flex-shrink-0">
+              내 동네로
             </button>
           )}
           <button onClick={() => setPartnerOnly(v => !v)}
@@ -435,8 +485,9 @@ export default function FacilityExplorer({ place, placeText, isMember, userId, u
           </div>
         ) : (
           <>
-            <p className="text-[11.5px] text-slate-400 mb-2 px-1">{list.length}곳</p>
-            {list.map(f => <FacilityCard key={f.id} f={f} isMember={isMember} reviews={reviews[f.id]} onOpen={() => setOpenId(f.id)} />)}
+            <p className="text-[11.5px] text-slate-400 mb-2 px-1">{list.length}곳{here && ' · 내 위치에서 가까운 순'}</p>
+            {list.map(f => <FacilityCard key={f.id} f={f} isMember={isMember} reviews={reviews[f.id]}
+              awayKm={here ? kmBetween(here, f) : undefined} onOpen={() => setOpenId(f.id)} />)}
           </>
         )}
       </div>
@@ -452,6 +503,7 @@ export default function FacilityExplorer({ place, placeText, isMember, userId, u
           hint="핀을 누르면 이용료·할인 정보를 볼 수 있어요"
           emptyText={mapSport === 'all' ? '조건에 맞는 등록 시설이 없어요' : `등록된 ${CATEGORY_META[mapSport].label} 시설이 아직 없어요`}
           osm={osm}
+          focus={homeCenter}
           onClose={() => setShowMap(false)}
           renderItem={f => <FacilityCard f={f} isMember={isMember} reviews={reviews[f.id]} onOpen={() => setOpenId(f.id)} />}
         />
