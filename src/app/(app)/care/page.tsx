@@ -10,9 +10,11 @@ import { CARE_BODY_PARTS } from '@/data/careBodyParts'
 import { CATEGORY_META } from '@/data/meetupData'
 import { recommendedMeetupCategories } from '@/lib/care-recommend'
 import {
-  useFeed, AlbumGrid, PostCard, WriteModal, albumSectionsByPeriod, loadView, saveView,
-  type FeedView, type SnsPost,
+  useFeed, AlbumGrid, PostCard, WriteModal, albumSectionsByPeriod, loadView, saveView, takeReviewDraft,
+  type FeedView, type SnsPost, type ReviewDraft,
 } from '@/components/feed/LudiaFeed'
+
+type FeedTab = 'feed' | 'review'
 
 const ALL_GRADIENT = 'linear-gradient(135deg,#f43f75,#a855f7)'
 const ONLY_MINE_KEY = 'ludia_feed_only_mine_v1'
@@ -132,6 +134,9 @@ export default function CarePage() {
   // 펼친 목록에 내가 고른 케어카드만 보여줄지 (기기에 기억해요)
   const [onlyMine, setOnlyMine] = useState(true)
   const [query, setQuery] = useState('')
+  // 피드 탭: 건강상식(전문가 글·레시피·운동) | 후기 자랑
+  const [tab, setTab] = useState<FeedTab>('feed')
+  const [draft, setDraft] = useState<ReviewDraft | null>(null)
   const feed = useFeed()
   const myCare = useMemo(() => user?.careTypes ?? [], [user])
 
@@ -146,10 +151,20 @@ export default function CarePage() {
     try { setOnlyMine(localStorage.getItem(ONLY_MINE_KEY) !== '0') } catch {}
     setView(loadView('list'))
     const sync = () => {
-      const id = new URLSearchParams(window.location.search).get('id')
+      const params = new URLSearchParams(window.location.search)
+      const id = params.get('id')
       setOpenId(isCareId(id) ? id : null)
+      setTab(params.get('tab') === 'review' ? 'review' : 'feed')
     }
     sync()
+    // 진단 리포트에서 '자랑하기'로 넘어오면 후기 초안으로 글쓰기를 바로 열어요
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('write') === 'review') {
+      setDraft(takeReviewDraft())
+      setShowWrite(true)
+      params.delete('write')
+      window.history.replaceState(null, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`)
+    }
     window.addEventListener('popstate', sync)
     return () => window.removeEventListener('popstate', sync)
   }, [])
@@ -158,9 +173,21 @@ export default function CarePage() {
     setPickerOpen(false)
     if (id === openId) return
     setOpenId(id)
-    const url = id ? `${window.location.pathname}?id=${id}` : window.location.pathname
-    window.history.pushState(null, '', url)
+    pushUrl(id, tab)
     window.scrollTo(0, 0)
+  }
+
+  function pushUrl(id: CareCaseId | null, t: FeedTab) {
+    const params = new URLSearchParams()
+    if (id) params.set('id', id)
+    if (t === 'review') params.set('tab', 'review')
+    window.history.pushState(null, '', `${window.location.pathname}${params.toString() ? `?${params}` : ''}`)
+  }
+
+  function changeTab(t: FeedTab) {
+    if (t === tab) return
+    setTab(t)
+    pushUrl(openId, t)
   }
 
   function changeView(v: FeedView) { setView(v); saveView(v) }
@@ -174,21 +201,23 @@ export default function CarePage() {
   const words = useMemo(() => query.trim().toLowerCase().split(/\s+/).filter(Boolean), [query])
   const posts: SnsPost[] = useMemo(() => feed.posts
     .filter(p => !care || p.tags.includes(care.id))
+    .filter(p => (p.type === 'review') === (tab === 'review'))
     .filter(p => {
       if (words.length === 0) return true
       const hay = [p.title, p.content, p.authorName, p.sport ?? '', p.type === 'exercise' ? '운동 자세' : '',
+        p.review?.routine ?? '', p.review?.exercise ?? '', p.review?.diet ?? '',
         ...p.tags.map(t => CARE_CASES.find(c => c.id === t)?.label ?? '')].join(' ').toLowerCase()
       return words.every(w => hay.includes(w))
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-  [feed.posts, care, words])
+  [feed.posts, care, words, tab])
   const openPost = feed.posts.find(p => p.id === openPostId) ?? null
   const gradient = care?.gradient ?? ALL_GRADIENT
 
   const postCard = (p: SnsPost, onDelete?: () => void) => (
     <PostCard key={p.id} post={p}
       liked={feed.liked.has(p.id)} saved={feed.saved.has(p.id)}
-      currentUserId={feed.user?.userId}
+      currentUserId={feed.myId}
       currentUserName={feed.authorName} currentUserEmoji={feed.authorEmoji}
       onLike={feed.handleLike} onSave={feed.handleSave}
       onDelete={id => { feed.handleDelete(id); onDelete?.() }} onAddComment={feed.handleAddComment}
@@ -198,12 +227,13 @@ export default function CarePage() {
   return (
     <div className="min-h-screen pb-24" style={{ background: '#fafafa' }}>
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
-        <div className="px-4 pt-3 pb-2 max-w-lg mx-auto">
+        {/* 화면 이름은 아래 탭에 이미 있어서 핸드폰에서는 숨겨요 (화면 읽기용으로는 남겨둬요) */}
+        <div className="sr-only lg:not-sr-only lg:block px-4 pt-3 pb-2 max-w-lg mx-auto">
           <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아피드</h1>
         </div>
 
         {/* 케어카드 고르기(접힘) + 검색 */}
-        <div className="max-w-lg mx-auto flex items-center gap-2 px-4 pb-3">
+        <div className="max-w-lg mx-auto flex items-center gap-2 px-4 pt-3 lg:pt-0 pb-3">
           <button onClick={() => setPickerOpen(v => !v)} aria-expanded={pickerOpen}
             className="h-9 pl-3 pr-2.5 rounded-full flex items-center gap-1 text-[12.5px] font-bold flex-shrink-0 transition-colors"
             style={care
@@ -286,9 +316,35 @@ export default function CarePage() {
 
       {/* 피드 */}
       <div className={cn('max-w-lg mx-auto', care && 'mt-4 bg-white border-t border-slate-100')}>
+        <div role="tablist" className="flex gap-1 mx-4 mt-3 p-1 rounded-2xl bg-slate-100">
+          {([['feed', '📚 건강상식'], ['review', '🏆 후기 자랑']] as const).map(([t, label]) => (
+            <button key={t} role="tab" aria-selected={tab === t} onClick={() => changeTab(t)}
+              className="flex-1 py-2 rounded-xl text-[13px] font-bold transition-all"
+              style={tab === t ? { background: '#fff', color: '#0f172a', boxShadow: '0 1px 3px rgba(15,23,42,0.08)' } : { color: '#94a3b8' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+        {feed.server === 'error' && (
+          <div className="mx-4 mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 text-[11.5px] text-amber-700">
+            <span className="flex-1">피드 서버에 연결하지 못해서 이 기기에 저장된 글만 보여줘요.</span>
+            <button onClick={feed.refresh} className="font-bold flex-shrink-0">다시 시도</button>
+          </div>
+        )}
+        {tab === 'feed' && !feed.canWriteKnowledge && (
+          <p className="mx-4 mt-2 text-[11.5px] text-slate-400 leading-snug">
+            건강상식은 인증된 전문가가 올려요. 궁금한 점은 글에 <b className="text-indigo-500">❓ 질문</b> 댓글로 물어보세요.{' '}
+            <Link href="/settings#expert" className="font-bold text-rose-500 whitespace-nowrap">전문가 인증 →</Link>
+          </p>
+        )}
+        {tab === 'review' && (
+          <p className="mx-4 mt-2 text-[11.5px] text-slate-400 leading-snug">
+            관리하면서 좋아진 몸 변화와 내가 한 루틴·운동·식단을 나눠요. 진단 리포트의 &lsquo;자랑하기&rsquo;로 변화 기록을 바로 붙일 수 있어요.
+          </p>
+        )}
         <div className="flex items-center gap-2 px-4 pt-4 pb-1">
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-bold text-slate-900">{care ? `${care.label} 피드` : '전체 피드'}</p>
+            <p className="text-[15px] font-bold text-slate-900">{tab === 'review' ? (care ? `${care.label} 후기` : '전체 후기') : care ? `${care.label} 피드` : '전체 피드'}</p>
             <p className="text-[11.5px] text-slate-400">{words.length ? `'${query.trim()}' 검색 결과 ${posts.length}개` : `게시물 ${posts.length}개`}</p>
           </div>
           <div className="flex rounded-full bg-slate-100 p-0.5 flex-shrink-0">
@@ -299,22 +355,24 @@ export default function CarePage() {
               </button>
             ))}
           </div>
-          <button onClick={() => setShowWrite(true)}
+          {(tab === 'review' || feed.canWriteKnowledge) && <button onClick={() => setShowWrite(true)}
             className="flex items-center gap-1 px-3 py-1.5 rounded-full text-[12px] font-bold text-white flex-shrink-0"
             style={{ background: gradient }}>
-            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> 글쓰기
-          </button>
+            <Plus className="w-3.5 h-3.5" strokeWidth={2.5} /> {tab === 'review' ? '자랑하기' : '글쓰기'}
+          </button>}
         </div>
 
         {posts.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-3xl mb-2">{words.length ? '🔍' : '📷'}</p>
             <p className="text-[13px] text-slate-400">
-              {words.length ? '검색어에 맞는 글이 없어요' : care ? '아직 이 케어카드에 올라온 글이 없어요' : '아직 올라온 글이 없어요'}
+              {words.length ? '검색어에 맞는 글이 없어요'
+                : tab === 'review' ? (care ? '아직 이 케어카드에 올라온 후기가 없어요' : '아직 올라온 후기가 없어요')
+                : care ? '아직 이 케어카드에 올라온 글이 없어요' : '아직 올라온 글이 없어요'}
             </p>
             {words.length
               ? <button onClick={() => setQuery('')} className="mt-2 text-xs font-bold text-rose-500">검색어 지우기</button>
-              : <button onClick={() => setShowWrite(true)} className="mt-2 text-xs font-bold text-rose-500">첫 글 남기기</button>}
+              : (tab === 'review' || feed.canWriteKnowledge) && <button onClick={() => setShowWrite(true)} className="mt-2 text-xs font-bold text-rose-500">{tab === 'review' ? '첫 후기 자랑하기' : '첫 글 남기기'}</button>}
           </div>
         ) : view === 'album' ? (
           <AlbumGrid sections={albumSectionsByPeriod(posts)} onOpen={setOpenPostId} />
@@ -337,10 +395,27 @@ export default function CarePage() {
         </div>
       )}
 
+      {feed.notice && (
+        <div className="fixed inset-x-0 bottom-24 z-[70] flex justify-center px-4" role="status">
+          <div className="max-w-sm w-full flex items-start gap-2 px-4 py-3 rounded-2xl bg-slate-900 text-white text-[12.5px] shadow-xl">
+            <span className="flex-1 leading-snug">{feed.notice}</span>
+            <button onClick={feed.clearNotice} aria-label="닫기"><X className="w-4 h-4 opacity-70" /></button>
+          </div>
+        </div>
+      )}
+
       {showWrite && (
         <WriteModal authorName={feed.authorName} authorEmoji={feed.authorEmoji} defaultTags={care ? [care.id] : []}
-          onClose={() => setShowWrite(false)}
-          onSubmit={draft => { feed.handleSubmit(draft); setShowWrite(false) }} />
+          defaultType={tab === 'review' ? 'review' : 'tip'} draft={draft}
+          allowedTypes={feed.canWriteKnowledge ? undefined : ['review']}
+          onClose={() => { setShowWrite(false); setDraft(null) }}
+          onSubmit={async post => {
+            if (!(await feed.handleSubmit(post))) return
+            setShowWrite(false)
+            setDraft(null)
+            const t: FeedTab = post.type === 'review' ? 'review' : 'feed'
+            if (t !== tab) { setTab(t); pushUrl(openId, t) }
+          }} />
       )}
     </div>
   )

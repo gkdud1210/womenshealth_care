@@ -1,6 +1,13 @@
 # LUDIA AI 서비스 — Cloudflare Workers (무료 플랜)
 # 배포:  cd deploy/cloudflare-ai && npx wrangler deploy
 # 키 등록: npx wrangler secret put GEMINI_API_KEY   (앱 코드·저장소에는 절대 넣지 않는다)
+#
+# 루디아피드 서버 (글·댓글·좋아요·전문가 계정) — 처음 한 번만:
+#   npx wrangler d1 create ludia-feed                 → 나온 database_id 를 아래에 넣기
+#   npx wrangler kv namespace create FEED_IMAGES      → 나온 id 를 아래에 넣기
+#   npx wrangler d1 migrations apply ludia-feed --remote
+# 전문가 인증 코드 발급: ./new-expert-code.sh "가정의학과 전문의"
+# 로컬 테스트: npx wrangler dev   (로그인 없이 로컬 D1·KV 로 돌아가요. 먼저 migrations apply ludia-feed --local)
 name = "ludia-ai"
 main = "src/index.ts"
 compatibility_date = "2026-09-01"
@@ -9,3 +16,13 @@ compatibility_date = "2026-09-01"
 GEMINI_MODEL = "gemini-flash-lite-latest"
 ALLOWED_ORIGINS = "https://gkdud1210.github.io,http://localhost:3000"
 RATE_LIMIT_PER_10MIN = "40"
+
+[[d1_databases]]
+binding = "FEED_DB"
+database_name = "ludia-feed"
+database_id = "00000000-0000-0000-0000-000000000000"   # wrangler d1 create 후 바꾸기
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "FEED_IMAGES"
+id = "00000000000000000000000000000000"                # wrangler kv namespace create 후 바꾸기

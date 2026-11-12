@@ -10,9 +10,12 @@
  *   POST /chat              — 루디아에게 물어보기 (JSON: message, history, context)
  *   POST /vision-nutrition  — 루디아 호출 끼니 사진 분석 (form: file, mealType, careLabels, targetLo, targetHi)
  *   POST /feed-nutrition    — 루디아피드 게시물 사진 분석 (form: file×최대 4, caption)
+ *   /feed/*                 — 루디아피드 글·댓글·좋아요·전문가 계정 (src/feed.ts)
  */
 
-interface Env {
+import { handleFeed, FeedError, type FeedEnv } from './feed'
+
+interface Env extends FeedEnv {
   GEMINI_API_KEY: string
   GEMINI_MODEL: string
   ALLOWED_ORIGINS: string
@@ -35,8 +38,8 @@ function corsHeaders(req: Request, env: Env): Record<string, string> {
   if (!allowed.includes(origin)) return {}
   return {
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, X-Ludia-Author, X-Ludia-Key',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   }
@@ -289,6 +292,20 @@ export default {
     }
     if (req.method === 'GET' && path === '/health') {
       return json({ status: 'ok', model: env.GEMINI_MODEL, hasKey: !!env.GEMINI_API_KEY })
+    }
+
+    // 루디아피드 — 읽기는 자유롭게, 쓰기는 요청 제한을 걸어요
+    if (path === '/feed' || path.startsWith('/feed/')) {
+      if (req.method !== 'GET' && rateLimited(req, env)) return json({ error: 'rate_limited' }, 429)
+      try {
+        const out = await handleFeed(req, env, path)
+        if (out instanceof Response) return out
+        return json(out)
+      } catch (err) {
+        if (err instanceof FeedError || err instanceof HttpError) return json({ error: err.code }, err.status)
+        console.error(`[${path}]`, err)
+        return json({ error: 'feed_failed' }, 500)
+      }
     }
 
     const route = ROUTES[path]

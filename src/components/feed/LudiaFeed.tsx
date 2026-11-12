@@ -9,16 +9,44 @@ import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
 import { analyzeFeedPost, DAILY_REFERENCE, type FeedNutrition } from '@/lib/feed-nutrition'
+import { feedServer, feedServerBase, feedErrorText, feedIdentity } from '@/lib/feed-server'
 import MineralBars from '@/components/nutrition/MineralBars'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface SnsComment {
   id: string
+  authorId?: string
   authorName: string
   authorEmoji: string
+  authorVerified?: boolean
+  /** 전문가 직함 (예: 가정의학과 전문의) */
+  authorTitle?: string
   text: string
   createdAt: string
+  /** 궁금한 점을 묻는 질문 댓글 — 글쓴이(전문가)의 답글이 달리면 '답변 완료'로 보여요 */
+  question?: boolean
+  /** 답글 (한 단계까지만) */
+  replies?: SnsComment[]
+}
+
+/** 후기 글의 몸 변화 한 줄 — 진단 리포트에서 가져오거나 직접 써요 */
+export interface ReviewChange {
+  label: string
+  from: number
+  to: number
+  unit: string
+  /** 좋아진 변화인지 */
+  good: boolean
+}
+
+/** 후기 자랑 — 관리 기간·몸 변화·내가 한 루틴/운동/식단 */
+export interface ReviewInfo {
+  period?: string
+  changes: ReviewChange[]
+  routine?: string
+  exercise?: string
+  diet?: string
 }
 
 export interface SnsPost {
@@ -27,6 +55,10 @@ export interface SnsPost {
   authorName: string
   authorEmoji: string
   authorVerified?: boolean
+  /** 전문가 직함 (예: 가정의학과 전문의) */
+  authorTitle?: string
+  /** 서버에 올라가지 않고 이 기기에만 저장된 글 */
+  localOnly?: boolean
   createdAt: string
   type: PostType
   title: string
@@ -44,15 +76,39 @@ export interface SnsPost {
   video?: string
   /** 운동 글의 종목 (예: 수영, 테니스) */
   sport?: string
+  /** 후기 자랑 글의 몸 변화·루틴 */
+  review?: ReviewInfo
 }
 
-export type PostType = 'recipe' | 'tip' | 'exercise'
+export type PostType = 'recipe' | 'tip' | 'exercise' | 'review'
 
 export const POST_TYPE_META: Record<PostType, { label: string; emoji: string; bg: string; color: string; border: string; soft: string }> = {
   recipe:   { label: '레시피',   emoji: '🍳', bg: 'rgba(234,179,8,0.15)',  color: '#a16207', border: '#ca8a04', soft: '#fefce8' },
   tip:      { label: '팁',       emoji: '💡', bg: 'rgba(59,130,246,0.12)', color: '#1d4ed8', border: '#2563eb', soft: '#eff6ff' },
   exercise: { label: '운동·자세', emoji: '🏃‍♀️', bg: 'rgba(16,185,129,0.14)', color: '#047857', border: '#059669', soft: '#ecfdf5' },
+  review:   { label: '후기',     emoji: '🏆', bg: 'rgba(244,63,117,0.12)', color: '#be185d', border: '#e11d5a', soft: '#fff1f5' },
 }
+
+// ── 후기 자랑 초안 (진단 리포트 → 루디아피드 후기 탭) ───────────────────────
+
+const BRAG_DRAFT_KEY = 'ludia_feed_brag_draft_v1'
+
+export interface ReviewDraft { content: string; review: ReviewInfo; tags: string[] }
+
+/** 리포트에서 '자랑하기'를 누르면 초안을 남겨두고 피드로 넘어가요 */
+export function saveReviewDraft(d: ReviewDraft) {
+  try { localStorage.setItem(BRAG_DRAFT_KEY, JSON.stringify(d)) } catch {}
+}
+/** 남겨둔 초안을 한 번만 꺼내요 */
+export function takeReviewDraft(): ReviewDraft | null {
+  try {
+    const s = localStorage.getItem(BRAG_DRAFT_KEY)
+    localStorage.removeItem(BRAG_DRAFT_KEY)
+    return s ? JSON.parse(s) as ReviewDraft : null
+  } catch { return null }
+}
+
+function fmtNum(v: number) { return String(Math.round(v * 10) / 10) }
 
 /** 유튜브 주소면 embed 주소로, 영상 파일이면 그대로 — 알 수 없는 주소는 null */
 export function parseVideo(url: string): { kind: 'youtube'; src: string } | { kind: 'file'; src: string } | null {
@@ -507,7 +563,7 @@ export function PostCard({
   onLike: (id: string) => void
   onSave: (id: string) => void
   onDelete: (id: string) => void
-  onAddComment: (postId: string, text: string) => void
+  onAddComment: (postId: string, text: string, opts?: { question?: boolean; replyTo?: string }) => void
   analyzing: boolean
   onAnalyze: (id: string) => void
 }) {
@@ -515,6 +571,9 @@ export function PostCard({
   const [showNutrition, setShowNutrition] = useState(false)
   const [showComments, setShowComments] = useState(false)
   const [commentText, setCommentText] = useState('')
+  const [asQuestion, setAsQuestion]   = useState(false)
+  const [replyTo, setReplyTo]         = useState<SnsComment | null>(null)
+  const commentRef = useRef<HTMLInputElement>(null)
   const [showMenu, setShowMenu]       = useState(false)
   const [imgIdx, setImgIdx]           = useState(0)
   const touchX = useRef<number | null>(null)
@@ -539,9 +598,23 @@ export function PostCard({
   function submitComment() {
     const t = commentText.trim()
     if (!t) return
-    onAddComment(post.id, t)
+    onAddComment(post.id, t, replyTo ? { replyTo: replyTo.id } : { question: asQuestion })
     setCommentText('')
+    setAsQuestion(false)
+    setReplyTo(null)
+    setShowComments(true)
   }
+
+  function startReply(c: SnsComment) {
+    setReplyTo(c)
+    setShowComments(true)
+    setTimeout(() => commentRef.current?.focus(), 0)
+  }
+
+  const commentCount = post.comments.reduce((n, c) => n + 1 + (c.replies?.length ?? 0), 0)
+  const questionCount = post.comments.filter(c => c.question).length
+  // 글쓴이가 답글을 단 질문은 '답변 완료'
+  const answered = (c: SnsComment) => !!c.replies?.some(r => r.authorId === post.authorId || (post.authorVerified && r.authorVerified))
 
   return (
     <article className="bg-white rounded-xl shadow-sm mb-2 overflow-hidden">
@@ -567,9 +640,13 @@ export function PostCard({
             </span>
           </div>
           <div className="flex items-center gap-1.5 mt-0.5">
+            {post.authorTitle && <span className="text-[11px] font-semibold text-rose-500">{post.authorTitle}</span>}
+            {post.authorTitle && <span className="text-slate-300">·</span>}
             <span className="text-[11px] text-slate-400">{timeAgo(post.createdAt)}</span>
             <span className="text-slate-300">·</span>
-            <span className="text-[11px]">🌐</span>
+            {post.localOnly
+              ? <span className="text-[10.5px] text-slate-400">📱 이 기기에만</span>
+              : <span className="text-[11px]">🌐</span>}
             {post.tags.map(t => {
               const meta = careMeta(t)
               return (
@@ -614,6 +691,9 @@ export function PostCard({
           <button onClick={() => setExpanded(true)} className="text-[13px] font-semibold text-slate-500 mt-1">더 보기</button>
         )}
       </div>
+
+      {/* ── 후기: 몸 변화 · 내가 한 루틴 ── */}
+      {post.review && <ReviewPanel review={post.review} />}
 
       {/* ── 자세·영법 영상 ── */}
       {video && (
@@ -675,8 +755,8 @@ export function PostCard({
                 </div>
               )}
 
-              {/* 칼로리 분석 칩 — 결과가 있으면 kcal 배지, 없으면 분석 버튼 */}
-              <button
+              {/* 칼로리 분석 칩 — 결과가 있으면 kcal 배지, 없으면 분석 버튼 (후기 사진은 빼요) */}
+              {post.type !== 'review' && <button
                 onClick={() => nutrition ? setShowNutrition(v => !v) : onAnalyze(post.id)}
                 disabled={analyzing}
                 className="absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-white shadow-md transition-all active:scale-95"
@@ -693,7 +773,7 @@ export function PostCard({
                 ) : (
                   <><Sparkles className="w-3 h-3" /> 칼로리 분석</>
                 )}
-              </button>
+              </button>}
             </>
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2">
@@ -721,10 +801,11 @@ export function PostCard({
           </div>
           <span className="text-[13px] text-slate-500">{post.likes.toLocaleString()}명</span>
         </div>
-        {post.comments.length > 0 && (
+        {commentCount > 0 && (
           <button onClick={() => setShowComments(v => !v)}
             className="text-[13px] text-slate-500 hover:underline">
-            댓글 {post.comments.length}개
+            {questionCount > 0 && <span className="font-semibold text-indigo-500">질문 {questionCount} · </span>}
+            댓글 {commentCount}개
           </button>
         )}
       </div>
@@ -750,48 +831,149 @@ export function PostCard({
         </button>
       </div>
 
-      {/* ── Comments ── */}
+      {/* ── Comments (질문 · 답글) ── */}
       {showComments && post.comments.length > 0 && (
         <div className="px-4 pt-2 pb-1 space-y-3">
           {post.comments.map(c => (
-            <div key={c.id} className="flex gap-2.5">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
-                style={{ background: 'rgba(244,63,117,0.1)' }}>
-                {c.authorEmoji}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="inline-block px-3 py-2 rounded-2xl rounded-tl-sm"
-                  style={{ background: '#f0f2f5' }}>
-                  <p className="text-[12px] font-bold text-slate-900">{c.authorName}</p>
-                  <p className="text-[13px] text-slate-700 leading-relaxed">{c.text}</p>
+            <div key={c.id}>
+              <CommentBubble c={c} isPostAuthor={!!c.authorId && c.authorId === post.authorId}
+                answered={c.question ? answered(c) : undefined} onReply={() => startReply(c)} />
+              {c.replies && c.replies.length > 0 && (
+                <div className="ml-10 mt-2 space-y-2">
+                  {c.replies.map(r => (
+                    <CommentBubble key={r.id} c={r} small
+                      isPostAuthor={!!r.authorId && r.authorId === post.authorId} onReply={() => startReply(c)} />
+                  ))}
                 </div>
-                <p className="text-[10px] text-slate-400 mt-0.5 px-1">{timeAgo(c.createdAt)}</p>
-              </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
       {/* ── Comment input ── */}
-      <div className="flex items-center gap-2.5 px-4 py-3">
-        <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
-          style={{ background: 'rgba(244,63,117,0.1)' }}>
-          {currentUserEmoji}
-        </div>
-        <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-full"
-          style={{ background: '#f0f2f5' }}>
-          <input value={commentText} onChange={e => setCommentText(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitComment() } }}
-            placeholder="댓글 달기..."
-            className="flex-1 text-[13px] bg-transparent outline-none placeholder-slate-400 text-slate-800" />
-          {commentText.trim() && (
-            <button onClick={submitComment}>
-              <Send className="w-4 h-4 text-rose-400" />
-            </button>
-          )}
+      <div className="px-4 py-3">
+        {replyTo ? (
+          <div className="flex items-center gap-1.5 mb-2 text-[11.5px] text-slate-500">
+            <span><b className="text-slate-700">{replyTo.authorName}</b>님에게 답글 다는 중</span>
+            <button onClick={() => setReplyTo(null)} className="font-bold text-slate-400 hover:text-slate-600">취소</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 mb-2">
+            {([[false, '💬 댓글'], [true, '❓ 질문하기']] as const).map(([q, label]) => (
+              <button key={label} onClick={() => setAsQuestion(q)} aria-pressed={asQuestion === q}
+                className="px-2.5 py-1 rounded-full text-[11.5px] font-bold transition-colors"
+                style={asQuestion === q
+                  ? q ? { background: 'rgba(99,102,241,0.12)', color: '#4f46e5' } : { background: '#1e293b', color: '#fff' }
+                  : { background: '#f1f5f9', color: '#94a3b8' }}>
+                {label}
+              </button>
+            ))}
+            {asQuestion && <span className="text-[10.5px] text-slate-400">글쓴이가 답해줄 수 있게 질문으로 표시돼요</span>}
+          </div>
+        )}
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm flex-shrink-0"
+            style={{ background: 'rgba(244,63,117,0.1)' }}>
+            {currentUserEmoji}
+          </div>
+          <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-full"
+            style={{ background: asQuestion && !replyTo ? 'rgba(99,102,241,0.08)' : '#f0f2f5' }}>
+            <input ref={commentRef} value={commentText} onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submitComment() } }}
+              placeholder={replyTo ? '답글 달기...' : asQuestion ? '궁금한 점을 물어보세요...' : '댓글 달기...'}
+              maxLength={500}
+              className="flex-1 text-[13px] bg-transparent outline-none placeholder-slate-400 text-slate-800" />
+            {commentText.trim() && (
+              <button onClick={submitComment} aria-label="보내기">
+                <Send className="w-4 h-4 text-rose-400" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </article>
+  )
+}
+
+// ── 댓글 말풍선 ──────────────────────────────────────────────────────────────
+
+function CommentBubble({ c, isPostAuthor, answered, small, onReply }: {
+  c: SnsComment
+  isPostAuthor: boolean
+  /** 질문 댓글이면 답변이 달렸는지 */
+  answered?: boolean
+  small?: boolean
+  onReply: () => void
+}) {
+  return (
+    <div className="flex gap-2.5">
+      <div className={cn('rounded-full flex items-center justify-center flex-shrink-0', small ? 'w-7 h-7 text-xs' : 'w-8 h-8 text-sm')}
+        style={{ background: c.authorVerified ? 'linear-gradient(135deg,#f43f75,#a855f7)' : 'rgba(244,63,117,0.1)' }}>
+        {c.authorVerified ? <span className="text-white text-[11px] font-black">L</span> : c.authorEmoji}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="inline-block max-w-full px-3 py-2 rounded-2xl rounded-tl-sm"
+          style={{ background: c.question ? 'rgba(99,102,241,0.08)' : '#f0f2f5' }}>
+          <div className="flex items-center gap-1 flex-wrap">
+            <p className="text-[12px] font-bold text-slate-900">{c.authorName}</p>
+            {c.authorVerified && <span className="text-[9.5px] font-bold px-1.5 py-px rounded-full text-white" style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>{c.authorTitle ?? '전문가'}</span>}
+            {isPostAuthor && !c.authorVerified && <span className="text-[9.5px] font-bold px-1.5 py-px rounded-full bg-slate-200 text-slate-600">글쓴이</span>}
+            {c.question && <span className="text-[9.5px] font-bold px-1.5 py-px rounded-full" style={{ background: 'rgba(99,102,241,0.15)', color: '#4f46e5' }}>❓ 질문</span>}
+            {c.question && answered && <span className="text-[9.5px] font-bold px-1.5 py-px rounded-full bg-emerald-50 text-emerald-600">답변 완료</span>}
+          </div>
+          <p className="text-[13px] text-slate-700 leading-relaxed whitespace-pre-line break-words">{c.text}</p>
+        </div>
+        <div className="flex items-center gap-2.5 mt-0.5 px-1">
+          <p className="text-[10px] text-slate-400">{timeAgo(c.createdAt)}</p>
+          <button onClick={onReply} className="text-[10.5px] font-bold text-slate-500 hover:text-slate-700">
+            {c.question && !small ? '답변하기' : '답글'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 후기: 몸 변화 · 루틴 ─────────────────────────────────────────────────────
+
+function ReviewPanel({ review }: { review: ReviewInfo }) {
+  const sections = ([
+    ['🗓️', '루틴', review.routine],
+    ['🏃‍♀️', '운동', review.exercise],
+    ['🥗', '식단', review.diet],
+  ] as const).filter(([, , v]) => v && v.trim())
+  if (review.changes.length === 0 && sections.length === 0 && !review.period) return null
+  return (
+    <div className="mx-4 mb-3 rounded-2xl p-3.5 space-y-3"
+      style={{ background: 'linear-gradient(135deg,#fff1f5,#f5f0ff)', border: '1px solid rgba(244,63,117,0.12)' }}>
+      {(review.changes.length > 0 || review.period) && (
+        <div>
+          <p className="text-[12px] font-bold text-rose-600 mb-1.5">
+            🏆 이렇게 좋아졌어요{review.period && <span className="font-semibold text-slate-400"> · {review.period}</span>}
+          </p>
+          {review.changes.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5">
+              {review.changes.map(ch => (
+                <div key={ch.label} className="bg-white rounded-xl px-2.5 py-2">
+                  <p className="text-[10.5px] text-slate-400">{ch.label}</p>
+                  <p className="text-[13px] font-bold text-slate-800">
+                    {fmtNum(ch.from)} → <span style={{ color: ch.good ? '#059669' : '#e11d48' }}>{fmtNum(ch.to)}</span>
+                    <span className="text-[10.5px] font-semibold text-slate-400"> {ch.unit}</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {sections.map(([emoji, label, v]) => (
+        <div key={label}>
+          <p className="text-[12px] font-bold text-slate-700 mb-0.5">{emoji} 내가 한 {label}</p>
+          <p className="text-[12.5px] text-slate-600 leading-relaxed whitespace-pre-line">{v}</p>
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -909,26 +1091,43 @@ function NutritionPanel({ nutrition, reanalyzing, onReanalyze, onClose }: {
 
 // ── Write modal ────────────────────────────────────────────────────────────
 
+const ALL_WRITE_TYPES: PostType[] = ['tip', 'recipe', 'exercise', 'review']
+
 export function WriteModal({
-  authorName, authorEmoji, defaultTags = [],
+  authorName, authorEmoji, defaultTags = [], defaultType = 'tip', draft, allowedTypes = ALL_WRITE_TYPES,
   onClose, onSubmit,
 }: {
   authorName: string; authorEmoji: string
   defaultTags?: string[]
+  defaultType?: PostType
+  /** 고를 수 있는 글 종류 — 전문가가 아니면 후기만 */
+  allowedTypes?: PostType[]
+  /** 리포트 '자랑하기'에서 넘어온 후기 초안 */
+  draft?: ReviewDraft | null
   onClose: () => void
-  onSubmit: (post: Omit<SnsPost, 'id' | 'createdAt' | 'likes' | 'comments'>) => void
+  onSubmit: (post: Omit<SnsPost, 'id' | 'createdAt' | 'likes' | 'comments'>) => void | Promise<void>
 }) {
   const [images,    setImages]    = useState<string[]>([])
-  const [content,   setContent]   = useState('')
-  const [type,      setType]      = useState<PostType>('recipe')
+  const [sending,   setSending]   = useState(false)
+  const [content,   setContent]   = useState(draft?.content ?? '')
+  const [type,      setType]      = useState<PostType>(() => {
+    const want = draft ? 'review' : defaultType
+    return allowedTypes.includes(want) ? want : allowedTypes[0]
+  })
+  const [changes,   setChanges]   = useState<ReviewChange[]>(draft?.review.changes ?? [])
+  const [period,    setPeriod]    = useState(draft?.review.period ?? '')
+  const [routine,   setRoutine]   = useState(draft?.review.routine ?? '')
+  const [exercise,  setExercise]  = useState(draft?.review.exercise ?? '')
+  const [diet,      setDiet]      = useState(draft?.review.diet ?? '')
   const [videoUrl,  setVideoUrl]  = useState('')
   const [sport,     setSport]     = useState('')
   const videoOk = videoUrl.trim() === '' || parseVideo(videoUrl) !== null
-  const [tags,      setTags]      = useState<string[]>(defaultTags)
+  const [tags,      setTags]      = useState<string[]>(draft?.tags.length ? draft.tags : defaultTags)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const MAX_IMAGES = 10
+  // 서버에 올릴 때는 한 글에 4장까지
+  const MAX_IMAGES = feedServerBase() ? 4 : 10
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(e.target.files ?? [])
@@ -949,19 +1148,28 @@ export function WriteModal({
     setImages(prev => prev.filter((_, i) => i !== idx))
   }
 
-  function submit() {
-    if (!content.trim() || !videoOk) return
+  async function submit() {
+    if (!content.trim() || !videoOk || sending) return
+    setSending(true)
     const firstLine = content.split('\n')[0].slice(0, 50)
-    onSubmit({
+    await onSubmit({
       authorId: 'me', authorName, authorEmoji,
       type, title: firstLine, content: content.trim(),
       images: images.length > 0 ? images : undefined,
       video: videoUrl.trim() || undefined,
       sport: type === 'exercise' && sport.trim() ? sport.trim().slice(0, 12) : undefined,
-      coverEmoji: type === 'recipe' ? '🍽️' : type === 'exercise' ? '🏃‍♀️' : '💡',
+      review: type === 'review' ? {
+        period: period.trim() || undefined,
+        changes,
+        routine: routine.trim() || undefined,
+        exercise: exercise.trim() || undefined,
+        diet: diet.trim() || undefined,
+      } : undefined,
+      coverEmoji: type === 'recipe' ? '🍽️' : type === 'exercise' ? '🏃‍♀️' : type === 'review' ? '🏆' : '💡',
       coverGradient: tags[0] ? CARE_BY_ID[tags[0]]?.gradient : 'linear-gradient(135deg,#fce7f3,#ede9fe)',
       tags,
     })
+    setSending(false)
   }
 
   return (
@@ -972,10 +1180,10 @@ export function WriteModal({
         <button onClick={onClose} className="p-1">
           <X className="w-6 h-6 text-slate-600" />
         </button>
-        <p className="text-base font-bold text-slate-800">새 게시물</p>
-        <button onClick={submit} disabled={!content.trim() || !videoOk}
+        <p className="text-base font-bold text-slate-800">{type === 'review' ? '후기 자랑하기' : '새 게시물'}</p>
+        <button onClick={submit} disabled={!content.trim() || !videoOk || sending}
           className="text-sm font-bold text-rose-500 disabled:text-slate-300">
-          공유
+          {sending ? '올리는 중…' : '공유'}
         </button>
       </div>
 
@@ -1036,29 +1244,72 @@ export function WriteModal({
           {/* Content */}
           <textarea value={content} onChange={e => setContent(e.target.value)}
             rows={7} maxLength={2000}
-            placeholder={"오늘 먹은 음식, 카페 메뉴, 레시피나 건강 팁을 공유해보세요...\n\n사진을 올리면 루디아가 칼로리와 영양성분을 자동으로 분석해 드려요 🔥"}
+            placeholder={type === 'review'
+              ? "어떻게 관리했고, 몸이 어떻게 달라졌는지 자랑해보세요 🏆\n\n사진 없이 글만 올려도 돼요"
+              : "건강 상식, 레시피, 운동 팁을 공유해보세요...\n\n사진 없이 글만 올려도 돼요. 음식 사진을 올리면 루디아가 칼로리와 영양성분을 분석해 드려요 🔥"}
             className="w-full text-sm text-slate-800 placeholder-slate-400 outline-none resize-none leading-relaxed" />
           <p className="text-[11px] text-slate-400 text-right">{content.length} / 2000</p>
 
           {/* Post type */}
           <div>
             <p className="text-xs font-bold text-slate-500 mb-2">종류</p>
-            <div className="flex gap-2">
-              {(['recipe', 'tip', 'exercise'] as const).map(t => {
+            <div className="grid grid-cols-4 gap-1.5">
+              {allowedTypes.map(t => {
                 const m = POST_TYPE_META[t]
                 return (
                   <button key={t} onClick={() => setType(t)}
-                    className="flex-1 py-2.5 rounded-2xl text-sm font-semibold transition-all border"
+                    className="py-2.5 rounded-2xl text-[12.5px] font-semibold transition-all border"
                     style={type === t
                       ? { background: m.soft, borderColor: m.border, color: m.color }
                       : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#94a3b8' }
                     }>
-                    {m.emoji} {t === 'tip' ? '팁·경험' : m.label}
+                    {m.emoji} {t === 'tip' ? '건강상식' : t === 'exercise' ? '운동' : m.label}
                   </button>
                 )
               })}
             </div>
+            {allowedTypes.length < ALL_WRITE_TYPES.length && (
+              <p className="text-[11px] text-slate-400 mt-1.5">건강상식·레시피·운동 글은 인증된 전문가가 올려요. 궁금한 점은 글에 질문 댓글로 남겨주세요.</p>
+            )}
           </div>
+
+          {/* 후기: 몸 변화 · 루틴 · 운동 · 식단 */}
+          {type === 'review' && (
+            <div className="space-y-3">
+              {changes.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-2">몸 변화 <span className="font-normal text-slate-400">(진단 리포트에서 가져왔어요 · 빼고 싶은 건 지워주세요)</span></p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {changes.map(ch => (
+                      <span key={ch.label} className="inline-flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full text-[12px] font-semibold"
+                        style={{ background: '#fff1f5', color: '#be185d' }}>
+                        {ch.label} {fmtNum(ch.from)}→{fmtNum(ch.to)}{ch.unit}
+                        <button onClick={() => setChanges(prev => prev.filter(x => x.label !== ch.label))} aria-label={`${ch.label} 빼기`}>
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-bold text-slate-500 mb-2">관리 기간 <span className="font-normal text-slate-400">(선택)</span></p>
+                <input value={period} onChange={e => setPeriod(e.target.value)} maxLength={30} placeholder="예: 8주 동안"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none" />
+              </div>
+              {([
+                ['🗓️ 내가 한 루틴', routine, setRoutine, '예: 아침 공복 물 한 잔, 밤 11시 전 취침'],
+                ['🏃‍♀️ 내가 한 운동', exercise, setExercise, '예: 주 3회 수영 40분, 매일 스트레칭 10분'],
+                ['🥗 내가 먹은 식단', diet, setDiet, '예: 저녁은 단백질+채소 위주, 야식 끊기'],
+              ] as const).map(([label, v, set, ph]) => (
+                <div key={label}>
+                  <p className="text-xs font-bold text-slate-500 mb-2">{label} <span className="font-normal text-slate-400">(선택)</span></p>
+                  <textarea value={v} onChange={e => set(e.target.value)} rows={2} maxLength={500} placeholder={ph}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none resize-none leading-relaxed" />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* 운동 종목 */}
           {type === 'exercise' && (
@@ -1197,36 +1448,109 @@ export function AlbumGrid({ sections, onOpen }: {
 }
 // ── Feed state hook ────────────────────────────────────────────────────────
 
-/** 피드 게시물·좋아요·저장·칼로리 분석 상태와 핸들러 (localStorage 저장) */
+export type FeedServerState = 'off' | 'loading' | 'on' | 'error'
+
+const SEED_IDS = SEED.map(p => p.id)
+
+/** 앱 기본 글 + 서버 댓글·좋아요 합치기 */
+function mergeSeed(seed: SnsPost, t?: { comments: SnsComment[]; likes: number }): SnsPost {
+  return t ? { ...seed, likes: seed.likes + t.likes, comments: [...seed.comments, ...t.comments] } : seed
+}
+
+/**
+ * 피드 게시물·좋아요·저장·칼로리 분석 상태와 핸들러.
+ * LUDIA AI 서버가 있으면 여러 사람이 같은 피드를 보고(서버 저장), 없거나 닿지 않으면 이 기기에만 저장해요.
+ */
 export function useFeed() {
   const { user } = useAuth()
   const [posts, setPosts] = useState<SnsPost[]>([])
   const [liked, setLiked] = useState<Set<string>>(new Set())
   const [saved, setSaved] = useState<Set<string>>(new Set())
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
+  const [server, setServer] = useState<FeedServerState>(feedServerBase() ? 'loading' : 'off')
+  const [expert, setExpert] = useState<{ expert: boolean; title: string | null }>({ expert: false, title: null })
+  const [notice, setNotice] = useState<string | null>(null)
+  const postsRef = useRef<SnsPost[]>([])
+  postsRef.current = posts
 
   const authorName  = user?.nickname || user?.name || '나'
   const authorEmoji = AUTHOR_EMOJIS[Math.abs(authorName.charCodeAt(0)) % AUTHOR_EMOJIS.length]
+  const online = server === 'on'
+
+  /** 서버 모드에서 이 기기에만 남은 내 예전 글 */
+  const localExtras = useCallback(() => {
+    const seedIds = new Set(SEED_IDS)
+    return loadPosts().filter(p => !seedIds.has(p.id)).map(p => ({ ...p, localOnly: true }))
+  }, [])
+
+  const refresh = useCallback(async () => {
+    if (!feedServerBase()) return
+    try {
+      const [{ posts: remote }, { threads }, me] = await Promise.all([
+        feedServer.posts(), feedServer.threads(SEED_IDS), feedServer.me(),
+      ])
+      const likedNow = new Set<string>()
+      for (const p of remote) if (p.liked) likedNow.add(p.id)
+      for (const [id, t] of Object.entries(threads)) if (t.liked) likedNow.add(id)
+      const merged: SnsPost[] = [
+        ...remote.map(({ liked: _l, ...p }) => p),
+        ...localExtras(),
+        ...SEED.map(sp => mergeSeed(sp, threads[sp.id])),
+      ]
+      setPosts(merged)
+      setLiked(likedNow)
+      setExpert({ expert: me.expert, title: me.expertTitle })
+      setServer('on')
+    } catch {
+      // 서버에 닿지 않으면 이 기기 피드로 보여줘요
+      setPosts(loadPosts())
+      setLiked(loadLikes())
+      setServer('error')
+    }
+  }, [localExtras])
 
   useEffect(() => {
-    setPosts(loadPosts())
-    setLiked(loadLikes())
     setSaved(loadSaves())
-  }, [])
+    if (feedServerBase()) refresh()
+    else { setPosts(loadPosts()); setLiked(loadLikes()) }
+  }, [refresh])
+
+  const isRemote = useCallback((id: string) => {
+    if (!online) return false
+    const p = postsRef.current.find(x => x.id === id)
+    return !!p && !p.localOnly
+  }, [online])
+
+  /** 이 기기 저장 (서버 모드에서는 이 기기에만 있는 글만) */
+  const persistLocal = useCallback((list: SnsPost[]) => {
+    if (!online) { savePosts(list); return }
+    const seedIds = new Set(SEED_IDS)
+    const mine = list.filter(p => p.localOnly).map(({ localOnly: _x, ...p }) => p)
+    const stored = loadPosts().filter(p => seedIds.has(p.id))
+    savePosts([...mine, ...stored])
+  }, [online])
+
+  const updatePosts = useCallback((fn: (prev: SnsPost[]) => SnsPost[], persist = true) => {
+    setPosts(prev => { const u = fn(prev); if (persist) persistLocal(u); return u })
+  }, [persistLocal])
+
+  const fail = useCallback((err: unknown) => setNotice(feedErrorText(err)), [])
 
   const handleLike = useCallback((id: string) => {
-    setLiked(prev => {
-      const next = new Set(prev)
-      const was = next.has(id)
-      was ? next.delete(id) : next.add(id)
-      saveLikes(next)
-      setPosts(prevP => {
-        const updated = prevP.map(p => p.id === id ? { ...p, likes: p.likes + (was ? -1 : 1) } : p)
-        savePosts(updated); return updated
+    const was = liked.has(id)
+    const next = new Set(liked)
+    was ? next.delete(id) : next.add(id)
+    setLiked(next)
+    updatePosts(prev => prev.map(p => p.id === id ? { ...p, likes: Math.max(0, p.likes + (was ? -1 : 1)) } : p))
+    if (isRemote(id)) {
+      feedServer.toggleLike(id, authorName, authorEmoji).catch(err => {
+        // 되돌려요
+        setLiked(prev => { const n = new Set(prev); was ? n.add(id) : n.delete(id); return n })
+        updatePosts(prev => prev.map(p => p.id === id ? { ...p, likes: Math.max(0, p.likes + (was ? 1 : -1)) } : p))
+        fail(err)
       })
-      return next
-    })
-  }, [])
+    } else saveLikes(next)
+  }, [liked, isRemote, updatePosts, authorName, authorEmoji, fail])
 
   const handleSave = useCallback((id: string) => {
     setSaved(prev => {
@@ -1237,54 +1561,98 @@ export function useFeed() {
   }, [])
 
   const handleDelete = useCallback((id: string) => {
-    setPosts(prev => { const u = prev.filter(p => p.id !== id); savePosts(u); return u })
-  }, [])
+    const remove = () => updatePosts(prev => prev.filter(p => p.id !== id))
+    if (isRemote(id)) feedServer.deletePost(id).then(remove).catch(fail)
+    else remove()
+  }, [isRemote, updatePosts, fail])
 
-  const handleAddComment = useCallback((postId: string, text: string) => {
-    setPosts(prev => {
-      const updated = prev.map(p => p.id === postId ? {
-        ...p,
-        comments: [...p.comments, {
-          id: `c-${Date.now()}`,
-          authorName, authorEmoji,
-          text, createdAt: new Date().toISOString(),
-        }],
-      } : p)
-      savePosts(updated); return updated
-    })
-  }, [authorName, authorEmoji])
+  const handleAddComment = useCallback((postId: string, text: string, opts: { question?: boolean; replyTo?: string } = {}) => {
+    const insert = (c: SnsComment, parentId?: string | null) => updatePosts(prev => prev.map(p => {
+      if (p.id !== postId) return p
+      if (!parentId) return { ...p, comments: [...p.comments, c] }
+      return { ...p, comments: p.comments.map(x => x.id === parentId ? { ...x, replies: [...(x.replies ?? []), c] } : x) }
+    }))
+    // 앱 기본 글도 서버에 댓글을 남겨서 다 같이 봐요
+    const remote = online && (isRemote(postId) || SEED_IDS.includes(postId))
+    if (remote) {
+      feedServer.addComment(postId, {
+        text, question: opts.question && !opts.replyTo, parentId: opts.replyTo, authorName, authorEmoji,
+      }).then(r => insert(r.comment, r.parentId)).catch(fail)
+      return
+    }
+    insert({
+      id: `c-${Date.now()}`,
+      authorId: user?.userId ?? 'me',
+      authorName, authorEmoji,
+      text, createdAt: new Date().toISOString(),
+      ...(opts.question && !opts.replyTo ? { question: true } : {}),
+    }, opts.replyTo)
+  }, [online, isRemote, updatePosts, authorName, authorEmoji, user, fail])
 
-  // 게시물 사진 속 음식·음료의 칼로리/영양성분을 분석해 게시물에 붙여 저장해요
-  const analyzePost = useCallback(async (post: SnsPost) => {
-    const images = post.images?.length ? post.images : post.image ? [post.image] : []
+  // 게시물 사진 속 음식·음료의 칼로리/영양성분을 분석해 게시물에 붙여요 (서버 글은 내 글일 때만 서버에 저장)
+  const analyzePost = useCallback(async (post: SnsPost, images?: string[]) => {
+    const imgs = images ?? (post.images?.length ? post.images : post.image ? [post.image] : [])
     setAnalyzingIds(prev => new Set(prev).add(post.id))
     try {
-      const nutrition = await analyzeFeedPost(images, post.content)
-      setPosts(prev => {
-        const u = prev.map(p => p.id === post.id ? { ...p, nutrition } : p)
-        savePosts(u); return u
-      })
+      const nutrition = await analyzeFeedPost(imgs, post.content)
+      updatePosts(prev => prev.map(p => p.id === post.id ? { ...p, nutrition } : p))
+      if (isRemote(post.id) && post.authorId === feedIdentityId()) feedServer.saveNutrition(post.id, nutrition).catch(() => {})
     } finally {
       setAnalyzingIds(prev => { const n = new Set(prev); n.delete(post.id); return n })
     }
-  }, [])
+  }, [updatePosts, isRemote])
 
   const handleAnalyze = useCallback((id: string) => {
-    const post = posts.find(p => p.id === id)
+    const post = postsRef.current.find(p => p.id === id)
     if (post) analyzePost(post)
-  }, [posts, analyzePost])
+  }, [analyzePost])
 
-  const handleSubmit = useCallback((draft: Omit<SnsPost, 'id' | 'createdAt' | 'likes' | 'comments'>) => {
+  /** 글 올리기 — 성공하면 true */
+  const handleSubmit = useCallback(async (draft: Omit<SnsPost, 'id' | 'createdAt' | 'likes' | 'comments'>): Promise<boolean> => {
+    // 후기 사진은 몸·운동 사진이 많아서 칼로리 분석에서 빼요
+    const analyze = (p: SnsPost) => { if (draft.images?.length && draft.type !== 'review') analyzePost(p, draft.images) }
+    if (online) {
+      try {
+        const { post } = await feedServer.createPost({
+          type: draft.type, title: draft.title, content: draft.content, images: draft.images,
+          coverEmoji: draft.coverEmoji, coverGradient: draft.coverGradient, tags: draft.tags,
+          video: draft.video, sport: draft.sport, review: draft.review, authorName, authorEmoji,
+        })
+        const { liked: _l, ...clean } = post as SnsPost & { liked?: boolean }
+        updatePosts(prev => [clean, ...prev])
+        analyze(clean)
+        return true
+      } catch (err) { fail(err); return false }
+    }
     const post: SnsPost = { ...draft, authorId: user?.userId ?? draft.authorId, id: `post-${Date.now()}`, createdAt: new Date().toISOString(), likes: 0, comments: [] }
-    setPosts(prev => { const u = [post, ...prev]; savePosts(u); return u })
-    // 사진을 올리면 바로 칼로리·영양성분 분석을 시작해요
-    if (post.images?.length) analyzePost(post)
-  }, [analyzePost, user])
+    updatePosts(prev => [post, ...prev])
+    analyze(post)
+    return true
+  }, [online, analyzePost, updatePosts, user, authorName, authorEmoji, fail])
+
+  /** 전문가 인증 코드 등록 */
+  const registerExpert = useCallback(async (code: string): Promise<string | null> => {
+    try {
+      const r = await feedServer.registerExpert(code.trim(), authorName, authorEmoji)
+      setExpert({ expert: true, title: r.expertTitle })
+      return null
+    } catch (err) { return feedErrorText(err) }
+  }, [authorName, authorEmoji])
+
+  /** 이 기기에서 쓴 글인지 (서버 글은 서버 글쓴이 id 로 확인) */
+  const myId = online ? feedIdentityId() : user?.userId
 
   return {
-    user, posts, liked, saved, analyzingIds, authorName, authorEmoji,
+    user, posts, liked, saved, analyzingIds, authorName, authorEmoji, myId,
+    server, expert, notice, clearNotice: () => setNotice(null), refresh, registerExpert,
+    /** 건강상식·레시피·운동 글을 쓸 수 있는지 — 서버 모드에서는 전문가만 */
+    canWriteKnowledge: !online || expert.expert,
     handleLike, handleSave, handleDelete, handleAddComment, handleAnalyze, handleSubmit,
   }
+}
+
+function feedIdentityId(): string {
+  return feedIdentity().id
 }
 
 /** 오늘 · 이번 주 · 이번 달 … 기간별로 묶은 앨범 섹션 */
