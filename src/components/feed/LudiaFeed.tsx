@@ -8,6 +8,8 @@ import { Heart, MessageCircle, Bookmark, MoreHorizontal, Camera, Send, X, Plus, 
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { CARE_CASES } from '@/data/careCases'
+import Link from 'next/link'
+import { FACILITIES, FACILITY_TYPE_META } from '@/data/facilityData'
 import { analyzeFeedPost, DAILY_REFERENCE, type FeedNutrition } from '@/lib/feed-nutrition'
 import { feedServer, feedServerBase, feedErrorText, feedIdentity } from '@/lib/feed-server'
 import MineralBars from '@/components/nutrition/MineralBars'
@@ -78,6 +80,13 @@ export interface SnsPost {
   sport?: string
   /** 후기 자랑 글의 몸 변화·루틴 */
   review?: ReviewInfo
+  /** 장소로 지정한 루디아제휴 시설 id (src/data/facilityData.ts) — 시설 화면에서 이 장소 글을 모아 봐요 */
+  facilityId?: string
+}
+
+/** 글에 지정한 장소 (등록된 시설만) */
+export function postFacility(p: { facilityId?: string }) {
+  return p.facilityId ? FACILITIES.find(f => f.id === p.facilityId) ?? null : null
 }
 
 export type PostType = 'recipe' | 'tip' | 'exercise' | 'review'
@@ -657,6 +666,17 @@ export function PostCard({
               )
             })}
           </div>
+          {(() => {
+            const place = postFacility(post)
+            if (!place) return null
+            return (
+              <Link href={`/community?place=${place.id}`}
+                className="mt-1 inline-flex items-center gap-1 max-w-full text-[11px] font-semibold text-slate-500 hover:text-rose-500">
+                <span>📍</span><span className="truncate">{place.name.replace(/ \(예시\)$/, '')}</span>
+                <span className="text-slate-300 flex-shrink-0">· {FACILITY_TYPE_META[place.type].label}</span>
+              </Link>
+            )
+          })()}
         </div>
         <div className="relative">
           <button onClick={() => setShowMenu(v => !v)} className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-slate-100 transition-colors">
@@ -1095,10 +1115,12 @@ const ALL_WRITE_TYPES: PostType[] = ['tip', 'recipe', 'exercise', 'review']
 
 export function WriteModal({
   authorName, authorEmoji, defaultTags = [], defaultType = 'tip', draft, allowedTypes = ALL_WRITE_TYPES,
-  onClose, onSubmit,
+  defaultFacilityId, onClose, onSubmit,
 }: {
   authorName: string; authorEmoji: string
   defaultTags?: string[]
+  /** 시설 화면에서 글을 쓰면 그 시설이 장소로 미리 골라져 있어요 */
+  defaultFacilityId?: string
   defaultType?: PostType
   /** 고를 수 있는 글 종류 — 전문가가 아니면 후기만 */
   allowedTypes?: PostType[]
@@ -1121,6 +1143,8 @@ export function WriteModal({
   const [diet,      setDiet]      = useState(draft?.review.diet ?? '')
   const [videoUrl,  setVideoUrl]  = useState('')
   const [sport,     setSport]     = useState('')
+  const [facilityId, setFacilityId] = useState<string | undefined>(defaultFacilityId)
+  const [placeQuery, setPlaceQuery] = useState('')
   const videoOk = videoUrl.trim() === '' || parseVideo(videoUrl) !== null
   const [tags,      setTags]      = useState<string[]>(draft?.tags.length ? draft.tags : defaultTags)
   const [uploading, setUploading] = useState(false)
@@ -1158,6 +1182,7 @@ export function WriteModal({
       images: images.length > 0 ? images : undefined,
       video: videoUrl.trim() || undefined,
       sport: type === 'exercise' && sport.trim() ? sport.trim().slice(0, 12) : undefined,
+      facilityId,
       review: type === 'review' ? {
         period: period.trim() || undefined,
         changes,
@@ -1328,6 +1353,54 @@ export function WriteModal({
               </div>
             </div>
           )}
+
+          {/* 장소 — 루디아제휴 시설 */}
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-2">📍 장소 <span className="font-normal text-slate-400">(선택 · 시설 화면에서 이 장소 글로 모아 보여줘요)</span></p>
+            {(() => {
+              const picked = postFacility({ facilityId })
+              if (picked) {
+                const meta = FACILITY_TYPE_META[picked.type]
+                return (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl border" style={{ background: meta.bg, borderColor: meta.color }}>
+                    <span className="text-base">{meta.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-bold text-slate-800 truncate">{picked.name}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{meta.label} · {picked.address}</p>
+                    </div>
+                    <button onClick={() => setFacilityId(undefined)} aria-label="장소 지우기" className="p-1"><X className="w-4 h-4 text-slate-400" /></button>
+                  </div>
+                )
+              }
+              const q = placeQuery.trim().toLowerCase()
+              const matches = q
+                ? FACILITIES.filter(f => `${f.name} ${f.address} ${FACILITY_TYPE_META[f.type].label}`.toLowerCase().includes(q)).slice(0, 6)
+                : []
+              return (
+                <>
+                  <input value={placeQuery} onChange={e => setPlaceQuery(e.target.value)}
+                    placeholder="시설 이름·동네로 찾기 (예: 마포 수영장, 네일)"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none" />
+                  {q && (
+                    <div className="mt-1.5 rounded-xl border border-slate-100 bg-white divide-y divide-slate-50 overflow-hidden">
+                      {matches.length === 0
+                        ? <p className="px-3 py-2.5 text-[12px] text-slate-400">맞는 시설이 없어요</p>
+                        : matches.map(f => (
+                          <button key={f.id} onClick={() => { setFacilityId(f.id); setPlaceQuery('') }}
+                            className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-slate-50">
+                            <span>{FACILITY_TYPE_META[f.type].emoji}</span>
+                            <span className="flex-1 min-w-0">
+                              <span className="block text-[12.5px] font-semibold text-slate-700 truncate">{f.name}</span>
+                              <span className="block text-[10.5px] text-slate-400 truncate">{f.address}</span>
+                            </span>
+                          </button>
+                        ))}
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
 
           {/* 영상 링크 */}
           <div>
@@ -1616,7 +1689,7 @@ export function useFeed() {
         const { post } = await feedServer.createPost({
           type: draft.type, title: draft.title, content: draft.content, images: draft.images,
           coverEmoji: draft.coverEmoji, coverGradient: draft.coverGradient, tags: draft.tags,
-          video: draft.video, sport: draft.sport, review: draft.review, authorName, authorEmoji,
+          video: draft.video, sport: draft.sport, review: draft.review, facilityId: draft.facilityId, authorName, authorEmoji,
         })
         const { liked: _l, ...clean } = post as SnsPost & { liked?: boolean }
         updatePosts(prev => [clean, ...prev])

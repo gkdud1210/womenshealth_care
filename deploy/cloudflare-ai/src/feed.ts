@@ -169,6 +169,7 @@ async function threadsFor(db: D1Database, ids: string[], me: string | null) {
 interface PostRow {
   id: string; author_id: string; type: string; title: string; content: string; images: string
   cover_emoji: string | null; cover_gradient: string | null; tags: string; video: string | null; sport: string | null
+  facility_id: string | null
   review: string | null; nutrition: string | null; created_at: string
   name: string; emoji: string; expert: number; expert_title: string | null
 }
@@ -182,6 +183,7 @@ function toPost(p: PostRow, base: string, thread: { comments: unknown[]; likes: 
     images: images.length ? images : undefined,
     coverEmoji: p.cover_emoji ?? undefined, coverGradient: p.cover_gradient ?? undefined,
     tags: parseJson<string[]>(p.tags, []), video: p.video ?? undefined, sport: p.sport ?? undefined,
+    facilityId: p.facility_id ?? undefined,
     review: parseJson(p.review, undefined), nutrition: parseJson(p.nutrition, undefined),
     likes: thread.likes, liked: thread.liked, comments: thread.comments,
   }
@@ -275,13 +277,15 @@ export async function handleFeed(req: Request, env: FeedEnv, path: string): Prom
     for (const img of rawImages) imageIds.push(await storeImage(env.FEED_IMAGES!, img))
     const tags = Array.isArray(b.tags) ? b.tags.filter((t): t is string => typeof t === 'string' && ID_RE.test(t)).slice(0, 8) : []
     const review = type === 'review' && b.review && typeof b.review === 'object' ? JSON.stringify(b.review).slice(0, 6000) : null
+    // 장소 — 앱의 시설 id 모양(f-영문-숫자)만 받아요
+    const facilityId = typeof b.facilityId === 'string' && /^f-[a-z0-9-]{1,60}$/.test(b.facilityId) ? b.facilityId : null
     const id = newId('post')
     const createdAt = now()
-    await db.prepare(`INSERT INTO posts (id, author_id, type, title, content, images, cover_emoji, cover_gradient, tags, video, sport, review, created_at)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    await db.prepare(`INSERT INTO posts (id, author_id, type, title, content, images, cover_emoji, cover_gradient, tags, video, sport, review, facility_id, created_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       .bind(id, me.id, type, str(b.title, 60) || content.slice(0, 50), content, JSON.stringify(imageIds),
         optStr(b.coverEmoji, 8), optStr(b.coverGradient, 120), JSON.stringify(tags),
-        optStr(b.video, 300), optStr(b.sport, 12), review, createdAt).run()
+        optStr(b.video, 300), optStr(b.sport, 12), review, facilityId, createdAt).run()
     const row = await db.prepare(`SELECT p.*, a.name, a.emoji, a.expert, a.expert_title FROM posts p JOIN authors a ON a.id = p.author_id WHERE p.id = ?`).bind(id).first<PostRow>()
     return { post: toPost(row!, base, { comments: [], likes: 0, liked: false }) }
   }

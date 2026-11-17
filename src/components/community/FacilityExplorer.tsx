@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import {
   FACILITIES, FACILITY_TYPE_META, FACILITY_GROUPS, formatPrice, discountRate, facilityActivities,
-  type Facility, type FacilityType,
+  groupOfType, type Facility, type FacilityType,
 } from '@/data/facilityData'
 import { CATEGORY_GROUPS, CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
 import { ANY, placeLabel, type PlaceRef } from '@/data/regionData'
@@ -25,6 +25,7 @@ import {
   addReview, loadReviews, removeReview, saveReviews, type FacilityReview, type ReviewMap,
 } from '@/lib/facility-reviews'
 import { CollapsiblePicker, sportPickGroups } from '@/components/community/CollapsiblePicker'
+import FacilityFeed from '@/components/community/FacilityFeed'
 
 // ── 내 위치 ───────────────────────────────────────────────────────────────
 
@@ -291,6 +292,8 @@ function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteRev
           <FacilityReviews facility={f} reviews={reviews} userId={userId}
             onAdd={onAddReview} onDelete={onDeleteReview} />
 
+          <FacilityFeed f={f} />
+
           {facilityActivities(f).length > 0 && <div>
             <p className="text-[11.5px] font-bold text-slate-500 mb-1.5">여기서 할 수 있는 모임</p>
             <div className="flex flex-wrap gap-1.5">
@@ -325,7 +328,7 @@ function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteRev
 
 // ── 시설 찾기 탭 ───────────────────────────────────────────────────────────
 
-export default function FacilityExplorer({ place, placeText, homeCenter, isMember, userId, userName, onPickPlace, onBackHome, onShowGroups, onLocated }: {
+export default function FacilityExplorer({ place, placeText, homeCenter, isMember, userId, userName, onPickPlace, onBackHome, onShowGroups, onLocated, start }: {
   place: PlaceRef                 // 모임 찾기와 같은 지역 필터 (처음엔 내 동네)를 써요
   placeText: string
   /** 내 동네 중심 좌표 — 지도가 여기서 열려요 */
@@ -340,6 +343,8 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
   onShowGroups: (c: MeetupCategory) => void
   /** 내 위치를 알게 되면 불러요 — 지역 필터를 지금 있는 지역으로 맞출 때 써요 */
   onLocated?: (here: LatLng) => void
+  /** 처음 열 때 바로 보여줄 시설 종류 · 제휴 할인만 보기 */
+  start?: { type?: FacilityType; partner?: boolean; facilityId?: string } | null
 }) {
   const [groupId, setGroupId] = useState<string | null>(null)
   const [type, setType] = useState<FacilityType | 'all'>('all')
@@ -353,6 +358,23 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
   const [reviews, setReviews] = useState<ReviewMap>({})
 
   useEffect(() => { setReviews(loadReviews()) }, [])
+
+  useEffect(() => {
+    if (!start) return
+    if (start.type) {
+      setGroupId(groupOfType(start.type)?.id ?? null)
+      setType(start.type)
+      setGroupAll(false)
+    }
+    if (start.partner) setPartnerOnly(true)
+    // 피드 글의 📍 장소를 눌러 들어오면 그 시설 화면을 바로 열어요
+    const target = start.facilityId ? FACILITIES.find(f => f.id === start.facilityId) : null
+    if (target) {
+      setGroupId(groupOfType(target.type)?.id ?? null)
+      setType(target.type)
+      setOpenId(target.id)
+    }
+  }, [start])
 
   // 내 위치 — 지금 있는 곳에서 가까운 시설을 먼저 보여줘요. 위치를 허용하지 않으면 예전 순서 그대로예요.
   const [here, setHere] = useState<LatLng | null>(null)

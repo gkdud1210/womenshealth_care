@@ -72,7 +72,7 @@ export const feedServer = {
     call<{ expert: true; expertTitle: string }>('POST', '/feed/expert', { code, authorName, authorEmoji }),
   createPost: (draft: {
     type: PostType; title: string; content: string; images?: string[]; coverEmoji?: string; coverGradient?: string
-    tags: string[]; video?: string; sport?: string; review?: ReviewInfo; authorName: string; authorEmoji: string
+    tags: string[]; video?: string; sport?: string; review?: ReviewInfo; facilityId?: string; authorName: string; authorEmoji: string
   }) => call<{ post: ServerPost }>('POST', '/feed/posts', draft),
   deletePost: (id: string) => call<{ ok: true }>('DELETE', `/feed/posts/${encodeURIComponent(id)}`),
   saveNutrition: (id: string, nutrition: FeedNutrition) =>

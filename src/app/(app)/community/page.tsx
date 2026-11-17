@@ -22,6 +22,7 @@ import {
 } from '@/data/regionData'
 import GroupChat from '@/components/community/GroupChat'
 import FacilityExplorer from '@/components/community/FacilityExplorer'
+import { FACILITY_TYPE_META, type FacilityType } from '@/data/facilityData'
 import WorkoutLog from '@/components/community/WorkoutLog'
 import type { MapLocation } from '@/components/community/PlaceMap'
 import { coordsOf, nearestCity } from '@/data/regionCoords'
@@ -821,6 +822,8 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<MeetupPost[]>([])
   const [liked, setLiked] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'explore' | 'places' | 'workout' | 'mine'>('places')
+  // 루디아피드에서 넘어올 때 바로 보여줄 시설 종류·제휴 할인·시설 (?facility=pool, ?partner=1, ?place=f-mapo-pool)
+  const [facilityStart, setFacilityStart] = useState<{ type?: FacilityType; partner?: boolean; facilityId?: string } | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<MeetupCategory | 'all'>('all')
   const [placeFilter, setPlaceFilter] = useState<PlaceFilter>(ALL_PLACES)
   const [homePlace, setHomePlace] = useState<PlaceRef | null>(null)
@@ -849,7 +852,12 @@ export default function CommunityPage() {
     try {
       const params = new URLSearchParams(window.location.search)
       const cat = params.get('category')
-      if (cat && isMeetupCategory(cat)) setCategoryFilter(cat)
+      if (cat && isMeetupCategory(cat)) { setCategoryFilter(cat); setTab('explore') }
+      const ft = params.get('facility')
+      const placeId = params.get('place')
+      if (placeId) setFacilityStart({ facilityId: placeId })
+      else if (ft && ft in FACILITY_TYPE_META) setFacilityStart({ type: ft as FacilityType })
+      else if (params.get('partner') === '1') setFacilityStart({ partner: true })
       if (home) setPlaceFilter(placeToFilter(home))
     } catch {}
 
@@ -1079,6 +1087,7 @@ export default function CommunityPage() {
           userName={currentUserName}
           onPickPlace={() => setShowFilterPicker(true)}
           onShowGroups={c => { setCategoryFilter(c); setTab('explore') }}
+          start={facilityStart}
           onLocated={handleLocated} />
       )}
 
