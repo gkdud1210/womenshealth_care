@@ -2,8 +2,6 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { AppShell } from '@/components/layout/AppShell'
-import DashboardPage from './(app)/dashboard/page'
 import { useAuth } from '@/hooks/useAuth'
 
 export default function RootPage() {
@@ -24,16 +22,12 @@ export default function RootPage() {
     router.replace(existing ? '/login' : '/signup')
   }, [ready, hasSession, user, isOnboarded, router, storedUser])
 
-  if (!ready || !hasSession || !user || !isOnboarded) return (
+  // 첫 화면은 항상 루디아피드(/care)로 바로 넘어가요.
+  // 넘어가기 전에 다른 화면(예전 음성 대시보드)이 잠깐 보이지 않도록 로딩 표시만 보여줘요.
+  return (
     <div className="min-h-[100dvh] flex items-center justify-center"
       style={{ background: 'linear-gradient(145deg, #fdf6f9 0%, #fce9f0 35%, #f8eeff 70%, #fdf0f8 100%)' }}>
       <div className="w-8 h-8 rounded-full border-2 border-rose-300 border-t-rose-500 animate-spin" />
     </div>
-  )
-
-  return (
-    <AppShell>
-      <DashboardPage />
-    </AppShell>
   )
 }

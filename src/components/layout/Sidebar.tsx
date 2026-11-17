@@ -32,7 +32,7 @@ export function Sidebar() {
 
       {/* Logo */}
       <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(244,63,117,0.08)' }}>
-        <Link href="/" className="flex items-center justify-center group transition-opacity hover:opacity-80">
+        <Link href="/care" className="flex items-center justify-center group transition-opacity hover:opacity-80">
           <div style={{
             borderRadius: '18px',
             overflow: 'hidden',
