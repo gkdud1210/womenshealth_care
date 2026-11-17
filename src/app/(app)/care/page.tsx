@@ -227,13 +227,11 @@ export default function CarePage() {
   return (
     <div className="min-h-screen pb-24" style={{ background: '#fafafa' }}>
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
-        {/* 화면 이름은 아래 탭에 이미 있어서 핸드폰에서는 숨겨요 (화면 읽기용으로는 남겨둬요) */}
-        <div className="sr-only lg:not-sr-only lg:block px-4 pt-3 pb-2 max-w-lg mx-auto">
-          <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아피드</h1>
-        </div>
+        {/* 화면 이름은 메뉴에 이미 있어서 화면에는 안 보여줘요 (화면 읽기용으로만 남겨둬요) */}
+        <h1 className="sr-only">루디아피드</h1>
 
         {/* 케어카드 고르기(접힘) + 검색 */}
-        <div className="max-w-lg mx-auto flex items-center gap-2 px-4 pt-3 lg:pt-0 pb-3">
+        <div className="max-w-lg mx-auto flex items-center gap-2 px-4 pt-3 pb-3">
           <button onClick={() => setPickerOpen(v => !v)} aria-expanded={pickerOpen}
             className="h-9 pl-3 pr-2.5 rounded-full flex items-center gap-1 text-[12.5px] font-bold flex-shrink-0 transition-colors"
             style={care
