@@ -6,9 +6,10 @@ import Link from 'next/link'
 import { ChevronRight, Brain, Sparkles, Info } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceArea, CartesianGrid } from 'recharts'
 import {
-  analyzePsyche, tensionLine, STATE_META, TEMPERAMENTS, PSYCHE_TYPES, ANW_META, PIGMENT_META,
-  type PsycheResult, type Temperament,
+  analyzePsyche, tensionLine, STATE_META, TEMPERAMENTS, PSYCHE_TYPES, ANW_FORMS, HYBRID_TYPES, PIGMENT_META,
+  type PsycheResult, type Temperament, type HybridId,
 } from '@/lib/iris-psyche'
+import { comboFor, type IrisCombo } from '@/data/irisCombos'
 import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import type { DiagnosticSession } from '@/lib/diagnosticHistory'
 
@@ -112,6 +113,63 @@ function TypeMatrix({ r }: { r: PsycheResult }) {
           })}
         </div>
       ))}
+      <div className="border-t border-slate-100 bg-slate-50 px-2 py-1.5 text-[11px] font-bold text-slate-500">🔀 중간 단계 (하이브리드형)</div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-slate-100">
+        {(Object.keys(HYBRID_TYPES) as HybridId[]).map(h => {
+          const ty = HYBRID_TYPES[h]
+          const mine = r.hybrid === h
+          return (
+            <Link key={h} href={`/diagnostic/psyche/types?t=hybrid_${h}`} className="block px-2 py-2.5 text-center relative hover:bg-slate-50"
+              style={mine ? { background: '#ede9fe', boxShadow: 'inset 0 0 0 2px #8b5cf6' } : undefined}>
+              <p className="text-[18px] leading-none">{ty.emoji}</p>
+              <p className={`mt-1 text-[11px] ${mine ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>{ty.name}</p>
+              <p className="text-[9.5px] text-slate-400">{ty.pattern}</p>
+              {mine && <span className="absolute top-1 right-1 text-[9px] font-black px-1 rounded text-white bg-violet-500">나</span>}
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** LUDIA 조합 해석 — 타고난 기질 × 자율신경환 */
+function ComboCard({ c, estimated }: { c: IrisCombo; estimated: boolean }) {
+  return (
+    <div className="rounded-3xl overflow-hidden border border-violet-100 bg-white">
+      <div className="px-5 py-4 text-white" style={{ background: 'linear-gradient(135deg,#6d28d9,#db2777)' }}>
+        <p className="text-[11px] font-bold opacity-85">LUDIA 조합 해석 · 타고난 기질 × 자율신경환{estimated ? ' (추정)' : ''}</p>
+        <div className="flex items-center gap-2.5 mt-1.5">
+          <span className="text-[34px] leading-none">{c.emoji}</span>
+          <div>
+            <p className="text-[19px] font-black leading-tight">{c.name}</p>
+            <p className="text-[12px] opacity-90">{c.alias}</p>
+          </div>
+        </div>
+        <p className="mt-2.5 text-[12.5px] leading-relaxed opacity-95">{c.metaphor}</p>
+      </div>
+      <div className="p-5 space-y-4">
+        <div>
+          <p className="text-[11px] font-bold text-violet-500">1. 타고난 강점</p>
+          <p className="text-[14px] font-black text-slate-800 mt-0.5">“{c.strength.title}”</p>
+          <ul className="mt-1.5 space-y-1">{c.strength.points.map(x => <li key={x} className="text-[12.5px] text-slate-700 leading-relaxed flex gap-1.5"><span className="text-violet-400">•</span>{x}</li>)}</ul>
+        </div>
+        <div>
+          <p className="text-[11px] font-bold text-violet-500">2. 자율신경환이 이런 이유</p>
+          <p className="text-[14px] font-black text-slate-800 mt-0.5">“{c.why.title}”</p>
+          <p className="mt-1.5 text-[12.5px] text-slate-700 leading-relaxed">{c.why.text}</p>
+          {c.why.points && <ul className="mt-1.5 space-y-1">{c.why.points.map(x => <li key={x} className="text-[12.5px] text-slate-700 leading-relaxed flex gap-1.5"><span className="text-violet-400">•</span>{x}</li>)}</ul>}
+        </div>
+        <div>
+          <p className="text-[11px] font-bold text-violet-500">3. 지금 꼭 챙겨야 할 몸·웰니스 포인트</p>
+          <p className="mt-1.5 text-[12.5px] text-slate-700 leading-relaxed"><b>주의할 신호</b> — {c.watch.signals}</p>
+          <ul className="mt-1.5 space-y-1">{c.watch.routine.map(x => <li key={x} className="text-[12.5px] text-slate-700 leading-relaxed flex gap-1.5"><span>✔</span>{x}</li>)}</ul>
+        </div>
+        <div className="rounded-2xl px-4 py-3.5" style={{ background: 'linear-gradient(135deg,#f5f3ff,#fdf2f8)' }}>
+          <p className="text-[11px] font-bold text-violet-500 mb-1">💜 LUDIA가 건네는 말</p>
+          <p className="text-[13px] text-slate-800 leading-relaxed font-semibold">“{c.message}”</p>
+        </div>
+      </div>
     </div>
   )
 }
@@ -170,13 +228,14 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
             <div className="flex items-center gap-3">
               <span className="text-[40px] leading-none">{r.type.emoji}</span>
               <div className="min-w-0">
-                <p className="text-[11px] font-bold" style={{ color: tm.color }}>{tm.label} × {r.lean === 'calm' ? '안정' : '긴장'}</p>
+                <p className="text-[11px] font-bold" style={{ color: tm.color }}>{r.hybrid ? `🔀 중간 단계(하이브리드형) · ${HYBRID_TYPES[r.hybrid].pattern}` : `${tm.label} × ${r.lean === 'calm' ? '안정' : '긴장'}`}</p>
                 <p className="text-[18px] font-black text-slate-900">{r.type.name}</p>
                 <p className="text-[11.5px] text-slate-500">{r.type.tagline}</p>
               </div>
             </div>
             <p className="mt-3 text-[12.5px] text-slate-700 leading-relaxed">{r.type.desc}</p>
-            {r.state === 'border' && (
+            {r.hybrid && <p className="mt-1.5 text-[11.5px] text-slate-500">🔍 {HYBRID_TYPES[r.hybrid].feature} · 몸 — {HYBRID_TYPES[r.hybrid].body}</p>}
+            {r.state === 'border' && !r.hybrid && (
               <p className="mt-2 text-[11.5px] text-amber-700">가운데(40~60)에 있어서 그날 컨디션에 따라 {PSYCHE_TYPES[r.temperament!].calm.name}과 {PSYCHE_TYPES[r.temperament!].tense.name} 사이를 오갈 수 있어요.</p>
             )}
             {r.calmType && (
@@ -188,7 +247,7 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
             <ul className="mt-1 space-y-1">
               {r.type.care.map(c => <li key={c} className="text-[12px] text-slate-700 flex gap-1.5"><span>✔</span>{c}</li>)}
             </ul>
-            <Link href={`/diagnostic/psyche/types?t=${r.temperament}_${r.lean}`}
+            <Link href={`/diagnostic/psyche/types?t=${r.hybrid ? `hybrid_${r.hybrid}` : `${r.temperament}_${r.lean}`}`}
               className="mt-3 flex items-center justify-center gap-1 py-2.5 rounded-xl bg-white text-[12.5px] font-bold" style={{ color: tm.color }}>
               내 타입 자세히 — 어울리는 운동·식습관 <ChevronRight className="w-3.5 h-3.5" />
             </Link>
@@ -202,6 +261,11 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
           </div>
         )}
       </div>
+
+      {(() => {
+        const c = comboFor(r.temperament, r.anw?.form)
+        return c ? <ComboCard c={c} estimated={!!r.anw?.estimated} /> : null
+      })()}
 
       {/* 2. 무엇으로 계산했나 */}
       <div className="glass-card p-5">
@@ -229,7 +293,7 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
         <p className="text-[11px] text-slate-400 mb-3">타고난 기질(4) × 지금 상태(안정·긴장) — 타입을 누르면 자세한 설명·운동·식습관을 볼 수 있어요</p>
         <TypeMatrix r={r} />
         <Link href="/diagnostic/psyche/types" className="mt-3 flex items-center justify-center gap-1 text-[12px] font-bold text-violet-600">
-          8가지 타입 모두 자세히 보기 <ChevronRight className="w-3.5 h-3.5" />
+          모든 타입 · 자율신경환 형태 자세히 보기 <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
 
@@ -262,12 +326,22 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
       {r.hasIris && (
         <div className="glass-card p-5 space-y-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-700">스트레스 반응 타입 — 자율신경환·동공</h3>
-            {r.anw && (
-              <div className="mt-2 rounded-xl bg-slate-50 px-3.5 py-3">
-                <p className="text-[13px] font-bold text-slate-800">{ANW_META[r.anw].emoji} {ANW_META[r.anw].label}</p>
-                <p className="text-[12px] text-slate-600 mt-0.5 leading-relaxed">{ANW_META[r.anw].desc}</p>
-              </div>
+            <h3 className="text-sm font-semibold text-slate-700">자율신경환 형태</h3>
+            <p className="text-[11px] text-slate-400">정상은 동공 테두리에서 홍채 폭의 약 1/3 지점의 부드러운 원이에요</p>
+            {r.anw ? (() => {
+              const m = ANW_FORMS[r.anw.form]
+              return (
+                <div className="mt-2 rounded-xl bg-slate-50 px-3.5 py-3 space-y-1.5">
+                  <p className="text-[13.5px] font-bold text-slate-800">{m.emoji} {m.label} <span className="text-[11px] font-semibold text-slate-400">{m.short}{r.anw.estimated ? ' · 동공 크기로 추정' : ''}</span></p>
+                  <p className="text-[11.5px] text-slate-500">🔍 {m.feature}{r.anw.radiusPct != null ? ` (동공에서 홍채 폭의 ${r.anw.radiusPct}%)` : ''}{r.anw.bulgeAt ? ` · ${r.anw.bulgeAt} 방향으로 가장 튀어나옴` : ''}</p>
+                  <p className="text-[12px] text-slate-700 leading-relaxed"><b>마음</b> — {m.mind}</p>
+                  <p className="text-[12px] text-slate-700 leading-relaxed"><b>몸</b> — {m.body}</p>
+                  {r.anw.byEye && <p className="text-[11px] text-slate-400">눈마다 달라요: {r.anw.byEye.map(x => `${x.eye} ${ANW_FORMS[x.form].label}`).join(' · ')}</p>}
+                </div>
+              )
+            })() : <p className="mt-2 text-[12px] text-slate-400">자율신경환을 측정하지 못했어요 (LUDIA AI 엔진이 꺼져 있었거나 가림이 많았어요).</p>}
+            {r.stressRing && (
+              <p className="mt-2 text-[12px] text-slate-700 bg-rose-50 rounded-xl px-3.5 py-2.5">⚡ <b>긴장륜(스트레스 링)</b>도 보여요 — 교감신경이 오래 항진돼 스스로를 채찍질하거나 주변 평가에 예민한 상태예요.</p>
             )}
           </div>
           <div>

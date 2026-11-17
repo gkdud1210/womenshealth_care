@@ -5,7 +5,7 @@
 import { Cpu, Eye, AlertTriangle } from 'lucide-react'
 import type { IrisEyeDetection, MultimodalData } from '@/components/calendar/LudiaInsightCard'
 import { IrisDetectionCard } from './IrisDetectionCard'
-import { analyzePsyche, TEMPERAMENTS, ANW_META } from '@/lib/iris-psyche'
+import { analyzePsyche, TEMPERAMENTS, ANW_FORMS } from '@/lib/iris-psyche'
 
 const KIND_NOTE: Record<string, string> = {
   lac: '섬유가 벌어진 틈 — 그 구역 기능이 약해지기 쉬운 자리로 봐요',
@@ -136,8 +136,10 @@ export function IrisEngineReport({ data }: { data: MultimodalData }) {
             <p className="font-bold text-slate-800">{psyche.pupilRatio != null ? `${Math.round(psyche.pupilRatio * 100)}%` : '—'}</p>
           </div>
           <div className="rounded-xl bg-indigo-50/60 px-3 py-2 col-span-2">
-            <p className="text-[10.5px] text-slate-400">스트레스 반응 타입</p>
-            <p className="font-bold text-slate-800">{psyche.anw ? `${ANW_META[psyche.anw].emoji} ${ANW_META[psyche.anw].label}` : '—'}</p>
+            <p className="text-[10.5px] text-slate-400">자율신경환 형태</p>
+            <p className="font-bold text-slate-800">{psyche.anw
+              ? `${ANW_FORMS[psyche.anw.form].emoji} ${ANW_FORMS[psyche.anw.form].label}${psyche.anw.radiusPct != null ? ` · 홍채 폭의 ${psyche.anw.radiusPct}%` : ''}${psyche.anw.estimated ? ' (추정)' : ''}`
+              : '측정 안 됨'}</p>
           </div>
         </div>
         {flags.length > 0 && (

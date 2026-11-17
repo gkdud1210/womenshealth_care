@@ -92,12 +92,74 @@ export const PSYCHE_TYPES: Record<Temperament, Record<'calm' | 'tense', PsycheTy
   },
 }
 
-export type AnwType = 'nerve' | 'suppress' | 'diffuse' | 'balanced'
-export const ANW_META: Record<AnwType, { label: string; emoji: string; desc: string }> = {
-  nerve:    { label: '신경 긴장형', emoji: '⚡', desc: '긴장륜(스트레스 링)이 보여요. 교감신경이 오래 항진돼 스스로를 채찍질하거나 주변 평가에 예민해 긴장을 놓기 어려운 상태예요.' },
-  suppress: { label: '내면 억압형', emoji: '🛡️', desc: '동공이 작은 편이에요. 외부 자극에서 나를 지키려 방어벽을 치고, 욕구를 누르며 규칙·루틴에 기대는 경향이 있어요.' },
-  diffuse:  { label: '에너지 확산형', emoji: '🎆', desc: '동공이 큰 편이에요. 호기심이 많고 바깥으로 에너지를 쓰지만, 집중이 흩어지고 여러 일을 벌이다 쉽게 지칠 수 있어요.' },
-  balanced: { label: '균형형', emoji: '⚖️', desc: '긴장륜이 뚜렷하지 않고 동공 크기도 보통이에요. 자율신경 반응이 비교적 고른 편이에요.' },
+// ── 자율신경환(ANW) 4대 형태 ──
+// 정상은 동공 테두리에서 홍채 폭의 약 1/3 지점의 부드러운 원. LUDIA AI 자율신경환 감지(원장 선 기준)로 판별해요.
+export type AnwForm = 'normal' | 'narrow' | 'lost' | 'wide' | 'irregular'
+export interface AnwMeta { label: string; short: string; emoji: string; feature: string; mind: string; body: string; tension: number }
+export const ANW_FORMS: Record<AnwForm, AnwMeta> = {
+  normal:    { label: '정상형', short: '부드러운 원', emoji: '⭕', tension: 10,
+    feature: '동공 테두리에서 홍채 폭의 약 1/3 지점에 부드러운 원으로 자리 잡고 있어요',
+    mind: '긴장과 이완의 전환이 자연스러운 편이에요.',
+    body: '자율신경의 브레이크와 엑셀이 고르게 작동하고 있어요.' },
+  narrow:    { label: '협착형', short: '정상보다 좁음', emoji: '🔒', tension: 65,
+    feature: '자율신경환이 동공 쪽으로 바짝 좁아져 있어요',
+    mind: '방어적 통제형 — 변화를 두려워하고 스스로를 엄격한 틀과 규칙 안에 가두려 해요.',
+    body: '교감신경 긴장으로 위장관 연동 운동이 떨어지기 쉬워요 (변비·가스, 소화 흡수력 감소).' },
+  lost:      { label: '소실형', short: '거의 안 보임', emoji: '🌫️', tension: 55,
+    feature: '경계선의 명암 대비가 사라져 매끄럽게 지워진 듯 보여요',
+    mind: '감정 둔감·자제형 — 감정을 이성으로 누르거나 스트레스 신호 자체를 차단하고 버텨요.',
+    body: '자율신경 전환 스위치가 둔해져 기초 대사가 떨어지고, 피로를 못 느끼다 한 번에 무너지는 번아웃이 올 수 있어요.' },
+  wide:      { label: '확장형', short: '크게 넓어짐', emoji: '🎆', tension: 55,
+    feature: '자율신경환이 홍채 바깥쪽으로 크게 밀려나 있어요',
+    mind: '에너지 발산·산만형 — 호기심이 많고 자극에 즉각 반응하지만 집중이 쉽게 흩어져요.',
+    body: '교감·부교감 모두 에너지를 많이 써서 위장관 팽만감, 혈당 기복, 만성 피로가 오기 쉬워요.' },
+  irregular: { label: '불균형형', short: '찌그러짐·톱니', emoji: '〰️', tension: 70,
+    feature: '특정 방향으로 뾰족하게 튀어나오거나 톱니처럼 들쭉날쭉하고 비대칭이에요',
+    mind: '감정 기복·예민형 — 상황이나 자극에 따라 평온함과 예민함을 오가는 롤러코스터 성향이에요.',
+    body: '튀어나온 방향과 연결된 장기 구역의 국소 긴장, 신경성 두통, 불규칙한 수면 패턴이 오기 쉬워요.' },
+}
+
+export interface AnwResult {
+  form: AnwForm
+  /** 엔진 측정 없이 동공 크기로 추정했는지 */
+  estimated: boolean
+  radiusPct?: number | null
+  /** 가장 바깥으로 튀어나온 방향 (불균형형) */
+  bulgeAt?: string | null
+  label?: string | null
+  /** 두 눈이 다르면 눈별 형태 */
+  byEye?: { eye: string; form: AnwForm }[]
+}
+
+// ── 중간 단계(하이브리드형) 4대 타입 ──
+// 섬유 밀도가 중간일 때, 밀집과 개방이 어떤 패턴으로 섞였는지 + 자율신경 안정/긴장으로 나눠요.
+export type HybridId = 'harmony' | 'mask' | 'reverse' | 'overload'
+export interface HybridMeta extends PsycheTypeMeta { pattern: string; feature: string; body: string }
+export const HYBRID_TYPES: Record<HybridId, HybridMeta> = {
+  harmony:  { name: '조화로운 조율가형', emoji: '🎻', pattern: '균일 혼합 + 안정',
+    feature: '리넨형 바탕에 미세한 틈이 고르게 퍼져 있고 수축륜이 없어요',
+    tagline: '빠른 상황 파악 · 건강한 양면성',
+    desc: '상황 파악이 빠르고 유연해요. 공과 사를 잘 나누는 건강한 양면성이 있어요.',
+    body: '큰 약점은 없지만 환경이 바뀌면 수면·식사 리듬이 쉽게 흐트러져요.',
+    care: ['자는 시간·먹는 시간 고정하기', '여행·이사·야근 뒤엔 리듬 되찾는 하루 두기'] },
+  mask:     { name: '외강내유 가면형', emoji: '🎭', pattern: '외곽 밀집 + 중심 개방 + 긴장',
+    feature: '동공 주변(중심부)은 성글고 바깥쪽은 촘촘해요. 수축륜이 여러 개 보여요',
+    tagline: '겉은 단단 · 속은 여림',
+    desc: '겉으로는 차갑고 완벽해 보이지만, 속으로는 쉽게 상처받고 눈치를 보는 성향이에요.',
+    body: '신경성 위장장애, 만성 어깨·목 결림, 퇴근 후 갑자기 찾아오는 무기력이 오기 쉬워요.',
+    care: ['믿을 수 있는 한 사람에게 속마음 말하기', '퇴근 후 20분 따뜻한 샤워·스트레칭으로 "가면 벗기"', '위장이 편한 따뜻한 저녁'] },
+  reverse:  { name: '외유내강 반전형', emoji: '🍑', pattern: '중심 밀집 + 외곽 개방 + 안정',
+    feature: '동공 주변(중심부)은 단단히 뭉쳐 있고 바깥으로 갈수록 섬유가 벌어져요',
+    tagline: '부드러운 겉 · 단단한 심지',
+    desc: '평소엔 부드럽고 사교적이지만, 결정적인 순간엔 고집과 심지가 강해요.',
+    body: '에너지를 많이 쓴 뒤 회복이 늦고, 손발이 찬 말초 순환 저하가 오기 쉬워요.',
+    care: ['큰 일 뒤엔 회복일을 일정에 넣기', '반신욕·족욕으로 손발 데우기', '유산소 운동으로 말초 순환 돕기'] },
+  overload: { name: '감각 전환 과부하형', emoji: '🔋', pattern: '부분 열공 + 자율신경 요동',
+    feature: '전체 밀도는 보통인데 특정 구역(3·9시 등)에 열공이 몰려 있고 동공이 커져 있어요',
+    tagline: '높은 호기심 + 공감 · 쉬운 방전',
+    desc: '호기심과 공감 능력이 함께 높아 여러 일을 동시에 하다가 쉽게 방전돼요.',
+    body: '교감·부교감 전환이 어려워 잠들기 힘들고, 혈당 스파이크와 부신 피로가 오기 쉬워요.',
+    care: ['한 번에 한 가지 일만 하는 "싱글태스킹" 시간', '단 음식 대신 단백질 간식', '잠들기 1시간 전 화면 끄기'] },
 }
 
 export type PigmentZone = 'upper' | 'middle' | 'side'
@@ -126,7 +188,11 @@ export interface PsycheResult {
   /** 긴장 쪽일 때 돌아갈 본연의 안정 타입 */
   calmType: PsycheTypeMeta | null
   parts: TensionPart[]
-  anw: AnwType | null
+  anw: AnwResult | null
+  /** 긴장륜(스트레스 링)이 보이는지 */
+  stressRing: boolean
+  /** 중간 단계(하이브리드형) — 정해지면 type 도 이 타입이에요 */
+  hybrid: HybridId | null
   pupilRatio: number | null
   pigments: { zone: PigmentZone; count: number }[]
 }
@@ -175,13 +241,17 @@ export function analyzePsyche(d: MultimodalData): PsycheResult {
   const pigmentCount: Record<PigmentZone, number> = { upper: 0, middle: 0, side: 0 }
   let ring = 0
   const ratios: number[] = []
+  const clocks: number[] = []
+  const anwEyes: { eye: string; a: NonNullable<IrisEyeDetection['anw']> }[] = []
   for (const e of es) {
+    if (e.anw && e.anw.form !== 'unknown') anwEyes.push({ eye: e === d.iris.detection?.right ? '우안' : '좌안', a: e.anw })
     for (const l of e.lesions) {
       if (l.key === 'lac' || l.key === 'cry') {
         const w = Math.max(0.4, Math.min(1, l.confidence || 0.7))
         openings += w
         if (l.key === 'lac') lacunae += w
         if (isInner(l, e)) inner += w
+        if (l.position?.clock) clocks.push(l.position.clock)
       }
       if (l.key === 'pig') {
         const z = pigmentZone(l)
@@ -206,6 +276,20 @@ export function analyzePsyche(d: MultimodalData): PsycheResult {
   }
   const pupilRatio = ratios.length ? ratios.reduce((a, b) => a + b, 0) / ratios.length : null
 
+  // ── 자율신경환 형태 — 엔진 측정 우선, 없으면 동공 크기로 추정 ──
+  let anw: AnwResult | null = null
+  const RANK: AnwForm[] = ['irregular', 'lost', 'narrow', 'wide', 'normal']
+  if (anwEyes.length) {
+    const top = [...anwEyes].sort((x, y) => RANK.indexOf(x.a.form as AnwForm) - RANK.indexOf(y.a.form as AnwForm))[0]
+    anw = {
+      form: top.a.form as AnwForm, estimated: false, radiusPct: top.a.radiusPct ?? null,
+      bulgeAt: top.a.form === 'irregular' ? top.a.farthest?.at ?? null : null, label: top.a.label ?? null,
+      byEye: anwEyes.length > 1 && anwEyes[0].a.form !== anwEyes[1].a.form ? anwEyes.map(x => ({ eye: x.eye, form: x.a.form as AnwForm })) : undefined,
+    }
+  } else if (hasIris && pupilRatio !== null && (pupilRatio < 0.3 || pupilRatio > 0.42)) {
+    anw = { form: pupilRatio < 0.3 ? 'narrow' : 'wide', estimated: true }
+  }
+
   // ── 지금 긴장도 ──
   const parts: TensionPart[] = []
   if (hasIris) {
@@ -216,6 +300,12 @@ export function analyzePsyche(d: MultimodalData): PsycheResult {
       const dev = pupilRatio < 0.3 ? (0.3 - pupilRatio) / 0.12 : pupilRatio > 0.42 ? (pupilRatio - 0.42) / 0.12 : 0
       parts.push({ label: '동공 크기', value: Math.round(clamp(dev * 100)), weight: 0.1,
         note: `동공이 홍채의 ${Math.round(pupilRatio * 100)}% — ${pupilRatio < 0.3 ? '작은 편(수축)' : pupilRatio > 0.42 ? '큰 편(산동)' : '보통'}` })
+    }
+    if (anw && !anw.estimated) {
+      parts.push({ label: '자율신경환 형태', value: ANW_FORMS[anw.form].tension, weight: 0.15,
+        note: anw.form === 'lost'
+          ? '자율신경환이 거의 안 보여요 — 피로 신호를 스스로 꺼둔 상태일 수 있어 실제 피로가 숫자보다 클 수 있어요'
+          : `${ANW_FORMS[anw.form].label} (${ANW_FORMS[anw.form].short})${anw.radiusPct != null ? ` · 동공에서 홍채 폭의 ${anw.radiusPct}%` : ''}` })
     }
   }
   parts.push({ label: 'EDA 스트레스', value: clamp(d.eda.stressIndex), weight: 0.25, note: `피부 전도 스트레스 지수 ${d.eda.stressIndex}` })
@@ -229,13 +319,17 @@ export function analyzePsyche(d: MultimodalData): PsycheResult {
   const state: PsycheState = tension < 40 ? 'calm' : tension > 60 ? 'tense' : 'border'
   const lean = tension >= 50 ? 'tense' : 'calm'
 
-  // ── 자율신경환 반응 타입 ──
-  let anw: AnwType | null = null
-  if (hasIris) {
-    anw = ring >= 40 ? 'nerve'
-      : pupilRatio !== null && pupilRatio < 0.3 ? 'suppress'
-      : pupilRatio !== null && pupilRatio > 0.42 ? 'diffuse'
-      : 'balanced'
+  // ── 중간 단계(하이브리드형) — 섬유 밀도가 중간(눈당 틈 1~4개)일 때 섞인 패턴으로 ──
+  let hybrid: HybridId | null = null
+  if (hasIris && perEye >= 1 && perEye <= 4) {
+    // 틈이 한 방향(±1시간)에 얼마나 몰렸는지
+    const conc = clocks.length >= 2
+      ? Math.max(...clocks.map(c => clocks.filter(x => Math.min(Math.abs(x - c), 12 - Math.abs(x - c)) <= 1).length)) / clocks.length
+      : 0
+    if (conc >= 0.6 && clocks.length >= 2 && ((pupilRatio ?? 0) > 0.42 || tension >= 55)) hybrid = 'overload'
+    else if (innerShare >= 0.6 && lean === 'tense') hybrid = 'mask'
+    else if (innerShare <= 0.25 && lean === 'calm') hybrid = 'reverse'
+    else if (conc < 0.5 && lean === 'calm' && ring < 40) hybrid = 'harmony'
   }
 
   const pigments = (Object.keys(pigmentCount) as PigmentZone[])
@@ -246,9 +340,9 @@ export function analyzePsyche(d: MultimodalData): PsycheResult {
   return {
     hasIris, temperament, density, openings: Math.round(openings * 10) / 10, innerShare,
     tension, state, lean,
-    type: temperament ? PSYCHE_TYPES[temperament][lean] : null,
-    calmType: temperament && lean === 'tense' ? PSYCHE_TYPES[temperament].calm : null,
-    parts, anw, pupilRatio, pigments,
+    type: hybrid ? HYBRID_TYPES[hybrid] : temperament ? PSYCHE_TYPES[temperament][lean] : null,
+    calmType: !hybrid && temperament && lean === 'tense' ? PSYCHE_TYPES[temperament].calm : null,
+    parts, anw, stressRing: ring >= 40, hybrid, pupilRatio, pigments,
   }
 }
 
