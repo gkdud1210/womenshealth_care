@@ -1013,7 +1013,7 @@ export default function CommunityPage() {
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
           <div>
-            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아제휴</h1>
+            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 크루</h1>
             <p className="text-[11.5px] text-slate-400">운동·뷰티·힐링 제휴 시설을 회원가로</p>
           </div>
           {tab === 'explore' && (

@@ -3,7 +3,7 @@
  *
  * 각 답변 보기에 케어카드별 가중치를 매겨 점수를 합산하고, 점수가 높은 카드를
  * 자동으로 선택해요. 사용자는 온보딩 화면이나 설정 > 케어 카드 재선택에서 언제든 수정할 수 있고,
- * 선택된 케어카드(user.careTypes)는 루디아피드·루디아제휴의 추천 순서에 그대로 쓰여요.
+ * 선택된 케어카드(user.careTypes)는 루디아피드·루디아 크루의 추천 순서에 그대로 쓰여요.
  */
 
 import { CARE_CASES, type CareCaseId } from '@/data/careCases'
@@ -143,7 +143,7 @@ export function loadIntake(): string[] {
   } catch { return [] }
 }
 
-// ── 케어카드 → 루디아제휴 종목 추천 ────────────────────────────────────────
+// ── 케어카드 → 루디아 크루 종목 추천 ────────────────────────────────────────
 
 export const CARE_MEETUP_CATEGORIES: Record<CareCaseId, MeetupCategory[]> = {
   hair_scalp:            ['walking', 'mind', 'cooking'],

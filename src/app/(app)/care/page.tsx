@@ -146,7 +146,7 @@ function ThemeGuide({ theme, mine, onToggleMine }: { theme: FeedTheme; mine: boo
           <span className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-[24px] flex-shrink-0">{theme.emoji}</span>
           <div className="flex-1 min-w-0">
             <p className="text-[16px] font-bold leading-tight">{theme.label}</p>
-            <p className="text-[11.5px] text-white/85 mt-0.5 leading-snug">관련 글 · 루디아제휴 시설{meetup ? ' · 같이 할 모임' : ''}을 모아 봐요</p>
+            <p className="text-[11.5px] text-white/85 mt-0.5 leading-snug">관련 글 · 루디아 크루 제휴 시설{meetup ? ' · 같이 할 모임' : ''}을 모아 봐요</p>
           </div>
           <button onClick={onToggleMine} aria-pressed={mine}
             className="flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11.5px] font-bold flex-shrink-0"
@@ -159,7 +159,7 @@ function ThemeGuide({ theme, mine, onToggleMine }: { theme: FeedTheme; mine: boo
       {places.length > 0 && (
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5 px-0.5">
-            <p className="text-[12.5px] font-bold text-slate-700">🤝 루디아제휴 시설</p>
+            <p className="text-[12.5px] font-bold text-slate-700">🤝 루디아 크루 제휴 시설</p>
             <Link href={moreHref} className="flex items-center text-[11.5px] font-bold text-rose-500">
               전체 보기 <ChevronRight className="w-3.5 h-3.5" />
             </Link>

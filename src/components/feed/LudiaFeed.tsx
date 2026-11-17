@@ -80,7 +80,7 @@ export interface SnsPost {
   sport?: string
   /** 후기 자랑 글의 몸 변화·루틴 */
   review?: ReviewInfo
-  /** 장소로 지정한 루디아제휴 시설 id (src/data/facilityData.ts) — 시설 화면에서 이 장소 글을 모아 봐요 */
+  /** 장소로 지정한 루디아 크루 시설 id (src/data/facilityData.ts) — 시설 화면에서 이 장소 글을 모아 봐요 */
   facilityId?: string
 }
 
@@ -1354,7 +1354,7 @@ export function WriteModal({
             </div>
           )}
 
-          {/* 장소 — 루디아제휴 시설 */}
+          {/* 장소 — 루디아 크루 시설 */}
           <div>
             <p className="text-xs font-bold text-slate-500 mb-2">📍 장소 <span className="font-normal text-slate-400">(선택 · 시설 화면에서 이 장소 글로 모아 보여줘요)</span></p>
             {(() => {

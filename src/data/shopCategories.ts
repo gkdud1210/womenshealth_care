@@ -105,7 +105,7 @@ export const SHOP_ADS: ShopAd[] = [
     cta: '구독 알아보기', emoji: '🥗', gradient: 'linear-gradient(135deg,#4ade80,#15803d)', to: { product: 'ludia_salad_subscription' } },
   { id: 'ad-fertility', eyebrow: '임신 준비', title: '엽산 · 이노시톨 ·\nCoQ10 한 번에', sub: '가임 준비 영양제 모아보기',
     cta: '영양제 보기', emoji: '🤰', gradient: 'linear-gradient(135deg,#fbbf24,#ea580c)', to: { dept: 'supplement', sub: 'fertility' } },
-  { id: 'ad-fitness', eyebrow: '루디아제휴 회원 추천', title: '집에서도 필라테스,\n홈트 용품 기획전', sub: '요가 매트 · 폼롤러 · 레깅스',
+  { id: 'ad-fitness', eyebrow: '루디아 크루 회원 추천', title: '집에서도 필라테스,\n홈트 용품 기획전', sub: '요가 매트 · 폼롤러 · 레깅스',
     cta: '기획전 보기', emoji: '🧘', gradient: 'linear-gradient(135deg,#818cf8,#4338ca)', to: { dept: 'fitness' } },
 ]
 
