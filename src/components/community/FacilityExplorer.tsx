@@ -16,15 +16,15 @@ import {
   FACILITIES, FACILITY_TYPE_META, FACILITY_GROUPS, formatPrice, discountRate, facilityActivities,
   groupOfType, type Facility, type FacilityType,
 } from '@/data/facilityData'
-import { CATEGORY_GROUPS, CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
+import { CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
 import { ANY, placeLabel, type PlaceRef } from '@/data/regionData'
-import { fetchOsmFacilities, osmDirectionsUrl, osmSupportsSport, type Bounds } from '@/lib/osm-facilities'
+import { fetchOsmByType, osmDirectionsUrl, osmSupportsType, type Bounds } from '@/lib/osm-facilities'
 import type { MapLocation } from '@/components/community/PlaceMap'
 import FacilityReviews, { RatingBadge, TopKeywords } from '@/components/community/FacilityReviews'
 import {
   addReview, loadReviews, removeReview, saveReviews, type FacilityReview, type ReviewMap,
 } from '@/lib/facility-reviews'
-import { CollapsiblePicker, sportPickGroups } from '@/components/community/CollapsiblePicker'
+import { CollapsiblePicker } from '@/components/community/CollapsiblePicker'
 import FacilityFeed from '@/components/community/FacilityFeed'
 
 // ── 내 위치 ───────────────────────────────────────────────────────────────
@@ -52,23 +52,23 @@ const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
   ),
 }) as typeof import('@/components/community/PlaceMap').default
 
-// 지도에서 고를 수 있는 종목 — 등록 시설에서 할 수 있거나 실제 시설 찾기가 되는 종목만, 종목 분류 순서대로
-const MAP_SPORTS: MeetupCategory[] = (() => {
-  const registered = new Set(FACILITIES.flatMap(facilityActivities))
-  return CATEGORY_GROUPS.flatMap(g => g.sections.flatMap(s => s.categories))
-    .filter(c => registered.has(c) || osmSupportsSport(c))
-})()
+// 지도에서 고르는 시설 종류 — 목록과 같은 분류(스포츠·러닝·마사지·헤어·반영구·네일·피부·요리)
+const MAP_PICK_GROUPS = FACILITY_GROUPS.map(g => ({
+  label: `${g.emoji} ${g.label}`,
+  options: g.types.map(t => ({ id: t, ...FACILITY_TYPE_META[t] })),
+}))
 
-/** 목록에서 고른 시설 종류 → 지도를 열 때 처음 선택할 종목 */
-function sportForType(t: FacilityType | 'all'): MeetupCategory | 'all' {
-  if (t === 'all' || t === 'sports_center') return 'all'
-  return FACILITY_TYPE_META[t].categories[0] ?? 'all'
+/** 지도에서 이 종류를 고르면 보여줄 등록 시설 — 같은 종류 + (운동이면) 그 종목을 할 수 있는 곳 (예: 배드민턴장 → 스포츠센터도) */
+function matchesMapType(f: Facility, t: FacilityType): boolean {
+  if (f.type === t) return true
+  const sport = FACILITY_TYPE_META[t].categories[0]
+  return t !== 'sports_center' && !!sport && facilityActivities(f).includes(sport)
 }
 
-function SportChips({ value, onChange }: { value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void }) {
+function MapTypeChips({ value, onChange }: { value: FacilityType | 'all'; onChange: (t: FacilityType | 'all') => void }) {
   return (
     <CollapsiblePicker className="px-4 py-2.5" value={value} onChange={onChange}
-      groups={sportPickGroups(MAP_SPORTS)} allLabel="모든 종목" hint="종목을 고르면 그 종목을 할 수 있는 곳만 보여줘요" />
+      groups={MAP_PICK_GROUPS} allLabel="모든 시설" hint="시설 종류를 고르면 그 종류의 등록 시설과 주변 실제 시설을 보여줘요" />
   )
 }
 
@@ -354,7 +354,7 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
   const [showMap, setShowMap] = useState(false)
-  const [mapSport, setMapSport] = useState<MeetupCategory | 'all'>('all')
+  const [mapType, setMapType] = useState<FacilityType | 'all'>('all')
   const [reviews, setReviews] = useState<ReviewMap>({})
 
   useEffect(() => { setReviews(loadReviews()) }, [])
@@ -447,16 +447,17 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
 
   // 지도: 고른 종목을 할 수 있는 곳은 시설 종류와 상관없이 다 보여줘요 (예: 배드민턴 → 배드민턴장 + 스포츠센터)
   const mapItems = useMemo(
-    () => mapSport === 'all' ? searched : searched.filter(f => facilityActivities(f).includes(mapSport)),
-    [searched, mapSport],
+    () => mapType === 'all' ? searched : searched.filter(f => matchesMapType(f, mapType)),
+    [searched, mapType],
   )
   const osm = useMemo(
-    () => osmSupportsSport(mapSport)
-      ? { key: mapSport, fetch: (b: Bounds) => fetchOsmFacilities(b, mapSport) }
+    () => osmSupportsType(mapType)
+      ? { key: mapType, fetch: (b: Bounds) => fetchOsmByType(b, mapType) }
       : null,
-    [mapSport],
+    [mapType],
   )
-  const openMap = () => { setMapSport(sportForType(type)); setShowMap(true) }
+  // 목록에서 고른 종류 그대로, 분류만 골랐으면 그 분류의 첫 종류로 지도를 열어요
+  const openMap = () => { setMapType(type !== 'all' ? type : group && group.id !== 'sports' ? group.types[0] : 'all'); setShowMap(true) }
   const opened = FACILITIES.find(f => f.id === openId) ?? null
   const placeIsSet = place.country !== ANY
 
@@ -612,10 +613,10 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
           items={mapItems}
           locate={locate}
           markerBadge={badge}
-          toolbar={<SportChips value={mapSport} onChange={setMapSport} />}
-          filterKey={mapSport}
+          toolbar={<MapTypeChips value={mapType} onChange={setMapType} />}
+          filterKey={mapType}
           hint="핀을 누르면 이용료·할인 정보를 볼 수 있어요"
-          emptyText={mapSport === 'all' ? '조건에 맞는 등록 시설이 없어요' : `등록된 ${CATEGORY_META[mapSport].label} 시설이 아직 없어요`}
+          emptyText={mapType === 'all' ? '조건에 맞는 등록 시설이 없어요' : `등록된 ${FACILITY_TYPE_META[mapType].label}이(가) 아직 없어요`}
           osm={osm}
           focus={homeCenter}
           onClose={() => setShowMap(false)}

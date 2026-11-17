@@ -1,4 +1,4 @@
-// ── OpenStreetMap 주변 운동 시설 조회 ─────────────────────────────────────────
+// ── OpenStreetMap 주변 시설 조회 (운동 + 마사지·스파·헤어·반영구·네일·피부·요리) ─────────
 //
 // 루디아에 등록되지 않은 동네 시설도 찾을 수 있게, 지도에 보이는 영역 안의
 // 스포츠센터·수영장·헬스장·코트·트랙 등을 Overpass API 로 불러와요.
@@ -16,6 +16,7 @@ export interface OsmFacility {
 }
 
 import type { MeetupCategory } from '@/data/meetupData'
+import type { FacilityType } from '@/data/facilityData'
 
 export interface Bounds { south: number; west: number; north: number; east: number }
 
@@ -48,6 +49,22 @@ const SPORT_KIND: Record<string, [string, string]> = {
 
 function classify(tags: Record<string, string>): [string, string] {
   const sport = (tags.sport ?? '').split(';')[0]
+  const name = tags.name ?? ''
+  const beauty = tags.beauty ?? ''
+  // 뷰티·힐링
+  if (tags.shop === 'hairdresser') return /두피|헤드스파|scalp/i.test(name) ? ['두피·헤드스파', '🫧'] : ['미용실', '💇']
+  if (tags.shop === 'massage') return ['마사지샵', '💆']
+  if (tags.leisure === 'sauna' || tags.amenity === 'public_bath') return ['사우나·목욕탕', '♨️']
+  if (tags.leisure === 'spa' || tags.amenity === 'spa') return ['스파', '🛁']
+  if (tags.shop === 'beauty' || tags.shop === 'tattoo') {
+    if (/nails/.test(beauty) || /네일|nail/i.test(name)) return ['네일샵', '💅']
+    if (/반영구|눈썹|brow/i.test(name) || /eyebrow|cosmetic/.test(beauty)) return ['눈썹 반영구', '✏️']
+    if (/속눈썹|래쉬|lash/i.test(name) || /eyelash/.test(beauty)) return ['속눈썹', '👁️']
+    if (/왁싱|wax/i.test(name) || /waxing/.test(beauty)) return ['왁싱', '🌸']
+    if (/피부|에스테틱|skin/i.test(name) || /skin_care|facial/.test(beauty)) return ['피부관리실', '🧖']
+    return ['뷰티샵', '✨']
+  }
+  if (/공유주방|쿠킹|쿡스튜디오|cooking/i.test(name)) return ['공유 주방·쿠킹', '🍳']
   if (tags.leisure === 'swimming_pool' || sport === 'swimming') return ['수영장', '🏊']
   if (tags.leisure === 'fitness_centre') return ['헬스장·피트니스', '💪']
   if (tags.leisure === 'track') return ['러닝 트랙', '🏃']
@@ -89,14 +106,52 @@ const SPORT_CLAUSES: Partial<Record<MeetupCategory, string[]>> = {
   dance:        ['nwr["leisure"="dance"]({bbox});', 'nwr["sport"~"dance"]({bbox});'],
 }
 
+// 시설 종류별 Overpass 조건 — 지도 '시설 종류' 고르기에 써요
+const TYPE_CLAUSES: Partial<Record<FacilityType, string[]>> = {
+  sports_center:  ['nwr["leisure"="sports_centre"]({bbox});'],
+  pool:           ['nwr["leisure"="swimming_pool"]["name"]({bbox});', 'nwr["sport"~"swimming"]({bbox});'],
+  badminton:      ['nwr["sport"~"badminton"]({bbox});'],
+  tennis:         ['nwr["sport"~"tennis"]["sport"!~"table_tennis"]({bbox});'],
+  fitness:        ['nwr["leisure"="fitness_centre"]({bbox});', 'nwr["sport"~"fitness"]({bbox});'],
+  yoga:           ['nwr["sport"~"yoga|pilates"]({bbox});', 'nwr["name"~"요가|필라테스|[Pp]ilates"]["shop"!~"."]({bbox});'],
+  climbing:       ['nwr["sport"~"climbing"]({bbox});'],
+  golf:           ['nwr["sport"~"golf"]({bbox});', 'nwr["leisure"="golf_course"]({bbox});'],
+  jogging:        ['nwr["leisure"="track"]({bbox});', 'nwr["sport"~"running|athletics"]({bbox});'],
+  walking:        ['nwr["leisure"="park"]["name"]({bbox});'],
+  kitchen:        ['nwr["name"~"공유주방|쿠킹|쿡스튜디오|[Cc]ooking"]({bbox});'],
+  massage:        ['nwr["shop"="massage"]({bbox});'],
+  spa:            ['nwr["leisure"="spa"]({bbox});', 'nwr["amenity"="spa"]({bbox});'],
+  sauna:          ['nwr["leisure"="sauna"]({bbox});', 'nwr["amenity"="public_bath"]({bbox});'],
+  hair_salon:     ['nwr["shop"="hairdresser"]({bbox});'],
+  head_spa:       ['nwr["shop"="hairdresser"]["name"~"두피|헤드스파|[Ss]calp"]({bbox});', 'nwr["shop"="beauty"]["name"~"두피|헤드스파"]({bbox});'],
+  semi_permanent: ['nwr["shop"~"beauty|tattoo"]["name"~"반영구|눈썹|[Bb]row"]({bbox});', 'nwr["beauty"~"eyebrow|cosmetic"]({bbox});'],
+  lash:           ['nwr["shop"="beauty"]["name"~"속눈썹|래쉬|[Ll]ash"]({bbox});', 'nwr["beauty"~"eyelash"]({bbox});'],
+  nail:           ['nwr["beauty"~"nails"]({bbox});', 'nwr["shop"="beauty"]["name"~"네일|[Nn]ail"]({bbox});'],
+  skincare:       ['nwr["beauty"~"skin_care|facial"]({bbox});', 'nwr["shop"="beauty"]["name"~"피부|에스테틱|[Ss]kin"]({bbox});'],
+  waxing:         ['nwr["beauty"~"waxing"]({bbox});', 'nwr["shop"="beauty"]["name"~"왁싱|[Ww]ax"]({bbox});'],
+}
+
+/** 이 시설 종류로 실제 시설 찾기를 할 수 있는지 */
+export function osmSupportsType(t: FacilityType | 'all'): boolean {
+  return t === 'all' || !!TYPE_CLAUSES[t]
+}
+
+/** 지도에 보이는 영역의 실제 시설 — 시설 종류별 */
+export async function fetchOsmByType(b: Bounds, t: FacilityType | 'all' = 'all'): Promise<OsmFacility[]> {
+  return fetchClauses(b, t === 'all' ? ALL_SPORTS_CLAUSES : TYPE_CLAUSES[t] ?? [])
+}
+
 /** 이 종목으로 실제 시설 찾기를 할 수 있는지 */
 export function osmSupportsSport(sport: MeetupCategory | 'all'): boolean {
   return sport === 'all' || !!SPORT_CLAUSES[sport]
 }
 
 export async function fetchOsmFacilities(b: Bounds, sport: MeetupCategory | 'all' = 'all'): Promise<OsmFacility[]> {
+  return fetchClauses(b, sport === 'all' ? ALL_SPORTS_CLAUSES : SPORT_CLAUSES[sport] ?? [])
+}
+
+async function fetchClauses(b: Bounds, clauses: string[]): Promise<OsmFacility[]> {
   const bbox = `${b.south},${b.west},${b.north},${b.east}`
-  const clauses = sport === 'all' ? ALL_SPORTS_CLAUSES : SPORT_CLAUSES[sport] ?? []
   if (clauses.length === 0) return []
   const query = `
     [out:json][timeout:20];

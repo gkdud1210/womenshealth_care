@@ -1,10 +1,10 @@
 'use client'
 
-// ── 장소 지도 (모임 · 운동 시설 공용) ─────────────────────────────────────────
+// ── 장소 지도 (모임 · 시설 공용) ─────────────────────────────────────────
 //
 // 멀리서 보면 가까운 장소끼리 묶여 숫자로 보이고, 확대할수록 나라 → 지역 → 도시 → 장소 단위로
 // 나뉘어요. 핀을 누르면 그곳 항목 목록이 아래에서 올라와요.
-// osm 을 넘기면 OpenStreetMap 에 등록된 실제 주변 운동 시설도 불러올 수 있어요.
+// osm 을 넘기면 OpenStreetMap 에 등록된 실제 주변 시설도 불러올 수 있어요.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import L from 'leaflet'
@@ -314,7 +314,7 @@ export default function PlaceMap<T>({
                       ? <>🔎 이 지역 시설 {osmState.count}곳 표시됨</>
                       : osmState.status === 'error'
                         ? <>⚠️ 불러오지 못했어요 · 다시 시도</>
-                        : <>🔎 이 지역 실제 운동 시설 찾기</>}
+                        : <>🔎 이 지역 실제 시설 찾기</>}
                 </button>
               )
             )}
