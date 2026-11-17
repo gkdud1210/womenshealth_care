@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen, Sparkles, Brain } from 'lucide-react'
+import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen, Sparkles, Brain, FileBarChart } from 'lucide-react'
 import { useDiagnosticHistory, groupSessionsByYear, type DiagnosticSession } from '@/lib/diagnosticHistory'
 import { buildScore } from '@/components/diagnostic/DiagnosticReport'
 import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
@@ -69,97 +69,75 @@ export default function DiagnosticPage() {
 
   /* ── Landing: action cards ── */
   if (view === 'home') {
+    const latest = sessions[0]
+    const q = latest ? `?id=${latest.id}` : ''
+    const tiles = [
+      { key: 'history', label: '과거 진단 기록', sub: ready && sessions.length ? `${sessions.length}건 · 변화 추이` : '날짜별 리포트 모아보기',
+        Icon: History, grad: 'linear-gradient(135deg,#a855f7,#7c3aed)', onClick: () => setView('history') },
+      { key: 'report', label: '진단 리포트', sub: latest ? '최근 기록 · 그래프·BMI' : '지금 값으로 보기',
+        Icon: FileBarChart, grad: 'linear-gradient(135deg,#f59e0b,#ea580c)', href: `/diagnostic/report${q}` },
+      { key: 'psyche', label: '홍채 심리', sub: '안정 ↔ 긴장 · 내 타입',
+        Icon: Brain, grad: 'linear-gradient(135deg,#8b5cf6,#e11d48)', href: `/diagnostic/psyche${q}` },
+      { key: 'iris', label: '홍채 엔진 리포트', sub: '소견 · 구역 · 자율신경환',
+        Icon: ScanEye, grad: 'linear-gradient(135deg,#6366f1,#0ea5e9)', href: `/diagnostic/iris-report${q}` },
+    ]
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 sm:p-10">
+      <div className="min-h-[calc(100dvh-96px)] lg:min-h-screen flex flex-col justify-center px-4 py-4 sm:p-8 max-w-lg mx-auto w-full">
 
         {/* Header */}
-        <div className="flex flex-col items-center mb-10 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-            style={{
-              background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
-              boxShadow: '0 8px 32px rgba(168,85,247,0.35)',
-            }}>
-            <Microscope className="w-7 h-7 text-white" />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)', boxShadow: '0 6px 20px rgba(168,85,247,0.3)' }}>
+            <Microscope className="w-5 h-5 text-white" />
           </div>
-          <h1 className="font-display text-2xl sm:text-3xl font-semibold text-slate-800 mb-2">멀티모달 진단 분석</h1>
-          <p className="text-sm text-slate-400">홍채 3D · EDA · HRV · BMI 융합 분석</p>
+          <div className="min-w-0">
+            <h1 className="font-display text-xl sm:text-2xl font-semibold text-slate-800 leading-tight">멀티모달 진단 분석</h1>
+            <p className="text-[12px] text-slate-400">홍채 3D · EDA · HRV · BMI 융합 분석</p>
+          </div>
         </div>
 
-        {/* Two CTA cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+        {/* 새 진단 시작 — 가장 큰 카드 */}
+        <Link href="/diagnostic/scan"
+          className="group flex items-center gap-4 rounded-3xl p-5 text-white active:scale-[0.98] transition-transform"
+          style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)', boxShadow: '0 10px 28px rgba(244,63,117,0.3)' }}>
+          <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+            <Scan className="w-7 h-7" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-display text-[19px] font-semibold leading-tight">새 진단 시작</p>
+            <p className="text-[12px] text-white/85 mt-0.5">홍채 · EDA · HRV · BMI 4단계 전신 진단</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-white/80 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
+        </Link>
 
-          {/* 새 진단 시작 */}
-          <Link href="/diagnostic/scan"
-            className="group glass-card p-6 sm:p-8 flex flex-col items-center text-center hover-lift transition-all duration-300 cursor-pointer"
-            style={{ border: '1.5px solid rgba(244,63,117,0.2)' }}>
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
-              style={{
-                background: 'linear-gradient(135deg, #f43f75, #e11d5a)',
-                boxShadow: '0 6px 24px rgba(244,63,117,0.35)',
-              }}>
-              <Scan className="w-6 h-6 text-white" />
-            </div>
-            <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">새 진단 시작</h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              홍채 · EDA · HRV · BMI<br />4단계 전신 진단을 시작합니다
-            </p>
-            <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg, #f43f75, #e11d5a)' }}>
-              시작하기 →
-            </div>
-          </Link>
-
-          {/* 과거 진단 기록 */}
-          <button onClick={() => setView('history')}
-            className="group glass-card p-6 sm:p-8 flex flex-col items-center text-center hover-lift transition-all duration-300 cursor-pointer"
-            style={{ border: '1.5px solid rgba(168,85,247,0.2)' }}>
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
-              style={{
-                background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
-                boxShadow: '0 6px 24px rgba(168,85,247,0.3)',
-              }}>
-              <History className="w-6 h-6 text-white" />
-            </div>
-            <h2 className="font-display text-lg font-semibold text-slate-800 mb-1.5">과거 진단 기록</h2>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              날짜 · 연도별로 지금까지의<br />진단 리포트를 모아봅니다
-            </p>
-            <div className="mt-4 px-4 py-1.5 rounded-full text-xs font-semibold text-white"
-              style={{ background: 'linear-gradient(135deg, #a855f7, #7c3aed)' }}>
-              기록 보기 →
-            </div>
-          </button>
+        {/* 기록 · 리포트 · 홍채 심리 · 홍채 엔진 — 2×2 */}
+        <div className="grid grid-cols-2 gap-3 mt-3">
+          {tiles.map(t => {
+            const body = (
+              <>
+                <span className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.grad }}>
+                  <t.Icon className="w-5 h-5 text-white" />
+                </span>
+                <span className="mt-2.5 block text-[14.5px] font-bold text-slate-800 leading-tight">{t.label}</span>
+                <span className="mt-0.5 block text-[11px] text-slate-400 leading-snug">{t.sub}</span>
+              </>
+            )
+            const cls = 'glass-card p-4 text-left flex flex-col items-start active:scale-[0.97] transition-transform hover-lift'
+            return t.href
+              ? <Link key={t.key} href={t.href} className={cls}>{body}</Link>
+              : <button key={t.key} onClick={t.onClick} className={cls}>{body}</button>
+          })}
         </div>
 
-        {/* 홍채 심리 · 홍채 엔진 리포트 — 가장 최근 기록으로 열려요 */}
-        <div className="grid grid-cols-2 gap-3 w-full max-w-lg mt-4">
-          <Link href={sessions[0] ? `/diagnostic/psyche?id=${sessions[0].id}` : '/diagnostic/psyche'}
-            className="glass-card p-4 flex items-center gap-3 hover-lift" style={{ border: '1.5px solid rgba(139,92,246,0.2)' }}>
-            <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#8b5cf6,#e11d48)' }}>
-              <Brain className="w-5 h-5 text-white" />
-            </span>
-            <span className="min-w-0 text-left">
-              <span className="block text-[14px] font-bold text-slate-800">홍채 심리</span>
-              <span className="block text-[11px] text-slate-400 leading-snug">안정 ↔ 긴장 내 위치 · 8가지 타입</span>
-            </span>
-          </Link>
-          <Link href={sessions[0] ? `/diagnostic/iris-report?id=${sessions[0].id}` : '/diagnostic/iris-report'}
-            className="glass-card p-4 flex items-center gap-3 hover-lift" style={{ border: '1.5px solid rgba(99,102,241,0.2)' }}>
-            <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'linear-gradient(135deg,#6366f1,#0ea5e9)' }}>
-              <ScanEye className="w-5 h-5 text-white" />
-            </span>
-            <span className="min-w-0 text-left">
-              <span className="block text-[14px] font-bold text-slate-800">홍채 엔진 리포트</span>
-              <span className="block text-[11px] text-slate-400 leading-snug">엔진이 찾은 소견·구역·섬유</span>
-            </span>
-          </Link>
-        </div>
+        {latest && (
+          <p className="mt-3 text-center text-[11px] text-slate-400">
+            최근 진단 {new Date(latest.createdAt).getMonth() + 1}월 {new Date(latest.createdAt).getDate()}일{latest.demo ? ' (예시)' : ''} · 리포트·홍채 심리는 이 기록으로 열려요
+          </p>
+        )}
 
         {/* 직접 입력 진입점 */}
         <button onClick={() => router.push('/diagnostic/report')}
-          className="mt-5 flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-rose-500 transition-colors">
+          className="mt-4 mx-auto flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-rose-500 transition-colors">
           <PenLine className="w-3.5 h-3.5" />
           기기 없이 건강정보를 직접 입력해서 진단할래요
         </button>
