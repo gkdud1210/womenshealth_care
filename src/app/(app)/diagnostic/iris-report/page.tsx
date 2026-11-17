@@ -20,7 +20,7 @@ export default function IrisEngineReportPage() {
               <PsycheGauge r={analyzePsyche(data)} />
               <Link href={`/diagnostic/psyche${session ? `?id=${session.id}` : ''}`}
                 className="mt-3 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[12.5px] font-bold text-violet-600 bg-violet-50">
-                <Brain className="w-3.5 h-3.5" /> 홍채 심리 자세히 <ChevronRight className="w-3.5 h-3.5" />
+                <Brain className="w-3.5 h-3.5" /> 홍채 타입 자세히 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
           )}

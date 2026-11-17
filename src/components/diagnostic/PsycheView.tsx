@@ -1,6 +1,6 @@
 'use client'
 
-// 홍채로 보는 나의 심리 상태 — 안정·균형 ↔ 긴장·과부하 위치, 8가지 타입, 기질·자율신경·색소 해석
+// 홍채 타입 · 지금 나의 상태 — 안정·균형 ↔ 긴장·과부하 위치, 8가지 타입, 기질·자율신경·색소 해석
 
 import Link from 'next/link'
 import { ChevronRight, Brain, Sparkles, Info } from 'lucide-react'
@@ -70,7 +70,7 @@ export function PsycheSummaryCard({ data, href }: { data: MultimodalData; href: 
     <div className="glass-card p-5">
       <div className="flex items-center gap-2 mb-3">
         <Brain className="w-4 h-4 text-violet-500" />
-        <h3 className="text-sm font-semibold text-slate-700">홍채로 보는 나의 심리 상태</h3>
+        <h3 className="text-sm font-semibold text-slate-700">홍채 타입 · 지금 나의 상태</h3>
       </div>
       <PsycheGauge r={r} />
       {r.type ? (
@@ -89,7 +89,7 @@ export function PsycheSummaryCard({ data, href }: { data: MultimodalData; href: 
       <Link href={href}
         className="mt-3 flex items-center justify-center gap-1 py-2.5 rounded-xl text-[12.5px] font-bold text-white"
         style={{ background: 'linear-gradient(135deg,#8b5cf6,#e11d48)' }}>
-        <Sparkles className="w-3.5 h-3.5" /> 홍채 심리 자세히 보기 <ChevronRight className="w-3.5 h-3.5" />
+        <Sparkles className="w-3.5 h-3.5" /> 홍채 타입 자세히 보기 <ChevronRight className="w-3.5 h-3.5" />
       </Link>
     </div>
   )
@@ -231,7 +231,7 @@ function TensionTrend({ sessions }: { sessions: DiagnosticSession[] }) {
   )
 }
 
-/** 홍채 심리 전체 화면 */
+/** 홍채 타입 전체 화면 */
 export function PsycheDetail({ data, sessions = [], scanHref }: { data: MultimodalData; sessions?: DiagnosticSession[]; scanHref: string }) {
   const r = analyzePsyche(data)
   const tm = r.temperament ? TEMPERAMENTS[r.temperament] : null
@@ -315,7 +315,7 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
 
       {/* 3. 8가지 타입 */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700">홍채 심리 타입 <span className="text-[11px] font-semibold text-slate-400">기본 8 + 중간형 4</span></h3>
+        <h3 className="text-sm font-semibold text-slate-700">홍채 타입 <span className="text-[11px] font-semibold text-slate-400">기본 8 + 중간형 4</span></h3>
         <p className="text-[11px] text-slate-400 mb-3">타고난 기질 × 지금 상태(안정·긴장), 섬유 밀도가 중간이면 가운데 중간형 줄 — 타입을 누르면 자세한 설명·운동·식습관을 볼 수 있어요</p>
         <TypeMatrix r={r} />
         <Link href="/diagnostic/psyche/types" className="mt-3 flex items-center justify-center gap-1 text-[12px] font-bold text-violet-600">

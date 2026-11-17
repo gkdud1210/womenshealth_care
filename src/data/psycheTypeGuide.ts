@@ -1,6 +1,6 @@
 import type { Temperament, HybridId } from '@/lib/iris-psyche'
 
-// ── 8가지 홍채 심리 타입 가이드 ─────────────────────────────────────────────
+// ── 8가지 홍채 타입 가이드 ─────────────────────────────────────────────
 // 타입마다 강점·주의할 점·어울리는 운동·식습관·생활 리듬. 웰니스용 참고 내용이에요.
 
 export type PsycheTypeId = `${Temperament}_${'calm' | 'tense'}` | `hybrid_${HybridId}`

@@ -147,12 +147,12 @@ export default function DiagnosticReportPage() {
         </div>
       )}
 
-      {/* 홍채 심리 · 홍채 엔진 리포트 바로가기 */}
+      {/* 홍채 타입 · 홍채 엔진 리포트 바로가기 */}
       <div className="grid grid-cols-2 gap-2 mb-4">
         <Link href={`/diagnostic/psyche${session ? `?id=${session.id}` : ''}`}
           className="flex items-center gap-2 px-3.5 py-3 rounded-2xl text-white"
           style={{ background: 'linear-gradient(135deg,#8b5cf6,#e11d48)' }}>
-          <Brain className="w-4 h-4" /><span className="flex-1 text-[13px] font-bold">홍채 심리</span><ChevronRight className="w-4 h-4" />
+          <Brain className="w-4 h-4" /><span className="flex-1 text-[13px] font-bold">홍채 타입</span><ChevronRight className="w-4 h-4" />
         </Link>
         <Link href={`/diagnostic/iris-report${session ? `?id=${session.id}` : ''}`}
           className="flex items-center gap-2 px-3.5 py-3 rounded-2xl text-white"

@@ -1,6 +1,6 @@
 'use client'
 
-// 홍채 심리 타입 — 기본 8가지 + 중간 단계(하이브리드) 4가지, 자율신경환 4대 형태 · 하나씩 자세히 (강점·주의·운동·식습관·생활 리듬·후기)
+// 홍채 타입 — 기본 8가지 + 중간 단계(하이브리드) 4가지, 자율신경환 4대 형태 · 하나씩 자세히 (강점·주의·운동·식습관·생활 리듬·후기)
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -53,7 +53,7 @@ export default function PsycheTypesPage() {
       <div className="min-h-screen p-4 sm:p-6 max-w-2xl mx-auto pb-16">
         <div className="flex items-center gap-3 mb-2">
           <Link href="/diagnostic/psyche" className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-rose-50 text-slate-400"><ChevronLeft className="w-5 h-5" /></Link>
-          <h1 className="font-display text-xl font-semibold text-slate-800">홍채 심리 타입</h1>
+          <h1 className="font-display text-xl font-semibold text-slate-800">홍채 타입</h1>
         </div>
         <p className="text-[12px] text-slate-500 mb-4 leading-relaxed">
           타고난 기질(홍채 섬유) 4가지 × 지금 상태(안정·긴장) 2가지. 기질은 잘 변하지 않지만, 상태는 관리하면 안정 쪽으로 움직여요.

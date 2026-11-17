@@ -76,7 +76,7 @@ export default function DiagnosticPage() {
         Icon: History, grad: 'linear-gradient(135deg,#a855f7,#7c3aed)', onClick: () => setView('history') },
       { key: 'report', label: '진단 리포트', sub: latest ? '최근 기록 · 그래프·BMI' : '지금 값으로 보기',
         Icon: FileBarChart, grad: 'linear-gradient(135deg,#f59e0b,#ea580c)', href: `/diagnostic/report${q}` },
-      { key: 'psyche', label: '홍채 심리', sub: '안정 ↔ 긴장 · 내 타입',
+      { key: 'psyche', label: '홍채 타입', sub: '안정 ↔ 긴장 · 내 타입',
         Icon: Brain, grad: 'linear-gradient(135deg,#8b5cf6,#e11d48)', href: `/diagnostic/psyche${q}` },
       { key: 'iris', label: '홍채 엔진 리포트', sub: '소견 · 구역 · 자율신경환',
         Icon: ScanEye, grad: 'linear-gradient(135deg,#6366f1,#0ea5e9)', href: `/diagnostic/iris-report${q}` },
@@ -110,7 +110,7 @@ export default function DiagnosticPage() {
           <ChevronRight className="w-5 h-5 text-white/80 flex-shrink-0 transition-transform group-hover:translate-x-0.5" />
         </Link>
 
-        {/* 기록 · 리포트 · 홍채 심리 · 홍채 엔진 — 2×2 */}
+        {/* 기록 · 리포트 · 홍채 타입 · 홍채 엔진 — 2×2 */}
         <div className="grid grid-cols-2 gap-3 mt-3">
           {tiles.map(t => {
             const body = (
@@ -131,7 +131,7 @@ export default function DiagnosticPage() {
 
         {latest && (
           <p className="mt-3 text-center text-[11px] text-slate-400">
-            최근 진단 {new Date(latest.createdAt).getMonth() + 1}월 {new Date(latest.createdAt).getDate()}일{latest.demo ? ' (예시)' : ''} · 리포트·홍채 심리는 이 기록으로 열려요
+            최근 진단 {new Date(latest.createdAt).getMonth() + 1}월 {new Date(latest.createdAt).getDate()}일{latest.demo ? ' (예시)' : ''} · 리포트·홍채 타입은 이 기록으로 열려요
           </p>
         )}
 
