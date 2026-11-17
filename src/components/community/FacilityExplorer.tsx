@@ -2,17 +2,18 @@
 
 // ── 시설 찾기 ───────────────────────────────────────────────────────────────
 //
-// 스포츠센터·수영장·코트·걷기 코스·공유 주방 같은 장소를 이용료, 루디아 회원 할인과 함께 보여줘요.
+// 첫 화면에서 스포츠·마사지·헤어·반영구 같은 큰 분류를 고르고, 그 안의 시설 종류(수영장·헬스장·마사지샵…)로 나눠 봐요.
+// 스포츠센터·수영장·코트·걷기 코스·공유 주방·뷰티샵 같은 장소를 이용료, 루디아 회원 할인과 함께 보여줘요.
 // 목록과 지도 두 가지로 볼 수 있고, 지도에서는 OpenStreetMap 의 실제 주변 시설도 찾아볼 수 있어요.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Search, X, MapPin, Clock, ChevronRight, Map as MapIcon, Navigation, BadgePercent, Footprints, Users,
-  Car, Backpack, Info,
+  Car, Backpack, Info, ChevronLeft,
 } from 'lucide-react'
 import {
-  FACILITIES, FACILITY_TYPE_META, ALL_FACILITY_TYPES, formatPrice, discountRate, facilityActivities,
+  FACILITIES, FACILITY_TYPE_META, FACILITY_GROUPS, formatPrice, discountRate, facilityActivities,
   type Facility, type FacilityType,
 } from '@/data/facilityData'
 import { CATEGORY_GROUPS, CATEGORY_META, type MeetupCategory } from '@/data/meetupData'
@@ -60,7 +61,7 @@ const MAP_SPORTS: MeetupCategory[] = (() => {
 /** 목록에서 고른 시설 종류 → 지도를 열 때 처음 선택할 종목 */
 function sportForType(t: FacilityType | 'all'): MeetupCategory | 'all' {
   if (t === 'all' || t === 'sports_center') return 'all'
-  return FACILITY_TYPE_META[t].categories[0]
+  return FACILITY_TYPE_META[t].categories[0] ?? 'all'
 }
 
 function SportChips({ value, onChange }: { value: MeetupCategory | 'all'; onChange: (c: MeetupCategory | 'all') => void }) {
@@ -290,7 +291,7 @@ function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteRev
           <FacilityReviews facility={f} reviews={reviews} userId={userId}
             onAdd={onAddReview} onDelete={onDeleteReview} />
 
-          <div>
+          {facilityActivities(f).length > 0 && <div>
             <p className="text-[11.5px] font-bold text-slate-500 mb-1.5">여기서 할 수 있는 모임</p>
             <div className="flex flex-wrap gap-1.5">
               {facilityActivities(f).map(c => (
@@ -301,7 +302,7 @@ function FacilityDetail({ f, isMember, reviews, userId, onAddReview, onDeleteRev
                 </button>
               ))}
             </div>
-          </div>
+          </div>}
 
           {f.sample && (
             <p className="text-[11px] text-amber-600 bg-amber-50 rounded-xl px-3 py-2">
@@ -340,7 +341,10 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
   /** 내 위치를 알게 되면 불러요 — 지역 필터를 지금 있는 지역으로 맞출 때 써요 */
   onLocated?: (here: LatLng) => void
 }) {
+  const [groupId, setGroupId] = useState<string | null>(null)
   const [type, setType] = useState<FacilityType | 'all'>('all')
+  /** 큰 분류 안에서 종류를 고르지 않고 '전체 보기'를 눌렀을 때 */
+  const [groupAll, setGroupAll] = useState(false)
   const [partnerOnly, setPartnerOnly] = useState(false)
   const [query, setQuery] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
@@ -398,10 +402,26 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
         : Number(!!b.ludia) - Number(!!a.ludia))
   }, [partnerOnly, query, here])
 
+  const group = FACILITY_GROUPS.find(g => g.id === groupId) ?? null
+  const inPlace = useMemo(() => searched.filter(f => matchesPlace(f, place)), [searched, place])
   const list = useMemo(
-    () => searched.filter(f => (type === 'all' || f.type === type) && matchesPlace(f, place)),
-    [searched, type, place],
+    () => inPlace.filter(f => type === 'all' ? (!group || group.types.includes(f.type)) : f.type === type),
+    [inPlace, type, group],
   )
+  // 검색어가 없고 큰 분류도 안 골랐으면 분류 카드부터 보여줘요
+  const showGroups = !group && !query.trim()
+  // 큰 분류를 고른 뒤에는 그 안의 시설 종류 카드를 보여줘요 (스포츠 → 스포츠센터·수영장…)
+  const showTypes = !!group && type === 'all' && !groupAll && !query.trim()
+  function openGroup(id: string | null) {
+    const g = FACILITY_GROUPS.find(x => x.id === id)
+    setGroupId(id); setGroupAll(false)
+    // 종류가 하나뿐인 분류(네일·요리)는 카드 없이 바로 목록으로
+    setType(g && g.types.length === 1 ? g.types[0] : 'all')
+  }
+  function goBack() {
+    if (group && group.types.length > 1 && (type !== 'all' || groupAll)) { setType('all'); setGroupAll(false) }
+    else openGroup(null)
+  }
 
   // 지도: 고른 종목을 할 수 있는 곳은 시설 종류와 상관없이 다 보여줘요 (예: 배드민턴 → 배드민턴장 + 스포츠센터)
   const mapItems = useMemo(
@@ -460,9 +480,41 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
         </div>
       </div>
 
-      <CollapsiblePicker className="px-4 pb-3 max-w-lg mx-auto" value={type} onChange={setType}
-        hint="시설 종류를 고르면 그 종류만 보여줘요"
-        groups={[{ options: ALL_FACILITY_TYPES.map(t => ({ id: t, ...FACILITY_TYPE_META[t] })) }]} />
+      {group && (
+        <div className="px-4 pb-3 max-w-lg mx-auto">
+          <div className="flex items-center gap-1.5">
+            <button onClick={goBack} aria-label="뒤로"
+              className="p-1 -ml-1 rounded-full hover:bg-slate-100"><ChevronLeft className="w-5 h-5 text-slate-600" /></button>
+            <button onClick={() => group.types.length > 1 ? (setType('all'), setGroupAll(false)) : openGroup(null)}
+              className={`text-[15px] font-bold ${showTypes ? 'text-slate-800' : 'text-slate-400'}`}>
+              {group.emoji} {group.label}
+            </button>
+            {!showTypes && (
+              <>
+                <ChevronRight className="w-4 h-4 text-slate-300" />
+                <p className="text-[15px] font-bold text-slate-800">
+                  {type === 'all' ? '전체' : `${FACILITY_TYPE_META[type].emoji} ${FACILITY_TYPE_META[type].label}`}
+                </p>
+              </>
+            )}
+          </div>
+          {!showTypes && group.types.length > 1 && (
+            <div className="mt-2 flex gap-1.5 overflow-x-auto scrollbar-hide -mx-4 px-4">
+              {group.types.map(t => {
+                const on = t === type
+                const meta = FACILITY_TYPE_META[t]
+                return (
+                  <button key={t} onClick={() => { setType(t); setGroupAll(false) }} aria-pressed={on}
+                    className="h-8 px-3 rounded-full flex items-center gap-1 text-[12.5px] font-semibold border whitespace-nowrap flex-shrink-0 transition-all active:scale-95"
+                    style={on ? { background: meta.bg, borderColor: meta.color, color: meta.color } : { background: '#fff', borderColor: '#e2e8f0', color: '#475569' }}>
+                    {meta.emoji} {meta.label}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="max-w-lg mx-auto px-4 py-3 border-t border-slate-100" style={{ background: '#fafafa' }}>
         <div className="flex items-center gap-2 mb-3 px-3.5 py-2.5 rounded-2xl"
@@ -475,7 +527,47 @@ export default function FacilityExplorer({ place, placeText, homeCenter, isMembe
           </p>
         </div>
 
-        {list.length === 0 ? (
+        {showGroups ? (
+          <div className="grid grid-cols-2 gap-2.5">
+            {FACILITY_GROUPS.map(g => {
+              const n = inPlace.filter(f => g.types.includes(f.type)).length
+              return (
+                <button key={g.id} onClick={() => openGroup(g.id)}
+                  className="text-left rounded-2xl p-3.5 border border-white shadow-sm active:scale-[0.98] transition-transform"
+                  style={{ background: g.gradient }}>
+                  <span className="text-[26px] leading-none">{g.emoji}</span>
+                  <p className="mt-2 text-[14.5px] font-bold text-slate-800">{g.label}</p>
+                  <p className="text-[11.5px] text-slate-600 leading-snug">{g.desc}</p>
+                  <p className="mt-1.5 text-[11px] font-semibold text-slate-500">{n > 0 ? `${n}곳` : '준비 중'}</p>
+                </button>
+              )
+            })}
+          </div>
+        ) : showTypes && group ? (
+          <>
+            <div className="grid grid-cols-2 gap-2.5">
+              {group.types.map(t => {
+                const meta = FACILITY_TYPE_META[t]
+                const n = inPlace.filter(f => f.type === t).length
+                return (
+                  <button key={t} onClick={() => setType(t)}
+                    className="text-left rounded-2xl p-3.5 bg-white border shadow-sm active:scale-[0.98] transition-transform"
+                    style={{ borderColor: meta.bg }}>
+                    <span className="w-11 h-11 rounded-xl flex items-center justify-center text-[24px]" style={{ background: meta.bg }}>
+                      {meta.emoji}
+                    </span>
+                    <p className="mt-2 text-[14px] font-bold" style={{ color: meta.color }}>{meta.label}</p>
+                    <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{n > 0 ? `${n}곳` : '준비 중'}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <button onClick={() => setGroupAll(true)}
+              className="mt-3 w-full py-2.5 rounded-2xl bg-white border border-slate-200 text-[12.5px] font-bold text-slate-600">
+              {group.label} 전체 {list.length}곳 보기
+            </button>
+          </>
+        ) : list.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">🗺️</p>
             <p className="text-sm text-slate-400 font-medium">이 조건에 맞는 등록 시설이 아직 없어요</p>

@@ -10,7 +10,11 @@ import type { MeetupCategory } from '@/data/meetupData'
 
 export type FacilityType =
   | 'sports_center' | 'pool' | 'badminton' | 'tennis' | 'fitness' | 'yoga'
-  | 'climbing' | 'jogging' | 'walking' | 'kitchen'
+  | 'climbing' | 'golf' | 'jogging' | 'walking' | 'kitchen'
+  | 'massage' | 'spa' | 'sauna'
+  | 'hair_salon' | 'head_spa'
+  | 'semi_permanent' | 'lash'
+  | 'nail' | 'skincare' | 'waxing'
 
 export interface FacilityTypeMeta {
   label: string
@@ -31,10 +35,57 @@ export const FACILITY_TYPE_META: Record<FacilityType, FacilityTypeMeta> = {
   climbing:      { label: '클라이밍장', emoji: '🧗', color: '#b45309', bg: 'rgba(180,83,9,0.1)',   categories: ['climbing'] },
   jogging:       { label: '조깅 코스',  emoji: '🏃', color: '#ea580c', bg: 'rgba(234,88,12,0.1)',  categories: ['running'] },
   walking:       { label: '걷기 코스',  emoji: '🚶', color: '#0284c7', bg: 'rgba(2,132,199,0.1)',  categories: ['walking', 'hiking'] },
+  golf:          { label: '골프연습장', emoji: '⛳', color: '#15803d', bg: 'rgba(21,128,61,0.1)',  categories: ['golf'] },
   kitchen:       { label: '공유 주방',  emoji: '🍳', color: '#ca8a04', bg: 'rgba(202,138,4,0.1)',  categories: ['cooking', 'baking'] },
+  // ── 뷰티·힐링 (모임 종목과는 연결되지 않아요) ──
+  massage:        { label: '마사지샵',       emoji: '💆', color: '#be185d', bg: 'rgba(190,24,93,0.1)',  categories: [] },
+  spa:            { label: '스파',           emoji: '🛁', color: '#0e7490', bg: 'rgba(14,116,144,0.1)', categories: [] },
+  sauna:          { label: '사우나·찜질방',  emoji: '♨️', color: '#c2410c', bg: 'rgba(194,65,12,0.1)',  categories: [] },
+  hair_salon:     { label: '미용실',         emoji: '💇', color: '#9333ea', bg: 'rgba(147,51,234,0.1)', categories: [] },
+  head_spa:       { label: '두피·헤드스파',  emoji: '🫧', color: '#0891b2', bg: 'rgba(8,145,178,0.1)',  categories: [] },
+  semi_permanent: { label: '눈썹 반영구',    emoji: '✏️', color: '#92400e', bg: 'rgba(146,64,14,0.1)',  categories: [] },
+  lash:           { label: '속눈썹 펌·연장', emoji: '👁️', color: '#4338ca', bg: 'rgba(67,56,202,0.1)',  categories: [] },
+  nail:           { label: '네일샵',         emoji: '💅', color: '#db2777', bg: 'rgba(219,39,119,0.1)', categories: [] },
+  skincare:       { label: '피부관리실',     emoji: '🧖', color: '#e11d48', bg: 'rgba(225,29,72,0.1)',  categories: [] },
+  waxing:         { label: '왁싱',           emoji: '🌸', color: '#a21caf', bg: 'rgba(162,28,175,0.1)', categories: [] },
 }
 
 export const ALL_FACILITY_TYPES = Object.keys(FACILITY_TYPE_META) as FacilityType[]
+
+// ── 제휴 시설 큰 분류 ──────────────────────────────────────────────────────
+// 루디아제휴 첫 화면에 카드로 보여주고, 누르면 그 안의 시설 종류로 나눠 보여줘요.
+
+export interface FacilityGroup {
+  id: string
+  label: string
+  emoji: string
+  desc: string
+  gradient: string
+  types: FacilityType[]
+}
+
+export const FACILITY_GROUPS: FacilityGroup[] = [
+  { id: 'sports',  label: '스포츠',         emoji: '🏅', desc: '수영장·헬스장·테니스장', gradient: 'linear-gradient(135deg,#dbeafe,#bfdbfe)',
+    types: ['sports_center', 'pool', 'fitness', 'yoga', 'tennis', 'badminton', 'golf', 'climbing'] },
+  { id: 'outdoor', label: '러닝·산책',      emoji: '🌳', desc: '조깅·걷기 코스',          gradient: 'linear-gradient(135deg,#dcfce7,#bbf7d0)',
+    types: ['jogging', 'walking'] },
+  { id: 'massage', label: '마사지·스파',    emoji: '💆', desc: '마사지샵·스파·찜질방',    gradient: 'linear-gradient(135deg,#fce7f3,#fbcfe8)',
+    types: ['massage', 'spa', 'sauna'] },
+  { id: 'hair',    label: '헤어',           emoji: '💇', desc: '미용실·두피 케어',        gradient: 'linear-gradient(135deg,#f3e8ff,#e9d5ff)',
+    types: ['hair_salon', 'head_spa'] },
+  { id: 'brow',    label: '반영구·속눈썹',  emoji: '✏️', desc: '눈썹 반영구·속눈썹 펌',   gradient: 'linear-gradient(135deg,#fef3c7,#fde68a)',
+    types: ['semi_permanent', 'lash'] },
+  { id: 'nail',    label: '네일',           emoji: '💅', desc: '젤네일·패디큐어',         gradient: 'linear-gradient(135deg,#ffe4e6,#fecdd3)',
+    types: ['nail'] },
+  { id: 'skin',    label: '피부·왁싱',      emoji: '🧖', desc: '피부관리실·왁싱',         gradient: 'linear-gradient(135deg,#ffedd5,#fed7aa)',
+    types: ['skincare', 'waxing'] },
+  { id: 'food',    label: '요리',           emoji: '🍳', desc: '공유 주방·쿠킹 스튜디오', gradient: 'linear-gradient(135deg,#fef9c3,#fef08a)',
+    types: ['kitchen'] },
+]
+
+export function groupOfType(t: FacilityType): FacilityGroup | undefined {
+  return FACILITY_GROUPS.find(g => g.types.includes(t))
+}
 
 export interface FacilityPrice {
   /** null 이면 무료 */
@@ -160,7 +211,7 @@ export const FACILITIES: Facility[] = [
     place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.4946, lng: 127.0571,
     address: '서울 강남구 대치동 일대', hours: '06:00 – 23:00',
     price: { amount: 20000, unit: '코트 1시간', currency: 'KRW' },
-    ludia: { memberAmount: 15000, perk: '루디아 크루 단체 예약 시 셔틀콕 제공' },
+    ludia: { memberAmount: 15000, perk: '루디아 단체 예약 시 셔틀콕 제공' },
     amenities: ['코트 8면', '라켓 대여', '샤워실'],
     description: '천장이 높은 배드민턴 전용 구장. 주말 오전 루디아 배드민턴 모임이 열려요.',
   },
@@ -1181,5 +1232,146 @@ export const FACILITIES: Facility[] = [
       '문의 0507-1367-7182',
     ],
     description: '일곡동 어린이 수영 강습 전용 수영장.',
+  },
+
+  // ── 서울 · 뷰티·힐링 제휴 (예시) ───────────────────────────────────────
+  {
+    id: 'f-gangnam-golf', name: '강남 실내 골프연습장 (예시)', type: 'golf', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.5010, lng: 127.0396,
+    address: '서울 강남구 역삼동 일대', hours: '06:00 – 24:00',
+    price: { amount: 25000, unit: '1시간', currency: 'KRW' },
+    ludia: { memberAmount: 19000, perk: '여성 초보 레슨 체험 1회 무료' },
+    amenities: ['스크린 타석', '레슨 프로', '클럽 대여', '샤워실'],
+    description: '초보 여성 골퍼를 위한 레슨이 잘 되어 있는 실내 연습장.',
+  },
+  {
+    id: 'f-seocho-massage', name: '서초 아로마 테라피 (예시)', type: 'massage', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'seocho' }, lat: 37.4935, lng: 127.0145,
+    address: '서울 서초구 서초동 일대', hours: '11:00 – 23:00 (예약제)',
+    price: { amount: 90000, unit: '전신 90분', currency: 'KRW' },
+    ludia: { memberAmount: 69000, perk: '생리통 완화 복부 케어 10분 추가' },
+    amenities: ['여성 테라피스트', '1인 룸', '샤워실', '주차 2시간'],
+    notes: ['임신 중이면 예약할 때 꼭 알려 주세요 — 산전 마사지로 안내해요'],
+    description: '림프·아로마 전신 마사지. 생리 전후 붓기 관리 코스가 있어요.',
+  },
+  {
+    id: 'f-mapo-massage', name: '홍대 타이·스포츠 마사지 (예시)', type: 'massage', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'mapo' }, lat: 37.5550, lng: 126.9220,
+    address: '서울 마포구 서교동 일대', hours: '12:00 – 02:00',
+    price: { amount: 60000, unit: '60분', currency: 'KRW' },
+    ludia: { memberAmount: 48000, perk: '발 마사지 20분 무료 추가' },
+    amenities: ['커플룸', '샤워실', '운동복 제공'],
+    description: '운동 후 뭉친 근육을 풀어 주는 스포츠·타이 마사지.',
+  },
+  {
+    id: 'f-gangnam-spa', name: '청담 웰니스 스파 (예시)', type: 'spa', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.5240, lng: 127.0470,
+    address: '서울 강남구 청담동 일대', hours: '10:00 – 22:00 (예약제)',
+    price: { amount: 180000, unit: '스파 패키지', currency: 'KRW' },
+    ludia: { memberAmount: 140000, perk: '반신욕 + 허브티 세트 제공' },
+    amenities: ['프라이빗 스파룸', '건식·습식 사우나', '파우더룸', '발레파킹'],
+    description: '반신욕·바디 스크럽·전신 케어를 한 번에 받는 프라이빗 스파.',
+  },
+  {
+    id: 'f-yeongdeungpo-sauna', name: '여의도 힐링 찜질방 (예시)', type: 'sauna', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'yeongdeungpo' }, lat: 37.5210, lng: 126.9240,
+    address: '서울 영등포구 여의도동 일대', hours: '24시간',
+    price: { amount: 15000, unit: '1회', currency: 'KRW' },
+    ludia: { memberAmount: 11000, perk: '식혜·구운 계란 세트 무료' },
+    amenities: ['여성 전용 수면실', '황토방', '소금방', '세신'],
+    supplies: ['갈아입을 속옷', '세면도구'],
+    description: '여성 전용 구역이 따로 있는 24시간 찜질방.',
+  },
+  {
+    id: 'f-seongsu-hair', name: '성수 헤어살롱 (예시)', type: 'hair_salon', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'seongdong' }, lat: 37.5435, lng: 127.0560,
+    address: '서울 성동구 성수동 일대', hours: '10:00 – 21:00 (화요일 휴무)',
+    price: { amount: 35000, unit: '여성 커트', currency: 'KRW' },
+    ludia: { memberAmount: 28000, perk: '펌·염색 시 두피 스케일링 무료' },
+    amenities: ['1:1 디자이너', '저자극 염색약', '주차 1시간'],
+    description: '임산부·두피 민감한 분을 위한 저자극 시술을 해 주는 미용실.',
+  },
+  {
+    id: 'f-gangnam-hair', name: '강남역 헤어 스튜디오 (예시)', type: 'hair_salon', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.4985, lng: 127.0280,
+    address: '서울 강남구 역삼동 일대', hours: '10:00 – 22:00',
+    price: { amount: 120000, unit: '디지털 펌', currency: 'KRW' },
+    ludia: { memberAmount: 95000, perk: '클리닉 트리트먼트 1회 무료' },
+    amenities: ['펌·염색', '클리닉', '예약제'],
+    description: '펌·염색 손상을 줄이는 클리닉 시술이 강점인 헤어 스튜디오.',
+  },
+  {
+    id: 'f-mapo-headspa', name: '망원 두피 헤드스파 (예시)', type: 'head_spa', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'mapo' }, lat: 37.5560, lng: 126.9050,
+    address: '서울 마포구 망원동 일대', hours: '11:00 – 21:00 (예약제)',
+    price: { amount: 70000, unit: '헤드스파 60분', currency: 'KRW' },
+    ludia: { memberAmount: 55000, perk: '두피 진단 무료' },
+    amenities: ['두피 진단기', '1인 룸'],
+    description: '탈모·두피 열감이 고민인 분께 맞는 두피 스케일링·헤드스파.',
+  },
+  {
+    id: 'f-gangnam-brow', name: '신사 눈썹 반영구 (예시)', type: 'semi_permanent', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.5205, lng: 127.0220,
+    address: '서울 강남구 신사동 일대', hours: '10:00 – 20:00 (예약제)',
+    price: { amount: 250000, unit: '자연눈썹 (리터치 1회 포함)', currency: 'KRW' },
+    ludia: { memberAmount: 199000, perk: '리터치 기간 2개월 → 3개월 연장' },
+    amenities: ['1:1 상담', '마취 크림', '일회용 바늘'],
+    notes: ['임신·수유 중이거나 피부 질환이 있으면 시술이 어려울 수 있어요', '시술 후 1주일은 사우나·수영을 피해 주세요'],
+    description: '얼굴형에 맞춰 디자인하는 자연눈썹·콤보눈썹 반영구.',
+  },
+  {
+    id: 'f-songpa-brow', name: '잠실 반영구 스튜디오 (예시)', type: 'semi_permanent', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'songpa' }, lat: 37.5110, lng: 127.0980,
+    address: '서울 송파구 잠실동 일대', hours: '10:00 – 21:00 (예약제)',
+    price: { amount: 220000, unit: '눈썹', currency: 'KRW' },
+    ludia: { memberAmount: 180000, perk: '아이라인 반영구 30% 할인' },
+    amenities: ['눈썹·아이라인·입술', '1:1 상담'],
+    description: '눈썹·아이라인·입술 반영구를 하는 스튜디오.',
+  },
+  {
+    id: 'f-mapo-lash', name: '합정 속눈썹 펌 (예시)', type: 'lash', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'mapo' }, lat: 37.5495, lng: 126.9135,
+    address: '서울 마포구 합정동 일대', hours: '11:00 – 21:00',
+    price: { amount: 45000, unit: '속눈썹 펌', currency: 'KRW' },
+    ludia: { memberAmount: 35000, perk: '속눈썹 영양 앰플 무료' },
+    amenities: ['펌·연장', '저자극 글루'],
+    description: '눈이 예민한 분을 위해 저자극 제품을 쓰는 속눈썹 펌·연장 샵.',
+  },
+  {
+    id: 'f-seongsu-nail', name: '성수 네일 아틀리에 (예시)', type: 'nail', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'seongdong' }, lat: 37.5445, lng: 127.0520,
+    address: '서울 성동구 성수동 일대', hours: '11:00 – 21:00 (예약제)',
+    price: { amount: 55000, unit: '젤네일 기본', currency: 'KRW' },
+    ludia: { memberAmount: 44000, perk: '손 보습 케어 무료' },
+    amenities: ['젤·아트', '패디큐어', '무독성 젤'],
+    description: '손톱 건강을 생각한 무독성 젤을 쓰는 네일샵.',
+  },
+  {
+    id: 'f-jung-nail', name: '명동 네일·패디 (예시)', type: 'nail', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'jung' }, lat: 37.5630, lng: 126.9850,
+    address: '서울 중구 명동 일대', hours: '10:00 – 22:00',
+    price: { amount: 60000, unit: '패디큐어', currency: 'KRW' },
+    ludia: { memberAmount: 48000, perk: '각질 케어 무료' },
+    amenities: ['패디큐어', '발 각질 케어', '당일 예약'],
+    description: '당일 예약이 쉬운 네일·패디큐어샵.',
+  },
+  {
+    id: 'f-seocho-skin', name: '서초 피부관리실 (예시)', type: 'skincare', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'seocho' }, lat: 37.4890, lng: 127.0080,
+    address: '서울 서초구 방배동 일대', hours: '10:00 – 21:00 (예약제)',
+    price: { amount: 80000, unit: '기본 관리 1회', currency: 'KRW' },
+    ludia: { memberAmount: 59000, perk: '생리 전 트러블 진정 팩 추가' },
+    amenities: ['여드름·진정 관리', '1인 룸', '주차'],
+    description: '호르몬 변화로 생기는 트러블·홍조를 진정시키는 관리가 있어요.',
+  },
+  {
+    id: 'f-gangnam-waxing', name: '역삼 왁싱 스튜디오 (예시)', type: 'waxing', sample: true,
+    place: { country: 'KR', region: 'seoul', city: 'gangnam' }, lat: 37.5000, lng: 127.0360,
+    address: '서울 강남구 역삼동 일대', hours: '11:00 – 22:00 (예약제)',
+    price: { amount: 70000, unit: '브라질리언', currency: 'KRW' },
+    ludia: { memberAmount: 55000, perk: '진정 케어 무료' },
+    amenities: ['여성 관리사', '1인 룸', '저자극 왁스'],
+    notes: ['생리 중이거나 피부가 예민한 날은 피하는 게 좋아요'],
+    description: '여성 관리사가 1:1로 관리하는 왁싱 스튜디오.',
   },
 ]

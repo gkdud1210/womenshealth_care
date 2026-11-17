@@ -13,7 +13,7 @@ const navItems = [
   { href: '/diagnostic', icon: Microscope,      label: '진단 분석' },
   { href: '/care',       icon: HeartPulse,      label: '루디아피드' },
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 헬스' },
-  { href: '/community',  icon: Users,           label: '루디아 크루' },
+  { href: '/community',  icon: Users,           label: '루디아제휴' },
   { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
 ]
 

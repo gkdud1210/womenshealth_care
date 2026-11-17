@@ -1005,8 +1005,8 @@ export default function CommunityPage() {
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
           <div>
-            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 크루</h1>
-            <p className="text-[11.5px] text-slate-400">우리 동네에서 함께 움직여요</p>
+            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아제휴</h1>
+            <p className="text-[11.5px] text-slate-400">운동·뷰티·힐링 제휴 시설을 회원가로</p>
           </div>
           {tab === 'explore' && (
             <button onClick={() => setShowCreate(true)} className="p-1.5 rounded-full hover:bg-slate-50 transition-colors">
@@ -1016,7 +1016,7 @@ export default function CommunityPage() {
         </div>
 
         <div className="flex px-4 max-w-lg mx-auto border-b border-slate-100">
-          {([{ key: 'places', label: '시설 찾기' }, { key: 'explore', label: '모임 찾기' }, { key: 'workout', label: '운동 기록' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
+          {([{ key: 'places', label: '제휴 시설' }, { key: 'explore', label: '모임 찾기' }, { key: 'workout', label: '운동 기록' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className="flex-1 py-2.5 text-sm font-bold relative"
               style={{ color: tab === t.key ? '#e11d5a' : '#94a3b8' }}>
