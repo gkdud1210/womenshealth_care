@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Microscope,
-  ShoppingBag, Users, ChefHat, HeartPulse
+  ShoppingBag, Users, ChefHat, HeartPulse, CircleUserRound
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 헬스', highlight: true },
   { href: '/community',  icon: Users,           label: '크루' },
   { href: '/shop',       icon: ShoppingBag,     label: '샵' },
+  { href: '/profile',    icon: CircleUserRound, label: '프로필' },
 ] as const
 
 export function MobileNav() {
@@ -31,7 +32,7 @@ export function MobileNav() {
       <div className="flex items-end justify-around px-0.5 py-1">
         {NAV_ITEMS.map(({ href, icon: Icon, label, ...rest }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/')
-            || (href === '/shop' && pathname.startsWith('/settings'))
+            || (href === '/profile' && pathname.startsWith('/settings'))
           const highlight = 'highlight' in rest && rest.highlight
 
           if (highlight) {
