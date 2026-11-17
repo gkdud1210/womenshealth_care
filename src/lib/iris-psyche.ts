@@ -133,7 +133,7 @@ export interface PsycheResult {
 
 const clamp = (v: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, v))
 
-const INNER_ZONE = ['위', '장', '소화', '십이지', '대장', '소장', '자율']
+const INNER_ZONE = ['위', '소화', '십이지', '대장', '소장', '결장', '맹장', '자율']
 const UPPER_ZONE = ['뇌', '신경', '머리', '정신', '수면']
 const SIDE_ZONE = ['간', '담']
 
