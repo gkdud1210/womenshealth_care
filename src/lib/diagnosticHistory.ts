@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import type { MultimodalData } from '@/components/calendar/LudiaInsightCard'
+import type { MultimodalData, IrisEyeDetection, IrisLesion } from '@/components/calendar/LudiaInsightCard'
 import type { OnboardingAnswers } from '@/lib/onboarding-profile'
 
 export type DiagnosticSource = 'scan' | 'manual'
@@ -114,6 +114,32 @@ const SAMPLE_ROWS: { daysAgo: number; v: number[] }[] = [
   { daysAgo: 1,  v: [70, 73, 64, 68, 8.2,  53, 58, 67, 54, 46, 7.1, 68, 60.2, 23.2] },
 ]
 
+/** 예시 기록용 홍채 엔진 결과 — 섬유 틈(열공·움) 수는 같고(타고난 기질), 긴장륜·동공은 점점 좋아져요 */
+function sampleDetection(i: number, n: number, score: number): IrisEyeDetection {
+  const t = 1 - i / Math.max(1, n - 1)          // 1 = 처음(긴장) → 0 = 최근(안정)
+  const L = (id: number, key: string, label: string, zoneName: string, clock: number): IrisLesion => ({
+    id, key, label, confidence: 0.75, organs: [{ name: zoneName, pct: 100 }], position: { rel: 0.5, clock }, zoneName, zoneTime: `${clock}시`, located: 'zone',
+  })
+  return {
+    score, annotatedImg: null, baseImg: null,
+    lesions: [
+      L(1, 'lac', '열공 (Lacuna)', '폐', 9),
+      L(2, 'cry', '움 (Crypt)', '위', 6),
+      L(3, 'pig', '색소 반점 (Pigment)', '간', 8),
+      ...(t > 0.4 ? [L(4, 'pig', '색소 반점 (Pigment)', '대뇌', 12)] : []),
+    ],
+    lesionSummary: [
+      { key: 'lac', label: '열공 (Lacuna)', count: 1, color: '#a855f7' },
+      { key: 'cry', label: '움 (Crypt)', count: 1, color: '#0ea5e9' },
+      { key: 'pig', label: '색소 반점 (Pigment)', count: t > 0.4 ? 2 : 1, color: '#f59e0b' },
+    ],
+    model: { source: '예시 데이터', runId: null, valMiou: null, trainImages: null, reliable: false },
+    globalFindings: t > 0.3 ? [{ key: 'stress_ring', label: '긴장륜(스트레스 링)', score: Math.round(40 + t * 50) }] : [],
+    geometry: { cx: 240, cy: 240, pupilR: Math.round(200 * (0.27 + (1 - t) * 0.08)), irisR: 200 },
+    disclaimer: '예시 기록이에요. 실제 홍채 사진을 분석한 결과가 아니에요.',
+  }
+}
+
 export function makeSampleSessions(base: { answers: OnboardingAnswers; careTypes: string[] }): DiagnosticSession[] {
   return SAMPLE_ROWS.map(({ daysAgo, v }, i) => {
     const d = new Date()
@@ -125,7 +151,8 @@ export function makeSampleSessions(base: { answers: OnboardingAnswers; careTypes
       createdAt: d.toISOString(),
       source: 'scan' as const,
       data: {
-        iris: { leftScore, rightScore, skinZone, thyroidZone },
+        iris: { leftScore, rightScore, skinZone, thyroidZone,
+          detection: { right: sampleDetection(i, SAMPLE_ROWS.length, rightScore), left: sampleDetection(i, SAMPLE_ROWS.length, leftScore) } },
         eda: { conductance, stressIndex, tensionLevel, relaxationScore, ansBalance },
         biosignal: { hrv, sleepHours, heartRate, weight, bmi },
       },

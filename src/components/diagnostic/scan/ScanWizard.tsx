@@ -54,6 +54,7 @@ interface EyeData {
   boundarySource?: string
   globalFindings?: IrisEyeDetection['globalFindings']
   readingError?: string | null
+  geometry?: IrisEyeDetection['geometry']
 }
 
 /* 주석 이미지를 리포트 기록(localStorage)에 넣을 수 있도록 축소 — 실패하면 원본 그대로 */
@@ -106,6 +107,7 @@ async function toDetection(d: EyeData): Promise<IrisEyeDetection | undefined> {
     boundarySource: d.boundarySource,
     globalFindings: d.globalFindings ?? null,
     readingError: d.readingError ?? null,
+    geometry: d.geometry ?? null,
   }
 }
 
@@ -210,6 +212,11 @@ function IrisStep({ onDone }: { onDone: (d: MultimodalData['iris']) => void }) {
         boundarySource: (data.boundary as { source?: string } | undefined)?.source,
         globalFindings: (data.globalFindings as EyeData['globalFindings']) ?? null,
         readingError: (data.readingError as string | null | undefined) ?? null,
+        geometry: (() => {
+          const p = data.pupil as { cx: number; cy: number; r: number } | null | undefined
+          const ir = data.iris as { r: number } | null | undefined
+          return p && ir ? { cx: p.cx, cy: p.cy, pupilR: p.r, irisR: ir.r } : null
+        })(),
       }
       if (eyeStep === 'right') setRightData(eyeData)
       else                     setLeftData(eyeData)
