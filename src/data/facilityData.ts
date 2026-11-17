@@ -53,7 +53,7 @@ export const FACILITY_TYPE_META: Record<FacilityType, FacilityTypeMeta> = {
 export const ALL_FACILITY_TYPES = Object.keys(FACILITY_TYPE_META) as FacilityType[]
 
 // ── 제휴 시설 큰 분류 ──────────────────────────────────────────────────────
-// 루디아제휴 첫 화면에 카드로 보여주고, 누르면 그 안의 시설 종류로 나눠 보여줘요.
+// 루디아 크루 첫 화면에 카드로 보여주고, 누르면 그 안의 시설 종류로 나눠 보여줘요.
 
 export interface FacilityGroup {
   id: string
