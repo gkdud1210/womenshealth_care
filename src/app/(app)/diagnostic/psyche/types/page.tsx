@@ -62,7 +62,33 @@ export default function PsycheTypesPage() {
           {TEMPS.map(t => {
             const tm = TEMPERAMENTS[t]
             return (
-              <div key={t}>
+              <div key={t} className="space-y-4">
+                {t === 'hessian' && (
+              <div>
+                <p className="text-[12px] font-bold mb-0.5 text-violet-600">🔀 중간 단계 (하이브리드형)</p>
+                <p className="text-[11px] text-slate-400 mb-1.5">밀집형과 개방형 사이 — 섬유 밀도가 중간일 때, 섞인 패턴 + 안정(왼쪽)/긴장(오른쪽)으로 나눠요</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['harmony', 'mask', 'reverse', 'overload'] as HybridId[]).map(h => {
+                    const ty = HYBRID_TYPES[h]
+                    const id = `hybrid_${h}`
+                    const isMine = id === myId
+                    return (
+                      <button key={h} onClick={() => open(id)}
+                        className="relative text-left rounded-2xl p-3.5 bg-white border active:scale-[0.98] transition-transform"
+                        style={{ borderColor: isMine ? '#8b5cf6' : '#f1f5f9', boxShadow: isMine ? '0 0 0 1px #8b5cf6' : '0 1px 3px rgba(15,23,42,0.05)' }}>
+                        {isMine && <span className="absolute top-2 right-2 text-[9.5px] font-black px-1.5 py-0.5 rounded text-white bg-violet-500">내 타입</span>}
+                        <span className="text-[28px] leading-none">{ty.emoji}</span>
+                        <p className="mt-1.5 text-[14px] font-black text-slate-800">{ty.name}</p>
+                        <p className="text-[10.5px] font-bold mt-0.5" style={{ color: ['harmony', 'reverse'].includes(h) ? CALM : TENSE }}>{['harmony', 'reverse'].includes(h) ? '① 안정·균형' : '② 긴장·과부하'}</p>
+                        <p className="text-[10px] text-violet-500 mt-0.5">{ty.pattern}</p>
+                        <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">{ty.tagline}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+                )}
+                <div>
                 <p className="text-[12px] font-bold mb-1.5" style={{ color: tm.color }}>{tm.emoji} {tm.label} · {tm.short} <span className="text-slate-400 font-semibold">({tm.axis})</span></p>
                 <div className="grid grid-cols-2 gap-2">
                   {(['calm', 'tense'] as const).map(s => {
@@ -82,32 +108,10 @@ export default function PsycheTypesPage() {
                     )
                   })}
                 </div>
+                </div>
               </div>
             )
           })}
-
-          <div>
-            <p className="text-[12px] font-bold mb-0.5 text-violet-600">🔀 중간 단계 (하이브리드형)</p>
-            <p className="text-[11px] text-slate-400 mb-1.5">섬유 밀도가 중간일 때 — 밀집과 개방이 섞인 패턴 + 자율신경 안정/긴장으로 나눠요</p>
-            <div className="grid grid-cols-2 gap-2">
-              {(Object.keys(HYBRID_TYPES) as HybridId[]).map(h => {
-                const ty = HYBRID_TYPES[h]
-                const id = `hybrid_${h}`
-                const isMine = id === myId
-                return (
-                  <button key={h} onClick={() => open(id)}
-                    className="relative text-left rounded-2xl p-3.5 bg-white border active:scale-[0.98] transition-transform"
-                    style={{ borderColor: isMine ? '#8b5cf6' : '#f1f5f9', boxShadow: isMine ? '0 0 0 1px #8b5cf6' : '0 1px 3px rgba(15,23,42,0.05)' }}>
-                    {isMine && <span className="absolute top-2 right-2 text-[9.5px] font-black px-1.5 py-0.5 rounded text-white bg-violet-500">내 타입</span>}
-                    <span className="text-[28px] leading-none">{ty.emoji}</span>
-                    <p className="mt-1.5 text-[14px] font-black text-slate-800">{ty.name}</p>
-                    <p className="text-[10.5px] font-bold mt-0.5 text-violet-500">{ty.pattern}</p>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">{ty.tagline}</p>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
 
           <div>
             <p className="text-[12px] font-bold mb-0.5 text-slate-700">⭕ 자율신경환 4대 형태</p>

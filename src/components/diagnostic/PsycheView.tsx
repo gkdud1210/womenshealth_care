@@ -16,16 +16,18 @@ import type { DiagnosticSession } from '@/lib/diagnosticHistory'
 const CALM = '#0d9488'
 const TENSE = '#e11d48'
 
+const ZONES = [
+  { id: 'calm',   label: '안정·균형',   emoji: '😌', range: '0~40',   w: '40%', color: CALM },
+  { id: 'border', label: '중간',        emoji: '⚖️', range: '40~60',  w: '20%', color: '#d97706' },
+  { id: 'tense',  label: '긴장·과부하', emoji: '😣', range: '60~100', w: '40%', color: TENSE },
+] as const
+
 /** 안정·균형 ↔ 긴장·과부하 막대 위에 내 위치 */
 export function PsycheGauge({ r, compact = false }: { r: PsycheResult; compact?: boolean }) {
   const st = STATE_META[r.state]
   return (
     <div>
-      <div className="flex items-end justify-between mb-1.5">
-        <span className="text-[11.5px] font-bold" style={{ color: CALM }}>😌 안정·균형</span>
-        <span className="text-[11.5px] font-bold" style={{ color: TENSE }}>긴장·과부하 😣</span>
-      </div>
-      <div className="relative h-4 rounded-full" role="img"
+      <div className="relative h-4 mt-2 rounded-full" role="img"
         aria-label={`긴장도 ${r.tension} / 100 — ${st.label}`}
         style={{ background: `linear-gradient(90deg, ${CALM} 0%, #a7f3d0 32%, #fde68a 50%, #fecaca 68%, ${TENSE} 100%)` }}>
         {/* 가운데(경계) 구간 */}
@@ -38,14 +40,23 @@ export function PsycheGauge({ r, compact = false }: { r: PsycheResult; compact?:
           </div>
         </div>
       </div>
-      <div className="relative h-3.5 mt-1 text-[10px] text-slate-400">
-        {[[0, '0'], [40, '40'], [50, '중간'], [60, '60'], [100, '100']].map(([v, t]) => (
-          <span key={t} className={`absolute ${v === 0 ? '' : v === 100 ? '-translate-x-full' : '-translate-x-1/2'}`} style={{ left: `${v}%` }}>{t}</span>
-        ))}
+      {/* 세 구간 — 지금 해당하는 칸을 강조 */}
+      <div className="flex gap-1 mt-2">
+        {ZONES.map(z => {
+          const on = z.id === r.state
+          return (
+            <div key={z.id} className="rounded-xl px-1 py-1.5 text-center transition-colors"
+              style={{ width: z.w, background: on ? z.color : '#f8fafc', color: on ? '#fff' : '#94a3b8', boxShadow: on ? `0 2px 8px ${z.color}55` : undefined }}>
+              {on && <p className="text-[9.5px] font-black leading-none mb-0.5">▼ 지금 여기</p>}
+              <p className="text-[11.5px] font-bold leading-tight">{z.emoji} {z.label}</p>
+              <p className={`text-[9.5px] leading-tight ${on ? 'opacity-90' : ''}`}>{z.range}</p>
+            </div>
+          )
+        })}
       </div>
       {!compact && (
         <p className="mt-2 text-[13px] font-bold text-center" style={{ color: st.color }}>
-          {st.label} · {tensionLine(r.tension)}
+          지금은 <b>{st.label}</b>예요 · {tensionLine(r.tension)}
         </p>
       )}
     </div>
@@ -93,7 +104,9 @@ function TypeMatrix({ r }: { r: PsycheResult }) {
         <div className="px-2 py-2 text-center" style={{ background: '#f0fdfa', color: CALM }}>① 안정·균형</div>
         <div className="px-2 py-2 text-center" style={{ background: '#fff1f2', color: TENSE }}>② 긴장·과부하</div>
       </div>
-      {(Object.keys(TEMPERAMENTS) as Temperament[]).map(t => (
+      {(Object.keys(TEMPERAMENTS) as Temperament[]).flatMap(t => [
+        // 리넨형(밀집)과 헤시안형(개방) 사이 = 섬유 밀도 중간 → 하이브리드 줄
+        ...(t === 'hessian' ? [<HybridRow key="hybrid" r={r} />] : []),
         <div key={t} className="grid grid-cols-[72px_1fr_1fr] border-t border-slate-100">
           <div className="bg-slate-50 px-2 py-2.5">
             <p className="text-[11.5px] font-bold text-slate-700">{TEMPERAMENTS[t].emoji} {TEMPERAMENTS[t].label}</p>
@@ -101,7 +114,7 @@ function TypeMatrix({ r }: { r: PsycheResult }) {
           </div>
           {(['calm', 'tense'] as const).map(s => {
             const ty = PSYCHE_TYPES[t][s]
-            const mine = r.temperament === t && r.lean === s
+            const mine = !r.hybrid && r.temperament === t && r.lean === s
             return (
               <Link key={s} href={`/diagnostic/psyche/types?t=${t}_${s}`} className="block px-2 py-2.5 text-center relative hover:bg-slate-50 active:scale-[0.97] transition-transform"
                 style={mine ? { background: s === 'calm' ? '#ccfbf1' : '#ffe4e6', boxShadow: `inset 0 0 0 2px ${s === 'calm' ? CALM : TENSE}` } : undefined}>
@@ -111,24 +124,37 @@ function TypeMatrix({ r }: { r: PsycheResult }) {
               </Link>
             )
           })}
+        </div>,
+      ])}
+    </div>
+  )
+}
+
+/** 섬유 밀도 중간(하이브리드) 줄 — 안정 칸에 2개, 긴장 칸에 2개 */
+export const HYBRID_STATE: Record<HybridId, 'calm' | 'tense'> = { harmony: 'calm', reverse: 'calm', mask: 'tense', overload: 'tense' }
+function HybridRow({ r }: { r: PsycheResult }) {
+  return (
+    <div className="grid grid-cols-[72px_1fr_1fr] border-t border-violet-100" style={{ background: '#faf5ff' }}>
+      <div className="px-2 py-2.5" style={{ background: '#f3e8ff' }}>
+        <p className="text-[11.5px] font-bold text-violet-700">🔀 중간형</p>
+        <p className="text-[10px] text-violet-400">하이브리드 · 섬유 밀도 중간</p>
+      </div>
+      {(['calm', 'tense'] as const).map(s => (
+        <div key={s} className="grid grid-cols-1 divide-y divide-violet-100">
+          {(Object.keys(HYBRID_TYPES) as HybridId[]).filter(h => HYBRID_STATE[h] === s).map(h => {
+            const ty = HYBRID_TYPES[h]
+            const mine = r.hybrid === h
+            return (
+              <Link key={h} href={`/diagnostic/psyche/types?t=hybrid_${h}`} className="block px-1.5 py-2 text-center relative hover:bg-violet-50"
+                style={mine ? { background: '#ede9fe', boxShadow: 'inset 0 0 0 2px #8b5cf6' } : undefined}>
+                <p className="text-[16px] leading-none">{ty.emoji}</p>
+                <p className={`mt-0.5 text-[10.5px] leading-tight ${mine ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>{ty.name}</p>
+                {mine && <span className="absolute top-1 right-1 text-[9px] font-black px-1 rounded text-white bg-violet-500">나</span>}
+              </Link>
+            )
+          })}
         </div>
       ))}
-      <div className="border-t border-slate-100 bg-slate-50 px-2 py-1.5 text-[11px] font-bold text-slate-500">🔀 중간 단계 (하이브리드형)</div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-slate-100">
-        {(Object.keys(HYBRID_TYPES) as HybridId[]).map(h => {
-          const ty = HYBRID_TYPES[h]
-          const mine = r.hybrid === h
-          return (
-            <Link key={h} href={`/diagnostic/psyche/types?t=hybrid_${h}`} className="block px-2 py-2.5 text-center relative hover:bg-slate-50"
-              style={mine ? { background: '#ede9fe', boxShadow: 'inset 0 0 0 2px #8b5cf6' } : undefined}>
-              <p className="text-[18px] leading-none">{ty.emoji}</p>
-              <p className={`mt-1 text-[11px] ${mine ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>{ty.name}</p>
-              <p className="text-[9.5px] text-slate-400">{ty.pattern}</p>
-              {mine && <span className="absolute top-1 right-1 text-[9px] font-black px-1 rounded text-white bg-violet-500">나</span>}
-            </Link>
-          )
-        })}
-      </div>
     </div>
   )
 }
@@ -289,8 +315,8 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
 
       {/* 3. 8가지 타입 */}
       <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-slate-700">8가지 홍채 심리 타입</h3>
-        <p className="text-[11px] text-slate-400 mb-3">타고난 기질(4) × 지금 상태(안정·긴장) — 타입을 누르면 자세한 설명·운동·식습관을 볼 수 있어요</p>
+        <h3 className="text-sm font-semibold text-slate-700">홍채 심리 타입 <span className="text-[11px] font-semibold text-slate-400">기본 8 + 중간형 4</span></h3>
+        <p className="text-[11px] text-slate-400 mb-3">타고난 기질 × 지금 상태(안정·긴장), 섬유 밀도가 중간이면 가운데 중간형 줄 — 타입을 누르면 자세한 설명·운동·식습관을 볼 수 있어요</p>
         <TypeMatrix r={r} />
         <Link href="/diagnostic/psyche/types" className="mt-3 flex items-center justify-center gap-1 text-[12px] font-bold text-violet-600">
           모든 타입 · 자율신경환 형태 자세히 보기 <ChevronRight className="w-3.5 h-3.5" />
