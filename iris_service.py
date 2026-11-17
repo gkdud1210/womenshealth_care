@@ -14,6 +14,7 @@
   POST /analyze/detailed  — (동일, 하위호환 유지)
 """
 import base64
+import math
 import os
 import re
 import sys
@@ -205,6 +206,45 @@ def _seg_reason(points: list, seg: dict) -> str:
     return "outside"
 
 
+def _anw(image_bytes: bytes, geom: Optional[dict]) -> Optional[dict]:
+    """자율신경환(ANW) 4대 형태 — LUDIA AI 엔진의 자율신경환 선 감지(/lab/collarette, 원장 선으로 맞춘 '확실한 구간만')로 판별.
+    보통 위치는 동공 경계~홍채 끝의 23.5~36%(≈ 1/3) — 엔진의 NORM 기준을 그대로 쓴다.
+    form: normal 정상 · narrow 협착형 · wide 확장형 · irregular 불균형형(방향 차·톱니) · lost 소실형 · unknown 판단 어려움.
+    엔진이 꺼져 있으면 None."""
+    import json as _json, urllib.request as _rq
+    body = {"image_base64": base64.b64encode(image_bytes).decode()}
+    if geom:
+        body["geometry"] = {k: geom[k] for k in ("cx", "cy", "pupilR", "limbusR") if k in geom}
+    try:
+        req = _rq.Request(ludia_reading.ENGINE + "/lab/collarette", _json.dumps(body).encode(), {"Content-Type": "application/json"})
+        with _rq.urlopen(req, timeout=90) as r:
+            res = _json.load(r)
+    except Exception as e:
+        print(f"[anw] 엔진 자율신경환 감지 실패: {e}")
+        return None
+    if not res.get("success"):
+        return None
+    base = {"source": "LUDIA AI 자율신경환 감지", "visible": res.get("visible")}
+    if not res.get("ok"):
+        return {**base, "form": "unknown", "reason": res.get("reason")}
+    sh = res.get("shape") or {}
+    if not sh.get("found"):
+        # 홍채가 충분히 보이는데도 확실한 선이 없으면 소실형, 가림이 많으면 판단 보류
+        return {**base, "form": "lost" if (res.get("visible") or 0) >= 0.6 else "unknown"}
+    lv = sh.get("level") or {}
+    if lv.get("uneven") == "high" or lv.get("jagged") == "high":
+        form = "irregular"
+    elif lv.get("r") == "low":
+        form = "narrow"
+    elif lv.get("r") == "high":
+        form = "wide"
+    else:
+        form = "normal"
+    return {**base, "form": form, "radiusPct": sh.get("radius_pct"), "level": lv, "label": sh.get("label"),
+            "jagged": sh.get("jagged"), "uneven": sh.get("uneven"),
+            "farthest": sh.get("farthest"), "nearest": sh.get("nearest")}
+
+
 def _analyze(image_bytes: bytes, eye: str) -> dict:
     bgr = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
     if bgr is None:
@@ -314,6 +354,8 @@ def _analyze(image_bytes: bytes, eye: str) -> dict:
                              "model": {k: ludia_eyeseg.meta().get(k) for k in ("trained_at", "n_images")}} if seg else
                             {"source": "기본 원 검출", "error": ludia_eyeseg.error()}),
         "pupilFindings":   seg["pupilFindings"] if seg else None,
+        # 자율신경환 4대 형태 (협착·소실·확장·불균형) — 판독 엔진과 상관없이 분할 모델의 자율신경환 선으로
+        "anw":             _anw(image_bytes, geom),
         "imageSize":       {"w": int(bgr.shape[1]), "h": int(bgr.shape[0])},
         "disclaimer":      "연구용 병소 후보 검출 결과입니다. 의료 진단이 아니며 전문가 판독을 대신하지 않습니다.",
     }

@@ -1,9 +1,9 @@
-import type { Temperament } from '@/lib/iris-psyche'
+import type { Temperament, HybridId } from '@/lib/iris-psyche'
 
 // ── 8가지 홍채 심리 타입 가이드 ─────────────────────────────────────────────
 // 타입마다 강점·주의할 점·어울리는 운동·식습관·생활 리듬. 웰니스용 참고 내용이에요.
 
-export type PsycheTypeId = `${Temperament}_${'calm' | 'tense'}`
+export type PsycheTypeId = `${Temperament}_${'calm' | 'tense'}` | `hybrid_${HybridId}`
 
 export interface GuideItem { title: string; why: string }
 
@@ -172,12 +172,88 @@ export const PSYCHE_GUIDE: Record<PsycheTypeId, PsycheTypeGuide> = {
     avoid: ['스트레스 폭식·야식', '술로 감정 풀기', '매운 음식 과다'],
     routine: ['결정하기 전 10분 기다리기', '수면 시간 고정 (같은 시각에 눕기)', '감정 그래프 기록하기'],
   },
+
+  // ── 중간 단계(하이브리드형) ──
+  hybrid_harmony: {
+    strengths: ['상황을 빨리 파악하고 유연하게 대처해요', '공과 사를 잘 나누는 건강한 양면성', '어디서든 무난하게 적응해요'],
+    watch: ['큰 약점이 없어 생활 리듬이 흐트러져도 늦게 알아채요', '출장·야근·여행 뒤 수면과 식사가 쉽게 밀려요'],
+    signals: ['잠드는 시간이 들쭉날쭉해요', '끼니 시간이 매일 달라요'],
+    exercise: [
+      { title: '요일을 정한 규칙 운동', why: '운동 종류보다 "같은 요일·같은 시간"이 리듬을 지켜 줘요.' },
+      { title: '필라테스 · 수영', why: '전신 균형을 고르게 쓰는 운동이 지금의 조화를 유지해요.' },
+      { title: '주말 가벼운 등산', why: '자연 속 유산소로 한 주의 리듬을 정리해요.' },
+    ],
+    exerciseThemes: ['yoga', 'swim', 'walking'],
+    food: [
+      { title: '같은 시간에 먹는 세 끼', why: '식사 시간이 생체 시계를 맞추는 가장 쉬운 방법이에요.' },
+      { title: '균형 잡힌 한 접시', why: '단백질·채소·통곡물을 한 접시에 고르게.' },
+      { title: '바뀐 환경에선 아침 햇빛 + 따뜻한 아침', why: '새 환경에서 리듬을 빨리 되찾게 해요.' },
+    ],
+    avoid: ['불규칙한 야식', '주말 몰아 자기'],
+    routine: ['자는 시각·일어나는 시각 고정', '환경이 바뀐 뒤엔 리듬 회복일 하루 두기'],
+  },
+  hybrid_mask: {
+    strengths: ['밖에서는 믿음직하고 완벽해 보이는 프로페셔널', '다른 사람 감정을 세심하게 살펴요'],
+    watch: ['속상한 일을 혼자 삼켜 안에서 상처가 쌓여요', '눈치를 보느라 진짜 원하는 걸 말하지 못해요'],
+    signals: ['신경성 위장장애', '만성 어깨·목 결림', '퇴근 후 갑자기 무기력'],
+    exercise: [
+      { title: '요가 · 회복 스트레칭', why: '굳은 어깨·목을 풀고 하루의 "가면"을 내려놓는 시간이 돼요.' },
+      { title: '혼자 하는 수영 · 걷기', why: '남의 시선이 없는 운동이 마음을 쉬게 해요.' },
+      { title: '마사지 · 스파', why: '몸을 맡기는 시간이 쌓인 긴장을 풀어 줘요.' },
+    ],
+    exerciseThemes: ['yoga', 'swim', 'massage'],
+    food: [
+      { title: '따뜻하고 소화 편한 저녁', why: '긴장으로 굳은 위장을 달래 줘요 (국·찜·죽).' },
+      { title: '마그네슘 · 비타민 B군', why: '근육 결림과 신경 피로 회복을 도와요.' },
+      { title: '카모마일·생강차', why: '퇴근 후 긴장을 내려놓는 저녁 루틴.' },
+    ],
+    avoid: ['스트레스 받은 날 맵고 자극적인 음식', '빈속에 커피'],
+    routine: ['감정 일기 3줄', '주말 하루는 약속 없이 나만의 시간'],
+  },
+  hybrid_reverse: {
+    strengths: ['부드럽고 사교적인 첫인상', '결정적인 순간에 흔들리지 않는 심지', '사람을 편하게 하면서도 중심이 있어요'],
+    watch: ['에너지를 많이 쓴 뒤 회복이 늦어요', '고집이 세질 때가 있어요'],
+    signals: ['손발이 차요', '큰 일 끝나고 며칠씩 지쳐요'],
+    exercise: [
+      { title: '유산소 30분 (걷기·러닝·자전거)', why: '말초 혈액순환을 높여 손발을 따뜻하게 해요.' },
+      { title: '하체 근력 운동', why: '종아리·허벅지 근육이 혈액을 순환시키는 펌프 역할을 해요.' },
+      { title: '반신욕 · 족욕', why: '운동 뒤 회복을 빠르게 해요.' },
+    ],
+    exerciseThemes: ['running', 'walking', 'gym'],
+    food: [
+      { title: '따뜻한 성질의 음식 (생강·계피·대추)', why: '수족냉증과 순환을 도와요.' },
+      { title: '철분 · 단백질 충분히', why: '에너지를 크게 쓴 뒤 회복 재료가 돼요.' },
+      { title: '찬 음료 줄이기', why: '몸을 차게 해 회복을 늦춰요.' },
+    ],
+    avoid: ['아이스 음료', '굶고 버티기'],
+    routine: ['큰 일 뒤엔 회복일을 일정에 넣기', '잠들기 전 족욕 10분'],
+  },
+  hybrid_overload: {
+    strengths: ['호기심과 공감 능력이 함께 높아요', '여러 분야를 연결하는 아이디어', '빠른 감각과 반응'],
+    watch: ['멀티태스킹하다 쉽게 방전돼요', '긴장↔이완 전환이 어려워 밤에 잠들기 힘들어요'],
+    signals: ['불면', '오후 혈당 급락과 단 것 당김', '아침에 일어나기 힘든 피로'],
+    exercise: [
+      { title: '리듬이 일정한 유산소 (수영·걷기)', why: '반복되는 리듬이 요동치는 자율신경을 고르게 해요.' },
+      { title: '요가 니드라 · 호흡 운동', why: '긴장에서 이완으로 넘어가는 "스위치"를 연습해요.' },
+      { title: '밤 고강도 운동 피하기', why: '늦은 시간 강한 운동은 잠들기를 더 어렵게 해요.' },
+    ],
+    exerciseThemes: ['swim', 'yoga', 'walking'],
+    food: [
+      { title: '혈당 스파이크 막기', why: '단 음식·흰 빵 대신 단백질·식이섬유를 먼저 드세요.' },
+      { title: '부신 피로 케어 (비타민 C·B군·마그네슘)', why: '과로한 스트레스 호르몬 체계를 도와요.' },
+      { title: '오후 카페인 끊기', why: '잠드는 스위치를 지켜 줘요.' },
+    ],
+    avoid: ['에너지 드링크', '밤 늦은 단 간식', '오후 커피'],
+    routine: ['한 번에 한 가지만 하는 "싱글태스킹" 시간', '잠들기 1시간 전 화면 끄기', '같은 시각에 눕기'],
+  },
 }
 
 export function typeId(t: Temperament, s: 'calm' | 'tense'): PsycheTypeId { return `${t}_${s}` }
 
-export function parseTypeId(v: string | null): { t: Temperament; s: 'calm' | 'tense' } | null {
+export type ParsedType = { kind: 'base'; t: Temperament; s: 'calm' | 'tense' } | { kind: 'hybrid'; h: HybridId }
+
+export function parseTypeId(v: string | null): ParsedType | null {
   if (!v || !(v in PSYCHE_GUIDE)) return null
-  const [t, s] = v.split('_') as [Temperament, 'calm' | 'tense']
-  return { t, s }
+  const [a, b] = v.split('_')
+  return a === 'hybrid' ? { kind: 'hybrid', h: b as HybridId } : { kind: 'base', t: a as Temperament, s: b as 'calm' | 'tense' }
 }

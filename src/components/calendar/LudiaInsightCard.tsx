@@ -58,6 +58,12 @@ export interface IrisEyeDetection {
   readingError?: string | null
   /** 동공·홍채 원 (원본 사진 픽셀) — 동공 크기·병소가 동공에서 얼마나 떨어졌는지 계산에 써요 */
   geometry?: { cx: number; cy: number; pupilR: number; irisR: number } | null
+  /** 자율신경환 형태 — LUDIA AI 자율신경환 감지 (iris_service anw) */
+  anw?: {
+    form: 'normal' | 'narrow' | 'lost' | 'wide' | 'irregular' | 'unknown'
+    radiusPct?: number | null; label?: string | null; reason?: string | null; visible?: number | null
+    farthest?: { at: string; pct: number } | null; nearest?: { at: string; pct: number } | null
+  } | null
 }
 
 export interface MultimodalData {

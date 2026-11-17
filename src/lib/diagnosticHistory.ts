@@ -136,6 +136,10 @@ function sampleDetection(i: number, n: number, score: number): IrisEyeDetection 
     model: { source: '예시 데이터', runId: null, valMiou: null, trainImages: null, reliable: false },
     globalFindings: t > 0.3 ? [{ key: 'stress_ring', label: '긴장륜(스트레스 링)', score: Math.round(40 + t * 50) }] : [],
     geometry: { cx: 240, cy: 240, pupilR: Math.round(200 * (0.27 + (1 - t) * 0.08)), irisR: 200 },
+    // 처음엔 들쭉날쭉(불균형형) → 최근엔 거의 안 보임(소실형)
+    anw: t > 0.5
+      ? { form: 'irregular', radiusPct: 38, label: '톱니 모양 · 방향마다 거리 차이 큼', farthest: { at: '2시', pct: 52 } }
+      : { form: 'lost', radiusPct: null, label: null, visible: 0.9 },
     disclaimer: '예시 기록이에요. 실제 홍채 사진을 분석한 결과가 아니에요.',
   }
 }
