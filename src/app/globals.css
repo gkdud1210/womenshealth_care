@@ -973,3 +973,30 @@
 .bio-bloom     { animation: bio-bloom    2.4s ease-in-out infinite; }
 .bio-pulse     { animation: bio-pulse    2s ease-in-out infinite; }
 .bio-particle  { animation: bio-particle 1.6s ease-out infinite; }
+
+/* ─── Auth inputs (login / signup) — mobile-safe ──────────────────
+   16px text stops iOS Safari from zooming in on focus; appearance:none
+   and the date-value rules keep the date field the same height and
+   left-aligned as the others; the inset shadow hides the autofill tint. */
+@layer components {
+  .auth-input {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    height: 48px;
+    font-size: 16px;
+    line-height: 1.25;
+  }
+  .auth-input::-webkit-date-and-time-value { text-align: left; margin: 0; }
+  .auth-input::-webkit-datetime-edit { padding: 0; }
+  .auth-input:-webkit-autofill,
+  .auth-input:-webkit-autofill:hover,
+  .auth-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #334155;
+    -webkit-box-shadow: 0 0 0 1000px #fdf8f6 inset;
+    caret-color: #334155;
+    transition: background-color 9999s ease-out 0s;
+  }
+}

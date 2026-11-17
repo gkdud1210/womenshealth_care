@@ -35,7 +35,7 @@ export default function LoginPage() {
       setError('등록된 계정이 없어요. 회원가입을 먼저 해주세요.')
       return
     }
-    if (profile.userId !== userId.trim()) {
+    if (profile.userId.trim().toLowerCase() !== userId.trim().toLowerCase()) {
       setError('아이디 또는 비밀번호가 올바르지 않아요.')
       return
     }
@@ -54,15 +54,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-5 py-12">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-5 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
 
-      <div className="flex flex-col items-center mb-8">
+      <div className="flex flex-col items-center mb-6">
         <div style={{
           borderRadius: '28px',
           overflow: 'hidden',
           boxShadow: '0 16px 48px rgba(137,15,93,0.38), 0 4px 16px rgba(137,15,93,0.22)',
         }}>
-          <LudiaLogo size={180} />
+          <LudiaLogo size={148} />
         </div>
       </div>
 
@@ -112,10 +112,15 @@ export default function LoginPage() {
               </label>
               <input
                 type="text"
+                name="username"
+                autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={userId}
                 onChange={e => { setUserId(e.target.value); setError('') }}
                 placeholder="아이디를 입력하세요"
-                className="w-full px-4 py-3 rounded-2xl text-sm text-slate-700 placeholder-slate-300 outline-none transition-all"
+                className="auth-input px-4 rounded-2xl text-slate-700 placeholder-slate-300 outline-none transition-all"
                 style={inputStyle}
                 onFocus={e => (e.currentTarget.style.border = '1.5px solid rgba(244,63,117,0.45)')}
                 onBlur={e  => (e.currentTarget.style.border = '1.5px solid rgba(244,63,117,0.15)')}
@@ -128,10 +133,12 @@ export default function LoginPage() {
               </label>
               <input
                 type="password"
+                name="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={e => { setPassword(e.target.value); setError('') }}
                 placeholder="비밀번호를 입력하세요"
-                className="w-full px-4 py-3 rounded-2xl text-sm text-slate-700 placeholder-slate-300 outline-none transition-all"
+                className="auth-input px-4 rounded-2xl text-slate-700 placeholder-slate-300 outline-none transition-all"
                 style={inputStyle}
                 onFocus={e => (e.currentTarget.style.border = '1.5px solid rgba(244,63,117,0.45)')}
                 onBlur={e  => (e.currentTarget.style.border = '1.5px solid rgba(244,63,117,0.15)')}

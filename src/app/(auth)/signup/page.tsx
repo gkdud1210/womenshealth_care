@@ -14,10 +14,10 @@ const inputFocusStyle = '1.5px solid rgba(244,63,117,0.45)'
 const inputBlurStyle  = '1.5px solid rgba(244,63,117,0.15)'
 
 function Field({
-  label, type = 'text', value, onChange, placeholder,
+  label, type = 'text', value, onChange, placeholder, autoComplete,
 }: {
   label: string; type?: string; value: string
-  onChange: (v: string) => void; placeholder: string
+  onChange: (v: string) => void; placeholder: string; autoComplete?: string
 }) {
   return (
     <div>
@@ -26,10 +26,14 @@ function Field({
       </label>
       <input
         type={type}
+        autoComplete={autoComplete}
+        autoCapitalize={type === 'text' ? 'none' : undefined}
+        autoCorrect="off"
+        spellCheck={false}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-4 py-3 rounded-2xl text-sm text-slate-700 placeholder-slate-300 outline-none transition-all"
+        className="auth-input px-4 rounded-2xl text-slate-700 placeholder-slate-300 outline-none transition-all"
         style={inputStyle}
         onFocus={e => (e.currentTarget.style.border = inputFocusStyle)}
         onBlur={e  => (e.currentTarget.style.border = inputBlurStyle)}
@@ -91,15 +95,15 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-5 py-12">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-5 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
 
-      <div className="flex flex-col items-center mb-8">
+      <div className="flex flex-col items-center mb-6">
         <div style={{
           borderRadius: '28px',
           overflow: 'hidden',
           boxShadow: '0 16px 48px rgba(137,15,93,0.38), 0 4px 16px rgba(137,15,93,0.22)',
         }}>
-          <LudiaLogo size={180} />
+          <LudiaLogo size={148} />
         </div>
       </div>
 
@@ -118,9 +122,9 @@ export default function SignupPage() {
           <p className="text-xs text-slate-400 text-center mb-7">나만의 건강 여정을 시작해요</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Field label="아이디" value={userId} onChange={v => { setUserId(v); setError('') }} placeholder="영문/숫자 4자 이상" />
-            <Field label="닉네임" value={nickname} onChange={v => { setNickname(v); setError('') }} placeholder="앱에서 표시될 이름" />
-            <Field label="이름" value={name} onChange={v => { setName(v); setError('') }} placeholder="실명을 입력하세요" />
+            <Field label="아이디" value={userId} onChange={v => { setUserId(v); setError('') }} placeholder="영문/숫자 4자 이상" autoComplete="username" />
+            <Field label="닉네임" value={nickname} onChange={v => { setNickname(v); setError('') }} placeholder="앱에서 표시될 이름" autoComplete="nickname" />
+            <Field label="이름" value={name} onChange={v => { setName(v); setError('') }} placeholder="실명을 입력하세요" autoComplete="name" />
 
             <div>
               <label className="block text-xs font-semibold text-slate-500 mb-1.5 tracking-wide uppercase">
@@ -130,15 +134,15 @@ export default function SignupPage() {
                 type="date"
                 value={birthdate}
                 onChange={e => { setBirthdate(e.target.value); setError('') }}
-                className="w-full px-4 py-3 rounded-2xl text-sm text-slate-700 outline-none transition-all"
+                className="auth-input px-4 rounded-2xl text-slate-700 outline-none transition-all"
                 style={inputStyle}
                 onFocus={e => (e.currentTarget.style.border = inputFocusStyle)}
                 onBlur={e  => (e.currentTarget.style.border = inputBlurStyle)}
               />
             </div>
 
-            <Field label="비밀번호" type="password" value={password} onChange={v => { setPassword(v); setError('') }} placeholder="6자 이상" />
-            <Field label="비밀번호 확인" type="password" value={pwConfirm} onChange={v => { setPwConfirm(v); setError('') }} placeholder="비밀번호를 다시 입력하세요" />
+            <Field label="비밀번호" type="password" value={password} onChange={v => { setPassword(v); setError('') }} placeholder="6자 이상" autoComplete="new-password" />
+            <Field label="비밀번호 확인" type="password" value={pwConfirm} onChange={v => { setPwConfirm(v); setError('') }} placeholder="비밀번호를 다시 입력하세요" autoComplete="new-password" />
 
             {error && <p className="text-xs text-rose-500 text-center">{error}</p>}
 
