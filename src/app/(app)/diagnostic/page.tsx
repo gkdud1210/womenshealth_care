@@ -8,6 +8,7 @@ import { useDiagnosticHistory, groupSessionsByYear, type DiagnosticSession } fro
 import { buildScore } from '@/components/diagnostic/DiagnosticReport'
 import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
 import { useOnboardingProfile } from '@/lib/onboarding-profile'
+import { ProfilePeek } from '@/components/profile/ProfilePeek'
 
 type View = 'home' | 'history'
 
@@ -83,6 +84,9 @@ export default function DiagnosticPage() {
     ]
     return (
       <div className="min-h-[calc(100dvh-96px)] lg:min-h-screen flex flex-col justify-center px-4 py-4 sm:p-8 max-w-lg mx-auto w-full">
+
+        {/* 내 프로필 — 일부만 보이고, 누르면 전체 프로필로 */}
+        <ProfilePeek />
 
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
