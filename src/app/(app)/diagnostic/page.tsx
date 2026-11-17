@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen, Sparkles } from 'lucide-react'
+import { Microscope, Scan, History, ChevronLeft, ChevronRight, PenLine, Trash2, ScanEye, FolderOpen, Sparkles, Brain } from 'lucide-react'
 import { useDiagnosticHistory, groupSessionsByYear, type DiagnosticSession } from '@/lib/diagnosticHistory'
 import { buildScore } from '@/components/diagnostic/DiagnosticReport'
 import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
@@ -129,6 +129,32 @@ export default function DiagnosticPage() {
               기록 보기 →
             </div>
           </button>
+        </div>
+
+        {/* 홍채 심리 · 홍채 엔진 리포트 — 가장 최근 기록으로 열려요 */}
+        <div className="grid grid-cols-2 gap-3 w-full max-w-lg mt-4">
+          <Link href={sessions[0] ? `/diagnostic/psyche?id=${sessions[0].id}` : '/diagnostic/psyche'}
+            className="glass-card p-4 flex items-center gap-3 hover-lift" style={{ border: '1.5px solid rgba(139,92,246,0.2)' }}>
+            <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#8b5cf6,#e11d48)' }}>
+              <Brain className="w-5 h-5 text-white" />
+            </span>
+            <span className="min-w-0 text-left">
+              <span className="block text-[14px] font-bold text-slate-800">홍채 심리</span>
+              <span className="block text-[11px] text-slate-400 leading-snug">안정 ↔ 긴장 내 위치 · 8가지 타입</span>
+            </span>
+          </Link>
+          <Link href={sessions[0] ? `/diagnostic/iris-report?id=${sessions[0].id}` : '/diagnostic/iris-report'}
+            className="glass-card p-4 flex items-center gap-3 hover-lift" style={{ border: '1.5px solid rgba(99,102,241,0.2)' }}>
+            <span className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,#6366f1,#0ea5e9)' }}>
+              <ScanEye className="w-5 h-5 text-white" />
+            </span>
+            <span className="min-w-0 text-left">
+              <span className="block text-[14px] font-bold text-slate-800">홍채 엔진 리포트</span>
+              <span className="block text-[11px] text-slate-400 leading-snug">엔진이 찾은 소견·구역·섬유</span>
+            </span>
+          </Link>
         </div>
 
         {/* 직접 입력 진입점 */}

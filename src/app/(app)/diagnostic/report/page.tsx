@@ -7,7 +7,9 @@ import { ChevronLeft, Save, Scan, RadioTower, Trophy } from 'lucide-react'
 import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
 import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
 import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
-import { Eye } from 'lucide-react'
+import { Eye, Brain, ScanEye, ChevronRight } from 'lucide-react'
+import { DiagnosticCharts } from '@/components/diagnostic/DiagnosticCharts'
+import { PsycheSummaryCard } from '@/components/diagnostic/PsycheView'
 import { useDiagnosticHistory, type DiagnosticSession } from '@/lib/diagnosticHistory'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 import { useEditableOnboardingProfile } from '@/lib/onboarding-profile'
@@ -144,6 +146,25 @@ export default function DiagnosticReportPage() {
           진단 기록에 저장했어요. 과거 진단 기록에서 언제든 다시 볼 수 있어요.
         </div>
       )}
+
+      {/* 홍채 심리 · 홍채 엔진 리포트 바로가기 */}
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <Link href={`/diagnostic/psyche${session ? `?id=${session.id}` : ''}`}
+          className="flex items-center gap-2 px-3.5 py-3 rounded-2xl text-white"
+          style={{ background: 'linear-gradient(135deg,#8b5cf6,#e11d48)' }}>
+          <Brain className="w-4 h-4" /><span className="flex-1 text-[13px] font-bold">홍채 심리</span><ChevronRight className="w-4 h-4" />
+        </Link>
+        <Link href={`/diagnostic/iris-report${session ? `?id=${session.id}` : ''}`}
+          className="flex items-center gap-2 px-3.5 py-3 rounded-2xl text-white"
+          style={{ background: 'linear-gradient(135deg,#6366f1,#0ea5e9)' }}>
+          <ScanEye className="w-4 h-4" /><span className="flex-1 text-[13px] font-bold">홍채 엔진 리포트</span><ChevronRight className="w-4 h-4" />
+        </Link>
+      </div>
+
+      <div className="space-y-4 mb-4">
+        <PsycheSummaryCard data={session?.data ?? data} href={`/diagnostic/psyche${session ? `?id=${session.id}` : ''}`} />
+        <DiagnosticCharts data={session?.data ?? data} />
+      </div>
 
       {session && (
         <div className="space-y-4 mb-4">

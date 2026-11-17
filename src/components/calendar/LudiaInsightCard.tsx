@@ -56,6 +56,8 @@ export interface IrisEyeDetection {
   boundarySource?: string
   globalFindings?: IrisGlobalFinding[] | null
   readingError?: string | null
+  /** 동공·홍채 원 (원본 사진 픽셀) — 동공 크기·병소가 동공에서 얼마나 떨어졌는지 계산에 써요 */
+  geometry?: { cx: number; cy: number; pupilR: number; irisR: number } | null
 }
 
 export interface MultimodalData {
