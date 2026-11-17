@@ -3,6 +3,7 @@
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 import { EventReminderHost } from '@/components/calendar/EventReminderHost'
+import { WeeklyAutoSaver } from '@/components/profile/WeeklyAutoSaver'
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
@@ -22,6 +23,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Event reminder toasts */}
       <EventReminderHost />
+
+      {/* 지난주 기록 자동 저장 (프로필 주간 기록) */}
+      <WeeklyAutoSaver />
     </div>
   )
 }

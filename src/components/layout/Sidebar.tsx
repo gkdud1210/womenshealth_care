@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   Microscope,
-  ShoppingBag, Settings, Users, ChefHat, HeartPulse
+  ShoppingBag, Settings, Users, ChefHat, HeartPulse, CircleUserRound
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { LudiaLogo } from '@/components/LudiaLogo'
@@ -15,6 +15,7 @@ const navItems = [
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 헬스' },
   { href: '/community',  icon: Users,           label: '루디아 크루' },
   { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
+  { href: '/profile',    icon: CircleUserRound, label: '내 프로필' },
 ]
 
 export function Sidebar() {

@@ -362,6 +362,12 @@ export default function CarePage() {
               </button>
             )}
           </label>
+          {/* 내 프로필 — 피드 올리기·리포트 공유·주간 기록 */}
+          <Link href="/profile" aria-label="내 프로필"
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-[17px] active:scale-95 transition-transform"
+            style={{ background: 'linear-gradient(135deg,#fce7f3,#ede9fe)', boxShadow: 'inset 0 0 0 1.5px rgba(244,63,117,0.25)' }}>
+            {feed.authorEmoji}
+          </Link>
         </div>
 
         {pickerOpen && (() => {
