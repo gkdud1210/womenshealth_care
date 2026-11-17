@@ -407,17 +407,31 @@ function ManualTagPicker({ onSubmit }: {
 
 type CaptureStep = 'capture' | 'analyzing' | 'manual' | 'done'
 
-function CaptureSheet({ mealType, mealProfile, careLabel, onClose, onSaved }: {
+/** 지금 시각에 맞는 끼니 — 그 끼니를 이미 기록했으면 아직 안 한 끼니를 먼저 골라요 */
+function mealForNow(dayLog: DayLog): MealType {
+  const h = new Date().getHours()
+  const byTime: MealType = h < 11 ? 'breakfast' : h < 16 ? 'lunch' : 'dinner'
+  if (!dayLog[byTime]) return byTime
+  return MEAL_ORDER.find(m => !dayLog[m]) ?? byTime
+}
+
+function CaptureSheet({ mealType, mealProfile, careLabel, initialPhoto, loggedMeals = [], onChangeMeal, onClose, onSaved }: {
   mealType: MealType
   mealProfile: CareMealProfile
   careLabel: string
+  /** 상단 '식단 촬영' 버튼으로 바로 찍은 사진 */
+  initialPhoto?: string | null
+  /** 오늘 이미 기록한 끼니 — 끼니 고르기에 표시해요 */
+  loggedMeals?: MealType[]
+  /** 있으면 시트 안에서 끼니(아침·점심·저녁)를 바꿀 수 있어요 */
+  onChangeMeal?: (m: MealType) => void
   onClose: () => void
   onSaved: (entry: MealEntry) => void
 }) {
   const meta = MEAL_META[mealType]
   const target = mealTargetKcal(mealProfile, mealType)
   const [step, setStep] = useState<CaptureStep>('capture')
-  const [photo, setPhoto] = useState<string | null>(null)
+  const [photo, setPhoto] = useState<string | null>(initialPhoto ?? null)
   const [uploading, setUploading] = useState(false)
   const [result, setResult] = useState<MealEntry | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -462,6 +476,26 @@ function CaptureSheet({ mealType, mealProfile, careLabel, onClose, onSaved }: {
       <div className="flex-1 overflow-y-auto px-4 py-4">
         {step === 'capture' && (
           <div className="space-y-4">
+            {onChangeMeal && (
+              <div>
+                <p className="text-[11.5px] font-bold text-slate-500 mb-1.5">어떤 끼니인가요?</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {MEAL_ORDER.map(m => {
+                    const on = m === mealType
+                    return (
+                      <button key={m} onClick={() => onChangeMeal(m)} aria-pressed={on}
+                        className="py-2.5 rounded-2xl text-[13px] font-bold border transition-all"
+                        style={on
+                          ? { background: '#fff1f5', borderColor: '#f43f75', color: '#e11d5a' }
+                          : { background: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b' }}>
+                        {MEAL_META[m].emoji} {MEAL_META[m].label}
+                        {loggedMeals.includes(m) && <span className="block text-[10px] font-semibold text-slate-400">기록 있음 · 바꾸기</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
             {photo ? (
               <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -975,6 +1009,10 @@ export default function LudiaCallPage() {
   const [logs, setLogs] = useState<MealLogs>({})
   const [hydrated, setHydrated] = useState(false)
   const [captureMeal, setCaptureMeal] = useState<MealType | null>(null)
+  // 상단 '식단 촬영' 버튼 — 카메라로 바로 찍고 끼니를 골라 분석해요
+  const [quickPhoto, setQuickPhoto] = useState<string | null>(null)
+  const [quickBusy, setQuickBusy] = useState(false)
+  const quickRef = useRef<HTMLInputElement>(null)
   const [viewing, setViewing] = useState<{ dateKey: string; mealType: MealType } | null>(null)
   const [showSymptomCheck, setShowSymptomCheck] = useState(false)
 
@@ -1071,14 +1109,31 @@ export default function LudiaCallPage() {
               <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 헬스</h1>
               <p className="text-[11.5px] text-slate-400">사진 한 장으로 받는 AI 웰니스 코칭</p>
             </div>
-            <Link href="/ludia-call/calendar"
+            <button onClick={() => quickRef.current?.click()} disabled={quickBusy} aria-label="식단 사진 찍기"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-shrink-0 text-white transition-all active:scale-95 disabled:opacity-70"
+              style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)', boxShadow: '0 2px 10px rgba(244,63,117,0.3)' }}>
+              {quickBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
+              <span className="text-xs font-bold tracking-wide">식단 촬영</span>
+            </button>
+            <input ref={quickRef} type="file" accept="image/*" capture="environment" className="hidden"
+              onChange={async e => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (!file) return
+                setQuickBusy(true)
+                try {
+                  setQuickPhoto(await compressImage(file))
+                  setCaptureMeal(mealForNow(todayLog))
+                } finally { setQuickBusy(false) }
+              }} />
+            <Link href="/ludia-call/calendar" aria-label="캘린더"
               className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-shrink-0 transition-all active:scale-95"
               style={{
                 background: 'linear-gradient(135deg, #0f0810 0%, #2d1129 55%, #1a0a18 100%)',
                 boxShadow: '0 2px 10px rgba(244,63,117,0.2)',
               }}>
               <CalendarHeart className="w-3.5 h-3.5 text-rose-300" />
-              <span className="text-xs font-bold text-white tracking-wide">캘린더</span>
+              <span className="hidden sm:inline text-xs font-bold text-white tracking-wide">캘린더</span>
             </Link>
           </div>
         </div>
@@ -1113,15 +1168,18 @@ export default function LudiaCallPage() {
       </div>
 
       {captureMeal && (
-        <CaptureSheet mealType={captureMeal} mealProfile={mealProfile} careLabel={careLabel}
-          onClose={() => setCaptureMeal(null)}
+        <CaptureSheet key={quickPhoto ? 'quick' : captureMeal} mealType={captureMeal} mealProfile={mealProfile} careLabel={careLabel}
+          initialPhoto={quickPhoto}
+          loggedMeals={MEAL_ORDER.filter(m => !!todayLog[m])}
+          onChangeMeal={quickPhoto ? setCaptureMeal : undefined}
+          onClose={() => { setCaptureMeal(null); setQuickPhoto(null) }}
           onSaved={handleSaved} />
       )}
 
       {viewingEntry && viewing && (
         <ViewSheet entry={viewingEntry} mealProfile={mealProfile}
           onClose={() => setViewing(null)}
-          onRetake={() => { setCaptureMeal(viewing.mealType); setViewing(null) }}
+          onRetake={() => { setQuickPhoto(null); setCaptureMeal(viewing.mealType); setViewing(null) }}
           onDelete={() => handleDelete(viewing.dateKey, viewing.mealType)} />
       )}
 

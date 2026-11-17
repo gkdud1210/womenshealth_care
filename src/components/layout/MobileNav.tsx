@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { href: '/diagnostic', icon: Microscope,      label: '진단' },
   { href: '/care',       icon: HeartPulse,      label: '루디아피드' },
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 헬스', highlight: true },
-  { href: '/community',  icon: Users,           label: '크루' },
+  { href: '/community',  icon: Users,           label: '제휴' },
   { href: '/shop',       icon: ShoppingBag,     label: '샵' },
 ] as const
 

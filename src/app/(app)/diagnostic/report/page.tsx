@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ChevronLeft, Save, Scan, RadioTower } from 'lucide-react'
+import { ChevronLeft, Save, Scan, RadioTower, Trophy } from 'lucide-react'
 import { DiagnosticReport } from '@/components/diagnostic/DiagnosticReport'
 import { DiagnosticTrends } from '@/components/diagnostic/DiagnosticTrends'
 import { IrisAnalysisView } from '@/components/diagnostic/IrisAnalysisView'
@@ -11,6 +11,30 @@ import { Eye } from 'lucide-react'
 import { useDiagnosticHistory, type DiagnosticSession } from '@/lib/diagnosticHistory'
 import { useMultimodalData } from '@/hooks/useMultimodalData'
 import { useEditableOnboardingProfile } from '@/lib/onboarding-profile'
+import { saveReviewDraft, type ReviewChange } from '@/components/feed/LudiaFeed'
+import { CARE_CASES } from '@/data/careCases'
+
+// 자랑하기 — 처음 기록과 이 기록을 비교해 좋아진 지표만 후기에 붙여요
+const BRAG_METRICS: { label: string; unit: string; higherIsBetter: boolean; min: number; pick: (s: DiagnosticSession) => number }[] = [
+  { label: '심박변이(HRV)', unit: 'ms',  higherIsBetter: true,  min: 1,   pick: s => s.data.biosignal.hrv },
+  { label: '스트레스',      unit: '/100', higherIsBetter: false, min: 1,   pick: s => s.data.eda.stressIndex },
+  { label: '이완 점수',     unit: '/100', higherIsBetter: true,  min: 1,   pick: s => s.data.eda.relaxationScore },
+  { label: '체중',          unit: 'kg',  higherIsBetter: false, min: 0.3, pick: s => s.data.biosignal.weight },
+  { label: 'BMI',           unit: '',    higherIsBetter: false, min: 0.1, pick: s => s.data.biosignal.bmi },
+  { label: '수면',          unit: '시간', higherIsBetter: true,  min: 0.2, pick: s => s.data.biosignal.sleepHours },
+]
+
+function improvementsSince(first: DiagnosticSession, now: DiagnosticSession): ReviewChange[] {
+  const out: ReviewChange[] = []
+  for (const m of BRAG_METRICS) {
+    const from = m.pick(first), to = m.pick(now)
+    if (!Number.isFinite(from) || !Number.isFinite(to) || from <= 0 || to <= 0) continue
+    const diff = to - from
+    if (Math.abs(diff) < m.min || (diff > 0) !== m.higherIsBetter) continue
+    out.push({ label: m.label, from, to, unit: m.unit, good: true })
+  }
+  return out
+}
 
 function formatDateTime(iso: string) {
   const d = new Date(iso)
@@ -41,6 +65,26 @@ export default function DiagnosticReportPage() {
 
   const session = id ? sessions.find(s => s.id === id) ?? null : null
   const isLive = !session
+
+  function handleBrag(s: DiagnosticSession) {
+    // 예시 기록은 비교 기준에서 빼요
+    const earlier = sessions
+      .filter(x => !x.demo && x.id !== s.id && x.createdAt < s.createdAt)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+    const first = earlier[0]
+    const changes = first ? improvementsSince(first, s) : []
+    const days = first ? Math.max(1, Math.round((new Date(s.createdAt).getTime() - new Date(first.createdAt).getTime()) / 86400000)) : 0
+    const period = days >= 14 ? `${Math.round(days / 7)}주 동안` : days > 0 ? `${days}일 동안` : undefined
+    const validCare = new Set<string>(CARE_CASES.map(c => c.id))
+    saveReviewDraft({
+      content: changes.length
+        ? `${period ? `${period} ` : ''}꾸준히 관리했더니 ${changes.slice(0, 2).map(c => c.label).join('·')} 지표가 좋아졌어요! 🎉\n\n`
+        : '루디아로 관리하면서 달라진 점을 나눠요 🎉\n\n',
+      review: { period, changes },
+      tags: s.careTypes.filter(t => validCare.has(t)),
+    })
+    router.push('/care?tab=review&write=review')
+  }
 
   function handleSave() {
     const newId = addSession({
@@ -74,6 +118,15 @@ export default function DiagnosticReportPage() {
             </p>
           </div>
         </div>
+
+        {session && !session.demo && (
+          <button onClick={() => handleBrag(session)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white flex-shrink-0 transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #f43f75, #a855f7)', boxShadow: '0 4px 14px rgba(168,85,247,0.3)' }}>
+            <Trophy className="w-3.5 h-3.5" />
+            자랑하기
+          </button>
+        )}
 
         {isLive && (
           <button onClick={handleSave}

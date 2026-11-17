@@ -13,7 +13,7 @@ const navItems = [
   { href: '/diagnostic', icon: Microscope,      label: '진단 분석' },
   { href: '/care',       icon: HeartPulse,      label: '루디아피드' },
   { href: '/ludia-call', icon: ChefHat,         label: '루디아 헬스' },
-  { href: '/community',  icon: Users,           label: '루디아 크루' },
+  { href: '/community',  icon: Users,           label: '루디아제휴' },
   { href: '/shop',       icon: ShoppingBag,     label: '루디아샵' },
 ]
 
@@ -32,7 +32,7 @@ export function Sidebar() {
 
       {/* Logo */}
       <div className="px-4 py-4" style={{ borderBottom: '1px solid rgba(244,63,117,0.08)' }}>
-        <Link href="/" className="flex items-center justify-center group transition-opacity hover:opacity-80">
+        <Link href="/care" className="flex items-center justify-center group transition-opacity hover:opacity-80">
           <div style={{
             borderRadius: '18px',
             overflow: 'hidden',

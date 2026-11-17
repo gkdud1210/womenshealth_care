@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { SCORE_KEY } from '@/lib/discomfortScore'
 import type { CycleMode } from '@/types/health'
+import { ExpertVerifyCard } from '@/components/feed/ExpertVerifyCard'
 
 const ANSWERS_KEY = 'ludia_answers_v1'
 
@@ -105,6 +106,9 @@ export default function SettingsPage() {
         </div>
         <ChevronRight className="w-4 h-4 text-slate-300" />
       </button>
+
+      {/* 루디아피드 전문가 인증 */}
+      <ExpertVerifyCard />
 
       {/* 앱 정보 */}
       <div className="glass-card p-5 mb-4">

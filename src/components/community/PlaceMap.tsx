@@ -10,7 +10,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { X, LocateFixed, Loader2 } from 'lucide-react'
-import { flagOf } from '@/data/regionData'
 import { osmDirectionsUrl, type Bounds, type OsmFacility } from '@/lib/osm-facilities'
 
 export interface MapLocation {
@@ -58,8 +57,7 @@ function escapeHtml(s: string): string {
 }
 
 function clusterIcon<T>(c: Cluster<T>, badge?: (items: T[]) => string): L.DivIcon {
-  const countries = new Set(c.points.map(p => p.country))
-  const flag = countries.size === 1 ? flagOf(c.points[0].country) : '🌏'
+  const flag = '📍'
   const single = c.points.length === 1
   const size = Math.min(64, 38 + Math.round(Math.log2(c.count + 1) * 6))
   const text = single && badge ? badge(c.points[0].items) : String(c.count)
@@ -104,9 +102,12 @@ function osmPopup(f: OsmFacility): string {
     </div>`
 }
 
+/** 내 동네를 보여줄 때 확대 정도 (구 하나가 화면에 들어올 만큼) */
+const FOCUS_ZOOM = 13
+
 export default function PlaceMap<T>({
   title, items, locate, renderItem, markerBadge, extraList, hint, emptyText, countText = n => `${n}곳`,
-  osm = null, toolbar, filterKey = '', hidden = false, onClose,
+  osm = null, toolbar, filterKey = '', hidden = false, focus = null, onClose,
 }: {
   title: string
   items: T[]
@@ -127,6 +128,8 @@ export default function PlaceMap<T>({
   /** 필터가 바뀐 걸 알려주는 값 — 바뀌면 걸러진 장소가 다 보이게 다시 맞춰요 */
   filterKey?: string
   hidden?: boolean               // 상세 화면을 보는 동안 지도 상태를 유지한 채 숨겨요
+  /** 처음 열 때 이 좌표(내 동네)를 가운데 두고 동네 크기로 보여줘요 */
+  focus?: [number, number] | null
   onClose: () => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -134,7 +137,8 @@ export default function PlaceMap<T>({
   const layerRef = useRef<L.LayerGroup | null>(null)
   const osmLayerRef = useRef<L.LayerGroup | null>(null)
   const fittedRef = useRef(false)
-  const [zoom, setZoom] = useState(2)
+  const focusRef = useRef(focus)
+  const [zoom, setZoom] = useState(focus ? FOCUS_ZOOM : 7)
   const [viewTick, setViewTick] = useState(0)
   // 선택한 장소 key — 목록은 최신 데이터로 다시 계산해요
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -165,9 +169,12 @@ export default function PlaceMap<T>({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     const map = L.map(containerRef.current, {
-      center: [25, 60], zoom: 2, minZoom: 0.5, maxZoom: 18, zoomSnap: 0.25,
-      worldCopyJump: true, zoomControl: false,
+      // 한국 안에서만 운영해요 — 내 동네가 있으면 동네부터, 없으면 한국 전체
+      center: focusRef.current ?? [36.4, 127.8], zoom: focusRef.current ? FOCUS_ZOOM : 7,
+      minZoom: 6, maxZoom: 18, zoomSnap: 0.25, zoomControl: false,
+      maxBounds: L.latLngBounds([32.5, 123.5], [39.5, 132.5]), maxBoundsViscosity: 0.8,
     })
+    if (focusRef.current) fittedRef.current = true
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     // OpenStreetMap 기본 타일 — 이용자가 많아지면 상용 타일 제공처(MapTiler 등)로 바꿔야 해요
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -223,7 +230,7 @@ export default function PlaceMap<T>({
     setOsmState({ status: 'idle', count: 0 })
     const map = mapRef.current
     if (map && osmRef.current && map.getZoom() >= OSM_MIN_ZOOM) loadOsm()
-    else fittedRef.current = false
+    else if (!focusRef.current) fittedRef.current = false
   }, [filterKey, loadOsm])
 
   // 처음 열릴 때 (또는 필터가 바뀐 뒤) 항목이 있는 곳이 다 보이게 맞춰요

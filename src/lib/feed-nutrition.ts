@@ -230,7 +230,10 @@ const num = (v: unknown) => (typeof v === 'number' && isFinite(v) ? Math.max(0, 
 async function callFeedVisionApi(images: string[], caption: string): Promise<FeedNutrition | null> {
   try {
     const fd = new FormData()
-    images.slice(0, 4).forEach((img, i) => fd.append('file', dataUrlToBlob(img), `photo-${i}.jpg`))
+    // 서버에 올라간 글의 사진은 주소(https://…)라서 받아와서 보내요
+    const blobs = await Promise.all(images.slice(0, 4).map(img =>
+      img.startsWith('data:') ? Promise.resolve(dataUrlToBlob(img)) : fetch(img).then(r => r.blob())))
+    blobs.forEach((b, i) => fd.append('file', b, `photo-${i}.jpg`))
     fd.append('caption', caption.slice(0, 500))
     const res = await fetch(ludiaApiUrl('feed-nutrition'), { method: 'POST', body: fd, signal: AbortSignal.timeout(30_000) })
     if (!res.ok) return null

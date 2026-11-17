@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   Plus, X, Search, MapPin, Clock, Users, Heart, MessageCircle,
-  Send, Camera, ArrowLeft, Globe, ChevronRight, Check, Languages, Sparkles, LayoutGrid, Map as MapIcon,
+  Send, Camera, ArrowLeft, ChevronRight, Check, Languages, Sparkles, LayoutGrid, Map as MapIcon,
 } from 'lucide-react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -16,15 +16,16 @@ import {
   type MeetupCategory, type MeetupGroup, type MeetupPost, type MeetupLanguage, type MeetupPlace,
 } from '@/data/meetupData'
 import {
-  ANY, ONLINE_CODE, COUNTRIES_BY_CONTINENT,
-  getCountry, getRegion, getCity, placeLabel, searchPlaces, flagOf,
+  ANY,
+  getCountry, getRegion, getCity, placeLabel, searchPlaces,
   type Country, type Region, type PlaceRef,
 } from '@/data/regionData'
 import GroupChat from '@/components/community/GroupChat'
 import FacilityExplorer from '@/components/community/FacilityExplorer'
+import { FACILITY_TYPE_META, type FacilityType } from '@/data/facilityData'
 import WorkoutLog from '@/components/community/WorkoutLog'
 import type { MapLocation } from '@/components/community/PlaceMap'
-import { coordsOf } from '@/data/regionCoords'
+import { coordsOf, nearestCity } from '@/data/regionCoords'
 import {
   CHAT_KEY, loadChats, saveChats, loadChatReads, saveChatReads, appendMessage, roomMessages, unreadCount,
   type ChatMessage, type ChatRooms, type ChatReadMap,
@@ -43,13 +44,12 @@ const PlaceMap = dynamic(() => import('@/components/community/PlaceMap'), {
 
 /** 모임은 도시 단위로 지도에 찍혀요 */
 function locateGroup(g: MeetupGroup): MapLocation | null {
-  if (g.place.country === ONLINE_CODE) return null
   const ll = coordsOf(g.place)
   if (!ll) return null
   return {
     key: `${g.place.country}/${g.place.city}`, lat: ll[0], lng: ll[1], country: g.place.country,
     label: placeLabel(g.place, { short: true, withFlag: false }),
-    title: `${flagOf(g.place.country)} ${placeLabel(g.place, { withFlag: false })}`,
+    title: `📍 ${neighborhoodLabel(g.place)}`,
   }
 }
 
@@ -87,12 +87,14 @@ function loadGroups(): MeetupGroup[] {
     if (s) {
       const parsed = JSON.parse(s)
       if (Array.isArray(parsed)) {
-        const list = parsed.map(normalizeGroup).filter((g): g is MeetupGroup => g !== null)
+        // 지금은 한국 안에서만 운영해요 — 예전에 저장된 해외·온라인 모임은 빼요
+        const list = parsed.map(normalizeGroup).filter((g): g is MeetupGroup => g !== null && g.place.country === KR)
+        if (list.length !== parsed.length) localStorage.setItem(GROUPS_KEY, JSON.stringify(list))
         if (list.length > 0) return list
       }
     }
     const migrated = migrateFromV1()
-    const next = migrated ?? SEED_GROUPS
+    const next = (migrated ?? SEED_GROUPS).filter(g => g.place.country === KR)
     localStorage.setItem(GROUPS_KEY, JSON.stringify(next))
     return next
   } catch { return SEED_GROUPS }
@@ -111,10 +113,15 @@ function loadLikes(): Set<string> {
 }
 function saveLikes(s: Set<string>) { try { localStorage.setItem(LIKES_KEY, JSON.stringify(Array.from(s))) } catch {} }
 
-/** 지금 머무는 지역 — 해외로 이동하면 여기만 바꾸면 돼요. */
+/** 내 동네 — 모임·시설·지도가 처음에 이 동네로 열려요. 언제든 바꿀 수 있어요. */
 function loadHomePlace(): PlaceRef | null {
   if (typeof window === 'undefined') return null
-  try { const s = localStorage.getItem(HOME_KEY); return s ? JSON.parse(s) : null } catch { return null }
+  try {
+    const s = localStorage.getItem(HOME_KEY)
+    const p = s ? JSON.parse(s) as PlaceRef : null
+    // 예전에 해외 지역을 저장했거나 도시까지 고르지 않았으면 다시 정해요
+    return p && p.country === KR && getCity(p.country, p.region, p.city) ? p : null
+  } catch { return null }
 }
 function saveHomePlace(p: PlaceRef | null) {
   try { p ? localStorage.setItem(HOME_KEY, JSON.stringify(p)) : localStorage.removeItem(HOME_KEY) } catch {}
@@ -143,36 +150,40 @@ export interface PlaceFilter {
   includeOnline: boolean
 }
 
-const ALL_PLACES: PlaceFilter = { country: ANY, region: ANY, city: ANY, includeOnline: true }
+/** 지금은 한국 안에서만 운영해요 */
+const KR = 'KR'
+const ALL_PLACES: PlaceFilter = { country: ANY, region: ANY, city: ANY, includeOnline: false }
 
-function filterLabel(f: PlaceFilter): string {
-  if (f.country === ANY) return '전 세계'
-  const country = getCountry(f.country)
-  if (!country) return '전 세계'
-  if (f.region === ANY) return `${country.flag} ${country.label} 전체`
-  const region = getRegion(f.country, f.region)
-  if (f.city === ANY) return `${country.flag} ${country.label} · ${region?.label ?? ''} 전체`
-  const city = getCity(f.country, f.region, f.city)
-  return `${country.flag} ${country.label} · ${region?.label ?? ''} · ${city?.label ?? ''}`
+function placeToFilter(p: PlaceRef): PlaceFilter {
+  return { country: p.country, region: p.region, city: p.city, includeOnline: false }
+}
+function sameCity(a: PlaceRef | null, b: PlaceRef | null) {
+  return !!a && !!b && a.country === b.country && a.region === b.region && a.city === b.city
 }
 
-/** 선택한 지역에 실제로 열리는 모임인지 (온라인 전용 모임은 제외) */
+/** "서울 · 마포구" */
+function neighborhoodLabel(p: PlaceRef): string {
+  const region = getRegion(p.country, p.region)
+  const city = getCity(p.country, p.region, p.city)
+  return [region?.label, city?.label].filter(Boolean).join(' · ') || '전국'
+}
+
+function filterLabel(f: PlaceFilter): string {
+  if (f.country === ANY || f.region === ANY) return '전국'
+  if (f.city === ANY) return `${getRegion(f.country, f.region)?.label ?? ''} 전체`
+  return neighborhoodLabel(f)
+}
+
+/** 선택한 지역(동네·시도·전국)에서 열리는 모임인지 */
 function isLocalMatch(g: MeetupGroup, f: PlaceFilter): boolean {
-  if (g.place.country === ONLINE_CODE) return false
   if (f.country === ANY) return true
-  if (f.country === ONLINE_CODE) return false
   return g.place.country === f.country &&
     (f.region === ANY || g.place.region === f.region) &&
     (f.city === ANY || g.place.city === f.city)
 }
 
 function matchesPlace(g: MeetupGroup, f: PlaceFilter): boolean {
-  const pureOnline = g.place.country === ONLINE_CODE
-  if (f.country === ONLINE_CODE) return pureOnline || g.onlineJoinable
-  if (pureOnline) return f.includeOnline
-  if (isLocalMatch(g, f)) return true
-  // 다른 지역 모임이라도 원격 참여가 열려 있으면 보여줘요.
-  return f.includeOnline && g.onlineJoinable
+  return isLocalMatch(g, f)
 }
 
 // ── 위치 선택 모달 ──────────────────────────────────────────────────────────
@@ -184,7 +195,7 @@ function LocationPicker({ mode, initial, onClose, onSelect, onOpenMap }: {
   onSelect: (place: PlaceRef | null) => void   // filter 모드에서 null = 전체
   onOpenMap?: () => void
 }) {
-  const [country, setCountry] = useState<Country | null>(initial ? getCountry(initial.country) ?? null : null)
+  const country = getCountry(KR) as Country
   const [region, setRegion] = useState<Region | null>(
     initial && initial.region !== ANY ? getRegion(initial.country, initial.region) ?? null : null,
   )
@@ -193,27 +204,27 @@ function LocationPicker({ mode, initial, onClose, onSelect, onOpenMap }: {
 
   function pick(place: PlaceRef | null) { onSelect(place); onClose() }
 
-  const title = !country ? '국가 선택' : !region ? `${country.flag} ${country.label}` : `${country.flag} ${country.label} · ${region.label}`
+  const title = !region ? (mode === 'filter' ? '내 동네 고르기' : '지역 고르기') : region.label
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col" style={{ background: '#fff' }}>
       <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-100 flex-shrink-0">
-        {country ? (
-          <button onClick={() => (region ? setRegion(null) : setCountry(null))} className="p-1">
+        {region ? (
+          <button onClick={() => setRegion(null)} className="p-1">
             <ArrowLeft className="w-5 h-5 text-slate-700" />
           </button>
         ) : (
           <button onClick={onClose} className="p-1"><X className="w-6 h-6 text-slate-600" /></button>
         )}
         <p className="flex-1 text-[15px] font-bold text-slate-800 truncate">{title}</p>
-        {country && <button onClick={onClose} className="p-1"><X className="w-5 h-5 text-slate-400" /></button>}
+        {region && <button onClick={onClose} className="p-1"><X className="w-5 h-5 text-slate-400" /></button>}
       </div>
 
       <div className="px-4 py-3 border-b border-slate-100 flex-shrink-0">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
           <input value={query} onChange={e => setQuery(e.target.value)}
-            placeholder="나라·도시 검색 (예: 어바인, 도쿄, 시드니)"
+            placeholder="동네 검색 (예: 마포구, 해운대, 유성구)"
             className="w-full pl-9 pr-9 py-2 rounded-2xl text-sm bg-slate-100 border-none outline-none placeholder-slate-400 text-slate-800 focus:bg-white focus:ring-2 focus:ring-rose-200 transition-all" />
           {query && <button onClick={() => setQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="w-4 h-4 text-slate-400" /></button>}
         </div>
@@ -229,54 +240,32 @@ function LocationPicker({ mode, initial, onClose, onSelect, onOpenMap }: {
                 <button key={`${r.country}-${r.region}-${r.city}`}
                   onClick={() => pick({ country: r.country, region: r.region, city: r.city })}
                   className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-white border border-slate-100 text-left hover:border-rose-200 transition-colors">
-                  <span className="text-lg">{r.flag}</span>
-                  <span className="flex-1 text-[13.5px] text-slate-700">{r.label}</span>
+                  <MapPin className="w-4 h-4 text-slate-300" />
+                  <span className="flex-1 text-[13.5px] text-slate-700">{r.label.replace(/^대한민국 · /, '')}</span>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
                 </button>
               ))}
             </div>
           )
-        ) : !country ? (
-          <>
+        ) : !region ? (
+          <div className="space-y-1.5">
+            {mode === 'filter' && (
+              <p className="text-[12px] text-slate-400 px-1 pb-1">고른 동네가 내 동네로 저장돼요. 모임·시설·지도가 이 동네로 먼저 열려요.</p>
+            )}
             {mode === 'filter' && (
               <button onClick={() => pick(null)}
-                className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl mb-3 text-left"
+                className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left"
                 style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.2)' }}>
-                <Globe className="w-4.5 h-4.5" style={{ color: '#e11d5a', width: 18, height: 18 }} />
-                <span className="flex-1 text-[13.5px] font-bold" style={{ color: '#e11d5a' }}>전 세계 모든 지역 보기</span>
+                <span className="text-[13.5px] font-bold" style={{ color: '#e11d5a' }}>전국 둘러보기</span>
               </button>
             )}
             {onOpenMap && (
               <button onClick={() => { onClose(); onOpenMap() }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl mb-3 text-left"
+                className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left"
                 style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.22)' }}>
                 <MapIcon style={{ color: '#4f46e5', width: 18, height: 18 }} />
-                <span className="flex-1 text-[13.5px] font-bold" style={{ color: '#4f46e5' }}>🗺️ 지도로 전 세계 모임 보기</span>
+                <span className="flex-1 text-[13.5px] font-bold" style={{ color: '#4f46e5' }}>지도로 모임 보기</span>
                 <ChevronRight className="w-4 h-4" style={{ color: '#818cf8' }} />
-              </button>
-            )}
-            {COUNTRIES_BY_CONTINENT.map(group => (
-              <div key={group.continent} className="mb-4">
-                <p className="text-[11px] font-bold text-slate-400 mb-1.5 px-1">{group.continent}</p>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {group.countries.map(x => (
-                    <button key={x.code} onClick={() => setCountry(x)}
-                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white border border-slate-100 text-left hover:border-rose-200 transition-colors">
-                      <span className="text-base">{x.flag}</span>
-                      <span className="flex-1 text-[13px] font-semibold text-slate-700 truncate">{x.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </>
-        ) : !region ? (
-          <div className="space-y-1.5">
-            {mode === 'filter' && (
-              <button onClick={() => pick({ country: country.code, region: ANY, city: ANY })}
-                className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left"
-                style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.2)' }}>
-                <span className="text-[13.5px] font-bold" style={{ color: '#e11d5a' }}>{country.label} 전체 보기</span>
               </button>
             )}
             {country.regions.map(r => (
@@ -294,7 +283,7 @@ function LocationPicker({ mode, initial, onClose, onSelect, onOpenMap }: {
               <button onClick={() => pick({ country: country.code, region: region.id, city: ANY })}
                 className="w-full flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left"
                 style={{ background: 'rgba(244,63,117,0.08)', border: '1px solid rgba(244,63,117,0.2)' }}>
-                <span className="text-[13.5px] font-bold" style={{ color: '#e11d5a' }}>{region.label} 전체 보기</span>
+                <span className="text-[13.5px] font-bold" style={{ color: '#e11d5a' }}>{region.label} 전체 둘러보기</span>
               </button>
             )}
             {region.cities.map(ct => (
@@ -394,18 +383,12 @@ function CategoryChips({ value, onChange, recommended = [] }: {
 // ── Group card ─────────────────────────────────────────────────────────────
 
 function placeLine(place: MeetupPlace): string {
-  const country = getCountry(place.country)
-  if (!country) return place.venue || '위치 미정'
-  const city = getCity(place.country, place.region, place.city)
-  const region = getRegion(place.country, place.region)
-  const spot = city?.label ?? region?.label ?? ''
-  const prefix = place.country === ONLINE_CODE ? '' : `${country.flag} `
-  return `${prefix}${country.label}${spot ? ` · ${spot}` : ''}`
+  if (!getCountry(place.country)) return place.venue || '위치 미정'
+  return neighborhoodLabel(place)
 }
 
 function GroupCard({ group, joined, recommended, unread = 0, onOpen }: { group: MeetupGroup; joined: boolean; recommended?: boolean; unread?: number; onOpen: () => void }) {
   const meta = CATEGORY_META[group.category]
-  const isOnline = group.place.country === ONLINE_CODE
   return (
     <button onClick={onOpen}
       className="w-full bg-white rounded-2xl shadow-sm p-4 flex gap-3.5 text-left mb-2.5 hover:shadow-md transition-shadow">
@@ -436,7 +419,7 @@ function GroupCard({ group, joined, recommended, unread = 0, onOpen }: { group: 
         <p className="text-[12.5px] text-slate-500 line-clamp-2 leading-snug mb-1.5">{group.description}</p>
         <div className="flex items-center gap-2.5 flex-wrap text-[11px] text-slate-400">
           <span className="flex items-center gap-0.5 font-semibold text-slate-500">
-            {isOnline ? <Globe className="w-3 h-3" /> : <MapPin className="w-3 h-3" />}{placeLine(group.place)}
+            <MapPin className="w-3 h-3" />{placeLine(group.place)}
           </span>
           <span className="flex items-center gap-0.5"><Clock className="w-3 h-3" />{group.schedule}</span>
           <span className="flex items-center gap-0.5"><Users className="w-3 h-3" />{group.memberIds.length}/{group.maxMembers}</span>
@@ -445,12 +428,6 @@ function GroupCard({ group, joined, recommended, unread = 0, onOpen }: { group: 
           <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full" style={{ background: meta.bg, color: meta.color }}>
             {meta.emoji} {meta.label}
           </span>
-          {!isOnline && group.onlineJoinable && (
-            <span className="inline-flex items-center gap-1 text-[10.5px] font-bold px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(37,99,235,0.1)', color: '#2563eb' }}>
-              <Globe className="w-2.5 h-2.5" /> 원격 참여 가능
-            </span>
-          )}
           <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
             <Languages className="w-2.5 h-2.5" /> {group.language}
           </span>
@@ -485,14 +462,12 @@ function CreateGroupModal({ defaultPlace, onClose, onCreate }: {
     defaultPlace && defaultPlace.city !== ANY ? defaultPlace : { country: 'KR', region: 'seoul', city: 'gangnam' },
   )
   const [venue, setVenue] = useState('')
-  const [onlineJoinable, setOnlineJoinable] = useState(false)
   const [language, setLanguage] = useState<MeetupLanguage>('한국어')
   const [schedule, setSchedule] = useState('')
   const [maxMembers, setMaxMembers] = useState(10)
   const [showPicker, setShowPicker] = useState(false)
   const [showCategories, setShowCategories] = useState(false)
 
-  const isOnlineGroup = place.country === ONLINE_CODE
   const canSubmit = name.trim().length > 0 && description.trim().length > 0
 
   return (
@@ -504,7 +479,7 @@ function CreateGroupModal({ defaultPlace, onClose, onCreate }: {
           onClick={() => onCreate({
             name: name.trim(), category, description: description.trim(),
             place: { ...place, venue: venue.trim() || '장소 미정' },
-            onlineJoinable: isOnlineGroup ? true : onlineJoinable,
+            onlineJoinable: false,
             language, schedule: schedule.trim() || '미정', maxMembers,
           })}
           className="text-sm font-bold text-rose-500 disabled:text-slate-300">만들기</button>
@@ -533,7 +508,7 @@ function CreateGroupModal({ defaultPlace, onClose, onCreate }: {
         <div>
           <p className="text-xs font-bold text-slate-500 mb-1.5">모임 이름</p>
           <input value={name} onChange={e => setName(e.target.value)} maxLength={30}
-            placeholder="예) 어바인 아침 러닝크루"
+            placeholder="예) 망원동 아침 러닝크루"
             className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-rose-300 text-slate-800" />
         </div>
 
@@ -545,29 +520,18 @@ function CreateGroupModal({ defaultPlace, onClose, onCreate }: {
         </div>
 
         <div>
-          <p className="text-xs font-bold text-slate-500 mb-1.5">국가 · 지역 · 도시</p>
+          <p className="text-xs font-bold text-slate-500 mb-1.5">동네</p>
           <button onClick={() => setShowPicker(true)}
             className="w-full flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 text-left">
-            {isOnlineGroup ? <Globe className="w-4 h-4 text-slate-400" /> : <MapPin className="w-4 h-4 text-slate-400" />}
-            <span className="flex-1 text-slate-800 truncate">{placeLabel(place)}</span>
+            <MapPin className="w-4 h-4 text-slate-400" />
+            <span className="flex-1 text-slate-800 truncate">{neighborhoodLabel(place)}</span>
             <ChevronRight className="w-4 h-4 text-slate-300" />
           </button>
           <input value={venue} onChange={e => setVenue(e.target.value)} maxLength={50}
-            placeholder={isOnlineGroup ? '참여 방법 (예: Zoom 링크는 가입 시 안내)' : '상세 장소 (예: Irvine Community Center)'}
+            placeholder="상세 장소 (예: 망원한강공원 주차장 앞)"
             className="w-full mt-2 px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none focus:border-rose-300 text-slate-800" />
         </div>
 
-        {!isOnlineGroup && (
-          <button onClick={() => setOnlineJoinable(v => !v)}
-            className="w-full flex items-center justify-between px-3.5 py-3 rounded-xl" style={{ background: '#f8fafc', border: '1px solid #e2e8f0' }}>
-            <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
-              <Globe className="w-4 h-4 text-blue-500" /> 다른 나라에서도 원격 참여 가능
-            </span>
-            <div className={cn('w-9 h-5 rounded-full transition-colors relative', onlineJoinable ? 'bg-rose-400' : 'bg-slate-300')}>
-              <div className="w-4 h-4 rounded-full bg-white absolute top-0.5 transition-all" style={{ left: onlineJoinable ? 18 : 2 }} />
-            </div>
-          </button>
-        )}
 
         <div>
           <p className="text-xs font-bold text-slate-500 mb-1.5">사용 언어</p>
@@ -742,7 +706,6 @@ function GroupDetail({
   onComment: (postId: string, text: string) => void
 }) {
   const meta = CATEGORY_META[group.category]
-  const isOnline = group.place.country === ONLINE_CODE
   const [showActivity, setShowActivity] = useState(false)
   const feed = posts.filter(p => p.groupId === group.id).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
@@ -771,8 +734,8 @@ function GroupDetail({
 
           <div className="rounded-xl p-3 space-y-1.5 mb-3" style={{ background: '#f8fafc' }}>
             <div className="flex items-start gap-1.5 text-[12.5px] text-slate-600">
-              {isOnline ? <Globe className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" /> : <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" />}
-              <span><b className="text-slate-800">{placeLabel(group.place, { withFlag: !isOnline })}</b>{group.place.venue ? ` · ${group.place.venue}` : ''}</span>
+              <MapPin className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" />
+              <span><b className="text-slate-800">{neighborhoodLabel(group.place)}</b>{group.place.venue ? ` · ${group.place.venue}` : ''}</span>
             </div>
             <div className="flex items-start gap-1.5 text-[12.5px] text-slate-600">
               <Clock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" />
@@ -788,11 +751,6 @@ function GroupDetail({
             </div>
           </div>
 
-          {(isOnline || group.onlineJoinable) && (
-            <div className="rounded-xl p-3 text-[12px] leading-relaxed" style={{ background: 'rgba(37,99,235,0.08)', color: '#1d4ed8' }}>
-              🌐 이 모임은 <b>다른 나라에서도 원격으로 함께</b>할 수 있어요. 해외에 있어도 시간만 맞추면 참여 가능해요.
-            </div>
-          )}
         </div>
 
         {joined ? (
@@ -864,6 +822,8 @@ export default function CommunityPage() {
   const [posts, setPosts] = useState<MeetupPost[]>([])
   const [liked, setLiked] = useState<Set<string>>(new Set())
   const [tab, setTab] = useState<'explore' | 'places' | 'workout' | 'mine'>('places')
+  // 루디아피드에서 넘어올 때 바로 보여줄 시설 종류·제휴 할인·시설 (?facility=pool, ?partner=1, ?place=f-mapo-pool)
+  const [facilityStart, setFacilityStart] = useState<{ type?: FacilityType; partner?: boolean; facilityId?: string } | null>(null)
   const [categoryFilter, setCategoryFilter] = useState<MeetupCategory | 'all'>('all')
   const [placeFilter, setPlaceFilter] = useState<PlaceFilter>(ALL_PLACES)
   const [homePlace, setHomePlace] = useState<PlaceRef | null>(null)
@@ -892,13 +852,13 @@ export default function CommunityPage() {
     try {
       const params = new URLSearchParams(window.location.search)
       const cat = params.get('category')
-      if (cat && isMeetupCategory(cat)) setCategoryFilter(cat)
-      const country = params.get('country')
-      if (country && (country === ONLINE_CODE || getCountry(country))) {
-        setPlaceFilter(f => ({ ...f, country, region: ANY, city: ANY }))
-      } else if (home) {
-        setPlaceFilter(f => ({ ...f, country: home.country, region: home.region, city: ANY }))
-      }
+      if (cat && isMeetupCategory(cat)) { setCategoryFilter(cat); setTab('explore') }
+      const ft = params.get('facility')
+      const placeId = params.get('place')
+      if (placeId) setFacilityStart({ facilityId: placeId })
+      else if (ft && ft in FACILITY_TYPE_META) setFacilityStart({ type: ft as FacilityType })
+      else if (params.get('partner') === '1') setFacilityStart({ partner: true })
+      if (home) setPlaceFilter(placeToFilter(home))
     } catch {}
 
     // 같은 기기의 다른 탭에서 보낸 메시지도 바로 반영해요
@@ -942,10 +902,8 @@ export default function CommunityPage() {
     [groups, currentUserId],
   )
 
-  // 지역을 고른 경우 현지 모임을 먼저, 원격 참여 모임을 뒤에 보여줘요.
-  const splitList = placeFilter.country !== ANY && placeFilter.country !== ONLINE_CODE
+  const splitList = placeFilter.country !== ANY
   const localGroups = splitList ? filteredGroups.filter(g => isLocalMatch(g, placeFilter)) : filteredGroups
-  const remoteGroups = splitList ? filteredGroups.filter(g => !isLocalMatch(g, placeFilter)) : []
 
   const openGroup = groups.find(g => g.id === openGroupId) ?? null
   const chatGroup = groups.find(g => g.id === chatGroupId && g.memberIds.includes(currentUserId)) ?? null
@@ -957,12 +915,27 @@ export default function CommunityPage() {
     setChatReads(prev => { const u = { ...prev, [chatGroupId]: new Date().toISOString() }; saveChatReads(u); return u })
   }, [chatGroupId, chats])
 
-  const handleSetHome = useCallback(() => {
-    if (placeFilter.country === ANY || placeFilter.country === ONLINE_CODE) return
-    const next: PlaceRef = { country: placeFilter.country, region: placeFilter.region, city: placeFilter.city }
+  /** 내 동네 바꾸기 — 저장하고 바로 그 동네로 보여줘요 */
+  const changeHome = useCallback((next: PlaceRef) => {
     setHomePlace(next)
     saveHomePlace(next)
-  }, [placeFilter])
+    setPlaceFilter(placeToFilter(next))
+  }, [])
+
+  // 내 동네를 아직 안 정했으면 지금 위치로 정해요 (언제든 바꿀 수 있어요)
+  const handleLocated = useCallback((here: { lat: number; lng: number }) => {
+    if (loadHomePlace()) return
+    const near = nearestCity(here.lat, here.lng)
+    if (near) changeHome(near)
+  }, [changeHome])
+  useEffect(() => {
+    if (loadHomePlace() || typeof navigator === 'undefined' || !navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(
+      pos => handleLocated({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 10 * 60_000 },
+    )
+  }, [handleLocated])
 
   const handleCreateGroup = useCallback((draft: GroupDraft) => {
     const group: MeetupGroup = {
@@ -1033,16 +1006,15 @@ export default function CommunityPage() {
 
   const totalUnread = myGroups.reduce((n, g) => n + unreadOf(g.id), 0)
   const placeIsSet = placeFilter.country !== ANY
-  const canSetHome = placeIsSet && placeFilter.country !== ONLINE_CODE &&
-    !(homePlace && homePlace.country === placeFilter.country && homePlace.region === placeFilter.region && homePlace.city === placeFilter.city)
+  const atHome = sameCity(homePlace, placeFilter)
 
   return (
     <div className="min-h-screen pb-24" style={{ background: '#fafafa' }}>
       <div className="sticky top-0 z-30 bg-white border-b border-slate-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-lg mx-auto">
           <div>
-            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아 크루</h1>
-            <p className="text-[11.5px] text-slate-400">어느 나라에 있든, 함께 움직여요</p>
+            <h1 className="font-display text-xl font-semibold text-slate-800 leading-tight">루디아제휴</h1>
+            <p className="text-[11.5px] text-slate-400">운동·뷰티·힐링 제휴 시설을 회원가로</p>
           </div>
           {tab === 'explore' && (
             <button onClick={() => setShowCreate(true)} className="p-1.5 rounded-full hover:bg-slate-50 transition-colors">
@@ -1052,7 +1024,7 @@ export default function CommunityPage() {
         </div>
 
         <div className="flex px-4 max-w-lg mx-auto border-b border-slate-100">
-          {([{ key: 'places', label: '시설 찾기' }, { key: 'explore', label: '모임 찾기' }, { key: 'workout', label: '운동 기록' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
+          {([{ key: 'places', label: '제휴 시설' }, { key: 'explore', label: '모임 찾기' }, { key: 'workout', label: '운동 기록' }, { key: 'mine', label: `내 모임${myGroups.length ? ` ${myGroups.length}` : ''}` }] as const).map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className="flex-1 py-2.5 text-sm font-bold relative"
               style={{ color: tab === t.key ? '#e11d5a' : '#94a3b8' }}>
@@ -1082,22 +1054,15 @@ export default function CommunityPage() {
                     ? { background: 'rgba(244,63,117,0.1)', color: '#e11d5a' }
                     : { background: '#f1f5f9', color: '#475569' }}>
                   <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="truncate">{filterLabel(placeFilter)}</span>
-                  <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+                  <span className="truncate">{atHome ? `내 동네 · ${filterLabel(placeFilter)}` : filterLabel(placeFilter)}</span>
+                  <span className="ml-auto text-[11px] font-semibold opacity-60 flex-shrink-0">바꾸기</span>
                 </button>
-                {placeIsSet && (
-                  <button onClick={() => setPlaceFilter(ALL_PLACES)}
-                    className="px-2.5 py-2 rounded-2xl bg-slate-100 text-slate-500 flex-shrink-0">
-                    <X className="w-3.5 h-3.5" />
+                {homePlace && !atHome && (
+                  <button onClick={() => setPlaceFilter(placeToFilter(homePlace))}
+                    className="px-3 py-2 rounded-2xl text-[12.5px] font-bold bg-slate-100 text-slate-600 flex-shrink-0">
+                    내 동네로
                   </button>
                 )}
-                <button onClick={() => setPlaceFilter(f => ({ ...f, country: f.country === ONLINE_CODE ? ANY : ONLINE_CODE, region: ANY, city: ANY }))}
-                  className="flex items-center gap-1 px-3 py-2 rounded-2xl text-[12.5px] font-bold flex-shrink-0 transition-colors"
-                  style={placeFilter.country === ONLINE_CODE
-                    ? { background: 'rgba(37,99,235,0.12)', color: '#2563eb' }
-                    : { background: '#f1f5f9', color: '#475569' }}>
-                  <Globe className="w-3.5 h-3.5" /> 온라인
-                </button>
                 <button onClick={() => setShowMap(true)}
                   className="flex items-center gap-1 px-3 py-2 rounded-2xl text-[12.5px] font-bold flex-shrink-0 transition-colors"
                   style={{ background: 'rgba(99,102,241,0.1)', color: '#4f46e5' }}>
@@ -1105,29 +1070,6 @@ export default function CommunityPage() {
                 </button>
               </div>
 
-              <div className="flex items-center gap-3 flex-wrap">
-                {placeFilter.country !== ONLINE_CODE && (
-                  <button onClick={() => setPlaceFilter(f => ({ ...f, includeOnline: !f.includeOnline }))}
-                    className="flex items-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
-                    <span className={cn('w-4 h-4 rounded-md flex items-center justify-center border transition-colors',
-                      placeFilter.includeOnline ? 'bg-rose-500 border-rose-500' : 'bg-white border-slate-300')}>
-                      {placeFilter.includeOnline && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-                    </span>
-                    원격 참여 가능한 모임도 함께 보기
-                  </button>
-                )}
-                {canSetHome && (
-                  <button onClick={handleSetHome} className="text-[11.5px] font-semibold text-rose-400">
-                    📍 지금 사는 지역으로 저장
-                  </button>
-                )}
-                {homePlace && placeFilter.country === ANY && (
-                  <button onClick={() => setPlaceFilter(f => ({ ...f, country: homePlace.country, region: homePlace.region, city: homePlace.city }))}
-                    className="text-[11.5px] font-semibold text-slate-400">
-                    내 지역({placeLabel(homePlace, { short: true })}) 모임 보기
-                  </button>
-                )}
-              </div>
             </div>
             <CategoryChips value={categoryFilter} onChange={setCategoryFilter} recommended={recCategories} />
           </>
@@ -1136,14 +1078,17 @@ export default function CommunityPage() {
 
       {tab === 'places' && (
         <FacilityExplorer
-          place={placeFilter.country === ONLINE_CODE ? ALL_PLACES : placeFilter}
-          placeText={placeFilter.country === ONLINE_CODE ? '전 세계' : filterLabel(placeFilter)}
+          place={placeFilter}
+          placeText={atHome ? `내 동네 · ${filterLabel(placeFilter)}` : filterLabel(placeFilter)}
+          homeCenter={homePlace ? coordsOf(homePlace) : null}
+          onBackHome={homePlace && !atHome ? () => setPlaceFilter(placeToFilter(homePlace)) : undefined}
           isMember={!!user && !user.userId.startsWith('guest_')}
           userId={currentUserId}
           userName={currentUserName}
           onPickPlace={() => setShowFilterPicker(true)}
-          onClearPlace={() => setPlaceFilter(ALL_PLACES)}
-          onShowGroups={c => { setCategoryFilter(c); setTab('explore') }} />
+          onShowGroups={c => { setCategoryFilter(c); setTab('explore') }}
+          start={facilityStart}
+          onLocated={handleLocated} />
       )}
 
       {tab === 'workout' && (
@@ -1189,16 +1134,6 @@ export default function CommunityPage() {
                       <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
                     ))
                   )}
-                  {remoteGroups.length > 0 && (
-                    <>
-                      <p className="text-[11.5px] font-bold text-slate-500 mt-5 mb-2 px-1">
-                        🌐 어디서든 원격으로 함께할 수 있는 모임 {remoteGroups.length}개
-                      </p>
-                      {remoteGroups.map(g => (
-                        <GroupCard key={g.id} group={g} joined={g.memberIds.includes(currentUserId)} recommended={recCategories.includes(g.category)} onOpen={() => setOpenGroupId(g.id)} />
-                      ))}
-                    </>
-                  )}
                 </>
               ) : (
                 <>
@@ -1236,12 +1171,14 @@ export default function CommunityPage() {
 
       {showFilterPicker && (
         <LocationPicker mode="filter"
-          initial={placeFilter.country === ANY ? null : { country: placeFilter.country, region: placeFilter.region, city: placeFilter.city }}
+          initial={homePlace}
           onClose={() => setShowFilterPicker(false)}
           onOpenMap={tab === 'places' ? undefined : () => setShowMap(true)}
-          onSelect={p => setPlaceFilter(f => p
-            ? { ...f, country: p.country, region: p.region, city: p.city }
-            : { ...f, country: ANY, region: ANY, city: ANY })} />
+          onSelect={p => {
+            if (!p) setPlaceFilter(ALL_PLACES)                       // 전국 둘러보기
+            else if (p.city === ANY) setPlaceFilter(placeToFilter(p))  // 시·도 전체 둘러보기
+            else changeHome(p)                                         // 동네를 고르면 내 동네로 저장
+          }} />
       )}
 
       {showMap && (
@@ -1252,11 +1189,7 @@ export default function CommunityPage() {
           hint="확대하면 지역·도시별로 나뉘어 보여요"
           emptyText="조건에 맞는 지역 모임이 없어요"
           countText={n => `모임 ${n}개`}
-          extraList={{
-            label: `🌐 온라인 모임 ${mapGroups.filter(g => g.place.country === ONLINE_CODE).length}개`,
-            title: '🌐 온라인 모임',
-            items: mapGroups.filter(g => g.place.country === ONLINE_CODE),
-          }}
+          focus={homePlace ? coordsOf(homePlace) : null}
           hidden={!!openGroup || !!chatGroup}
           onClose={() => setShowMap(false)}
           renderItem={g => (
