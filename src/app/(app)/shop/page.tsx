@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { Fragment, useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Star, X, ShoppingBag, Trash2, PenLine, ImagePlus, Sparkles,
   Droplets, Shield, Leaf, Wind, Heart, Zap, Search, ShieldCheck,
-  Salad, UtensilsCrossed, Flame, Soup, Settings,
+  Salad, UtensilsCrossed, Flame, Soup, Settings, Menu, ChevronRight, ChevronLeft,
   type LucideIcon,
 } from 'lucide-react'
 import {
@@ -13,6 +13,9 @@ import {
   type ShopProduct, type ProductReview, type ProductCategory,
 } from '@/data/shopProducts'
 import { CARE_CASES } from '@/data/careCases'
+import {
+  SHOP_DEPTS, SHOP_ADS, SHOP_MID_AD, productSub, productDept, findDept, type ShopAd,
+} from '@/data/shopCategories'
 import { useAuth } from '@/hooks/useAuth'
 import { IngredientSafetySheet } from '@/components/shop/IngredientSafetySheet'
 
@@ -159,6 +162,14 @@ function ProductImage({
         alt={product.name}
         className={`w-full h-full object-contain ${className}`}
       />
+    )
+  }
+  if (product.placeholderGradient && product.placeholderEmoji) {
+    return (
+      <div className="w-full h-full flex items-center justify-center"
+        style={{ background: `linear-gradient(135deg, ${product.placeholderGradient.from}, ${product.placeholderGradient.to})` }}>
+        <span style={{ fontSize: Math.round((iconSize ?? 44) * 1.1) }} className="leading-none drop-shadow-sm">{product.placeholderEmoji}</span>
+      </div>
     )
   }
   if (product.placeholderGradient && product.placeholderIcon) {
@@ -587,6 +598,11 @@ function ProductDetailSheet({ product, onClose }: { product: ShopProduct; onClos
               </div>
               <h2 className="font-display text-2xl font-bold text-slate-800">{product.name}</h2>
               <p className="text-sm text-slate-500 mt-0.5">{product.tagline}</p>
+              {product.sample && (
+                <p className="mt-1.5 inline-block text-[10.5px] font-semibold text-amber-700 bg-amber-50 rounded-lg px-2 py-1">
+                  아직 판매 전인 예시 상품이에요 · 가격·구성은 바뀔 수 있어요
+                </p>
+              )}
               <div className="flex items-center gap-2 mt-2">
                 <StarRow rating={avg} size={14} />
                 <span className="text-sm font-semibold text-slate-700">{avg.toFixed(1)}</span>
@@ -693,46 +709,6 @@ function ProductDetailSheet({ product, onClose }: { product: ShopProduct; onClos
   )
 }
 
-// ── CategoryTabs ───────────────────────────────────────────────────────────
-
-const TABS: { id: string; label: string }[] = [
-  { id: 'all', label: '전체' },
-  ...Object.entries(CATEGORY_META).map(([id, m]) => ({ id, label: m.label })),
-]
-
-function CategoryTabs({
-  active,
-  onChange,
-}: {
-  active: string
-  onChange: (id: string) => void
-}) {
-  return (
-    <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 scrollbar-none">
-      {TABS.map(tab => {
-        const isActive = tab.id === active
-        const meta = tab.id !== 'all' ? CATEGORY_META[tab.id as ProductCategory] : null
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onChange(tab.id)}
-            className="shrink-0 text-xs font-semibold px-4 py-2 rounded-full transition-all"
-            style={{
-              background: isActive
-                ? (meta ? meta.primaryColor : 'linear-gradient(135deg, #f43f75, #e11d5a)')
-                : 'rgba(255,255,255,0.8)',
-              color: isActive ? '#fff' : '#64748b',
-              boxShadow: isActive ? `0 2px 12px ${meta ? meta.primaryColor + '55' : 'rgba(244,63,117,0.35)'}` : 'none',
-              border: isActive ? 'none' : '1px solid rgba(100,116,139,0.12)',
-            }}>
-            {tab.label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 // ── ProductCard ────────────────────────────────────────────────────────────
 
 function ProductCard({ product, onTap }: { product: ShopProduct; onTap: () => void }) {
@@ -757,6 +733,11 @@ function ProductCard({ product, onTap }: { product: ShopProduct; onTap: () => vo
           style={{ background: 'rgba(255,255,255,0.88)', color: catMeta.primaryColor }}>
           {product.brand}
         </span>
+        {product.originalPrice && product.originalPrice > product.price && (
+          <span className="absolute top-3 right-3 text-[10px] font-black px-1.5 py-0.5 rounded-full text-white" style={{ background: '#e11d48' }}>
+            {Math.round((1 - product.price / product.originalPrice) * 100)}%
+          </span>
+        )}
       </div>
 
       {/* info */}
@@ -778,11 +759,139 @@ function ProductCard({ product, onTap }: { product: ShopProduct; onTap: () => vo
   )
 }
 
+// ── 광고 배너 ─────────────────────────────────────────────────────────────
+
+function AdCarousel({ ads, onGo }: { ads: ShopAd[]; onGo: (ad: ShopAd) => void }) {
+  const [idx, setIdx] = useState(0)
+  const [paused, setPaused] = useState(false)
+  useEffect(() => {
+    if (paused || ads.length < 2) return
+    const t = setInterval(() => setIdx(i => (i + 1) % ads.length), 4500)
+    return () => clearInterval(t)
+  }, [paused, ads.length])
+  const touchX = useRef<number | null>(null)
+
+  return (
+    <div className="relative rounded-3xl overflow-hidden mb-4 select-none"
+      onTouchStart={e => { touchX.current = e.touches[0].clientX; setPaused(true) }}
+      onTouchEnd={e => {
+        const start = touchX.current
+        touchX.current = null
+        setPaused(false)
+        if (start === null) return
+        const dx = e.changedTouches[0].clientX - start
+        if (Math.abs(dx) > 40) setIdx(i => (i + (dx < 0 ? 1 : ads.length - 1)) % ads.length)
+      }}>
+      <div className="flex transition-transform duration-500 ease-out" style={{ transform: `translateX(-${idx * 100}%)` }}>
+        {ads.map(ad => (
+          <button key={ad.id} onClick={() => onGo(ad)}
+            className="w-full flex-shrink-0 text-left p-5 min-h-[150px] flex items-center gap-3 text-white"
+            style={{ background: ad.gradient }}>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold opacity-85">{ad.eyebrow}</p>
+              <p className="mt-1 text-[19px] font-black leading-snug whitespace-pre-line">{ad.title}</p>
+              <p className="mt-1 text-[11.5px] opacity-85">{ad.sub}</p>
+              <span className="mt-3 inline-flex items-center gap-0.5 text-[11.5px] font-bold px-3 py-1.5 rounded-full bg-white/25">
+                {ad.cta} <ChevronRight size={13} />
+              </span>
+            </div>
+            <span className="text-[64px] leading-none drop-shadow-lg flex-shrink-0">{ad.emoji}</span>
+          </button>
+        ))}
+      </div>
+      <span className="absolute top-3 right-3 text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-black/20 text-white/90">AD</span>
+      <span className="absolute bottom-3 right-4 text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-black/25 text-white">
+        {idx + 1} / {ads.length}
+      </span>
+    </div>
+  )
+}
+
+// ── 전체 메뉴 (쇼핑몰 카테고리) ──────────────────────────────────────────
+
+function CategoryMenu({ onClose, onPick, onPickConcern, onIngredient }: {
+  onClose: () => void
+  onPick: (dept: string, sub: string | null) => void
+  onPickConcern: (c: ProductCategory) => void
+  onIngredient: () => void
+}) {
+  const [active, setActive] = useState<string>(SHOP_DEPTS[0].id)
+  const dept = findDept(active)
+  const count = (sub: string) => SHOP_PRODUCTS.filter(p => productSub(p) === sub).length
+
+  return (
+    <div className="fixed inset-0 z-[60] flex" style={{ background: 'rgba(15,23,42,0.45)' }} onClick={onClose}>
+      <div className="w-full max-w-md h-full bg-white flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
+          <p className="text-[16px] font-black text-slate-800">전체 카테고리</p>
+          <button onClick={onClose} aria-label="닫기" className="p-1.5 rounded-full hover:bg-slate-100"><X size={20} className="text-slate-500" /></button>
+        </div>
+        <div className="flex-1 flex min-h-0">
+          <div className="w-[112px] flex-shrink-0 bg-slate-50 overflow-y-auto">
+            {[...SHOP_DEPTS.map(d => ({ id: d.id, label: d.label, emoji: d.emoji })), { id: 'concern', label: '고민별', emoji: '💗' }].map(d => {
+              const on = d.id === active
+              return (
+                <button key={d.id} onClick={() => setActive(d.id)}
+                  className="w-full flex flex-col items-center gap-1 py-3.5 text-[12px] font-bold border-l-[3px] transition-colors"
+                  style={on ? { background: '#fff', color: '#e11d48', borderColor: '#e11d48' } : { color: '#64748b', borderColor: 'transparent' }}>
+                  <span className="text-[20px] leading-none">{d.emoji}</span>{d.label}
+                </button>
+              )
+            })}
+          </div>
+          <div className="flex-1 overflow-y-auto p-4">
+            {dept ? (
+              <>
+                <button onClick={() => onPick(dept.id, null)}
+                  className="w-full flex items-center justify-between mb-3 px-3.5 py-3 rounded-2xl text-[13.5px] font-black"
+                  style={{ background: dept.bg, color: dept.color }}>
+                  {dept.emoji} {dept.label} 전체 보기 <ChevronRight size={16} />
+                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  {dept.subs.map(s => (
+                    <button key={s.id} onClick={() => onPick(dept.id, s.id)}
+                      className="flex flex-col items-center gap-1.5 py-4 rounded-2xl border border-slate-100 hover:border-rose-200 active:scale-95 transition-all">
+                      <span className="w-12 h-12 rounded-full flex items-center justify-center text-[24px]" style={{ background: dept.bg }}>{s.emoji}</span>
+                      <span className="text-[12.5px] font-bold text-slate-700">{s.label}</span>
+                      <span className="text-[10.5px] text-slate-400">{count(s.id)}개</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11.5px] text-slate-400 mb-1">내 몸 고민에 맞춰 골라 봐요</p>
+                {(Object.keys(CATEGORY_META) as ProductCategory[]).map(c => (
+                  <button key={c} onClick={() => onPickConcern(c)}
+                    className="w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-[13px] font-bold"
+                    style={{ background: CATEGORY_META[c].bgColor, color: CATEGORY_META[c].primaryColor }}>
+                    {CATEGORY_META[c].label}
+                    <span className="text-[11px] font-semibold opacity-70">{SHOP_PRODUCTS.filter(p => p.category === c).length}개 <ChevronRight size={13} className="inline" /></span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <button onClick={onIngredient}
+          className="flex items-center gap-2 px-4 py-3.5 border-t border-slate-100 text-[12.5px] font-bold text-slate-600">
+          <ShieldCheck size={16} className="text-rose-400" /> 안심 성분 검색 — 내 제품 성분 확인하기
+          <ChevronRight size={14} className="ml-auto text-slate-300" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function ShopPage() {
   const [selected, setSelected] = useState<ShopProduct | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('all')
+  // 쇼핑몰 분류: 큰 분류 · 세부 분류 · 고민별
+  const [deptId, setDeptId] = useState<string | null>(null)
+  const [subId, setSubId] = useState<string | null>(null)
+  const [concern, setConcern] = useState<ProductCategory | null>(null)
+  const [showMenu, setShowMenu] = useState(false)
   const [query, setQuery] = useState('')
   const [showIngredientSearch, setShowIngredientSearch] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -795,30 +904,54 @@ export default function ShopPage() {
       const product = SHOP_PRODUCTS.find(p => p.id === id)
       if (product) {
         setSelected(product)
-        setActiveTab(product.category)
+        setDeptId(productDept(product)?.id ?? null)
       }
     } catch {}
   }, [])
 
+  function pick(dept: string | null, sub: string | null = null) {
+    setDeptId(dept); setSubId(sub); setConcern(null); setShowMenu(false); setQuery('')
+    window.scrollTo(0, 0)
+  }
+  function pickConcern(c: ProductCategory | null) {
+    setConcern(c); setDeptId(null); setSubId(null); setShowMenu(false); setQuery('')
+    window.scrollTo(0, 0)
+  }
+  function goAd(ad: ShopAd) {
+    if ('product' in ad.to) {
+      const p = SHOP_PRODUCTS.find(x => x.id === (ad.to as { product: string }).product)
+      if (p) setSelected(p)
+    } else pick(ad.to.dept, ad.to.sub ?? null)
+  }
+
+  const dept = findDept(deptId)
+  const sub = dept?.subs.find(s => s.id === subId) ?? null
+  const isHome = !dept && !concern
+
   const q = query.toLowerCase().trim()
-  const byCategory = activeTab === 'all'
-    ? SHOP_PRODUCTS
-    : SHOP_PRODUCTS.filter(p => p.category === activeTab)
+  const byCategory = SHOP_PRODUCTS
+    .filter(p => !concern || p.category === concern)
+    .filter(p => !dept || productDept(p)?.id === dept.id)
+    .filter(p => !sub || productSub(p) === sub.id)
   const visible = q === ''
     ? byCategory
-    : byCategory.filter(p =>
+    : SHOP_PRODUCTS.filter(p =>
         p.name.toLowerCase().includes(q) ||
         p.brand.toLowerCase().includes(q) ||
         p.tagline.toLowerCase().includes(q) ||
         p.ludiaTags.some(t => t.toLowerCase().replace(/_/g, ' ').includes(q))
       )
+  const title = sub ? sub.label : dept ? dept.label : concern ? CATEGORY_META[concern].label : '전체 상품'
 
   return (
     <div className="min-h-screen p-4 sm:p-6">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-slate-800">루디아샵</h1>
-          <p className="text-sm text-slate-400 mt-0.5">진단 결과 기반으로 큐레이션된 제품</p>
+      <div className="mb-3 flex items-center gap-2">
+        <button onClick={() => setShowMenu(true)} aria-label="전체 카테고리"
+          className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/80 border border-rose-100 shadow-sm active:scale-95 shrink-0">
+          <Menu className="w-5 h-5 text-slate-700" />
+        </button>
+        <div className="flex-1 min-w-0">
+          <h1 className="font-display text-2xl font-semibold text-slate-800 leading-tight">루디아샵</h1>
         </div>
         <Link href="/settings" aria-label="설정"
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-semibold text-slate-500 bg-white/80 border border-rose-100 shadow-sm transition-all hover:text-rose-500 hover:border-rose-200 active:scale-95 shrink-0">
@@ -826,32 +959,6 @@ export default function ShopPage() {
           설정
         </Link>
       </div>
-
-      {/* Ingredient Safety Search Banner */}
-      <button
-        onClick={() => setShowIngredientSearch(true)}
-        className="w-full flex items-center gap-3.5 p-4 rounded-2xl mb-4 text-left transition-all active:scale-[0.98]"
-        style={{
-          background: 'linear-gradient(135deg, rgba(244,63,117,0.07), rgba(99,102,241,0.09))',
-          border: '1.5px solid rgba(244,63,117,0.18)',
-          boxShadow: '0 2px 16px rgba(244,63,117,0.07)',
-        }}>
-        <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0"
-          style={{ background: 'linear-gradient(135deg,#f43f75,#a855f7)' }}>
-          <ShieldCheck size={22} color="#fff" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] font-black text-slate-800">안심 성분 검색</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            내 제품의 내분비계 교란 물질 · 경피독 즉시 확인
-          </p>
-        </div>
-        <div className="flex items-center gap-0.5 shrink-0">
-          <span className="text-[11px] font-bold" style={{ color: '#f43f75' }}>분석하기</span>
-          <span className="text-[11px]" style={{ color: '#f43f75' }}>→</span>
-        </div>
-      </button>
-
       {/* search bar */}
       <div className="relative mb-4">
         <Search size={15} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" />
@@ -880,26 +987,98 @@ export default function ShopPage() {
         )}
       </div>
 
-      <CategoryTabs active={activeTab} onChange={setActiveTab} />
+      {q === '' && isHome && (
+        <>
+          <AdCarousel ads={SHOP_ADS} onGo={goAd} />
+          <div className="grid grid-cols-4 gap-y-3 gap-x-2 mb-5">
+            {SHOP_DEPTS.map(d => (
+              <button key={d.id} onClick={() => pick(d.id)} className="flex flex-col items-center gap-1 active:scale-95 transition-transform">
+                <span className="w-14 h-14 rounded-2xl flex items-center justify-center text-[26px] shadow-sm" style={{ background: d.bg }}>{d.emoji}</span>
+                <span className="text-[11.5px] font-bold text-slate-600">{d.label}</span>
+              </button>
+            ))}
+            <button onClick={() => pickConcern('rhythm_balance')} className="flex flex-col items-center gap-1 active:scale-95 transition-transform">
+              <span className="w-14 h-14 rounded-2xl flex items-center justify-center text-[26px] shadow-sm" style={{ background: '#fff1f5' }}>💗</span>
+              <span className="text-[11.5px] font-bold text-slate-600">고민별</span>
+            </button>
+            <button onClick={() => setShowMenu(true)} className="flex flex-col items-center gap-1 active:scale-95 transition-transform">
+              <span className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm bg-slate-100"><Menu className="w-6 h-6 text-slate-500" /></span>
+              <span className="text-[11.5px] font-bold text-slate-600">전체 메뉴</span>
+            </button>
+          </div>
+        </>
+      )}
 
-      {/* category subtitle / search result count */}
-      <div className="mt-3 mb-1 h-4">
-        {q !== '' ? (
-          <p className="text-xs font-medium" style={{ color: '#f43f75' }}>
-            검색 결과 {visible.length}개
-          </p>
-        ) : activeTab !== 'all' ? (
-          <p className="text-xs font-medium"
-            style={{ color: CATEGORY_META[activeTab as ProductCategory].primaryColor }}>
-            {CATEGORY_META[activeTab as ProductCategory].subtitle}
-          </p>
-        ) : null}
+      {q === '' && !isHome && (
+        <div className="mb-2">
+          <div className="flex items-center gap-1 text-[12px] font-semibold text-slate-400 mb-2">
+            <button onClick={() => sub ? pick(dept!.id) : pick(null)} aria-label="뒤로" className="p-1 -ml-1 rounded-full hover:bg-white">
+              <ChevronLeft size={18} className="text-slate-600" />
+            </button>
+            <button onClick={() => pick(null)}>홈</button>
+            <ChevronRight size={12} />
+            {dept ? (
+              <>
+                <button onClick={() => pick(dept.id)} className={sub ? '' : 'text-slate-800 font-black text-[15px]'}>{dept.emoji} {dept.label}</button>
+                {sub && <><ChevronRight size={12} /><span className="text-slate-800 font-black text-[15px]">{sub.label}</span></>}
+              </>
+            ) : concern && <span className="text-slate-800 font-black text-[15px]">💗 고민별</span>}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-4 px-4 scrollbar-hide">
+            {dept ? (
+              [{ id: null as string | null, label: '전체', emoji: '' }, ...dept.subs].map(s => {
+                const on = s.id === subId
+                return (
+                  <button key={s.id ?? 'all'} onClick={() => pick(dept.id, s.id)}
+                    className="shrink-0 text-xs font-semibold px-3.5 py-2 rounded-full transition-all"
+                    style={on ? { background: dept.color, color: '#fff' } : { background: 'rgba(255,255,255,0.85)', color: '#64748b', border: '1px solid rgba(100,116,139,0.12)' }}>
+                    {s.emoji && <span className="mr-0.5">{s.emoji}</span>}{s.label}
+                  </button>
+                )
+              })
+            ) : (
+              (Object.keys(CATEGORY_META) as ProductCategory[]).map(c => {
+                const on = c === concern
+                const m = CATEGORY_META[c]
+                return (
+                  <button key={c} onClick={() => pickConcern(c)}
+                    className="shrink-0 text-xs font-semibold px-3.5 py-2 rounded-full transition-all"
+                    style={on ? { background: m.primaryColor, color: '#fff' } : { background: 'rgba(255,255,255,0.85)', color: '#64748b', border: '1px solid rgba(100,116,139,0.12)' }}>
+                    {m.label}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="mt-3 mb-1 flex items-baseline justify-between">
+        <p className="text-[15px] font-black text-slate-800">{q !== '' ? `'${query.trim()}' 검색 결과` : title}</p>
+        <p className="text-xs font-medium text-slate-400">{visible.length}개</p>
       </div>
 
       {visible.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 mt-2">
-          {visible.map(p => (
-            <ProductCard key={p.id} product={p} onTap={() => setSelected(p)} />
+          {visible.map((p, i) => (
+            <Fragment key={p.id}>
+              <ProductCard product={p} onTap={() => setSelected(p)} />
+              {/* 홈 목록 중간 광고 */}
+              {q === '' && isHome && i === 5 && (
+                <button onClick={() => goAd(SHOP_MID_AD)}
+                  className="col-span-2 relative flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left text-white"
+                  style={{ background: SHOP_MID_AD.gradient }}>
+                  <span className="text-[34px] leading-none">{SHOP_MID_AD.emoji}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[10.5px] font-bold opacity-85">{SHOP_MID_AD.eyebrow}</span>
+                    <span className="block text-[14.5px] font-black">{SHOP_MID_AD.title}</span>
+                    <span className="block text-[11px] opacity-85 truncate">{SHOP_MID_AD.sub}</span>
+                  </span>
+                  <ChevronRight size={18} />
+                  <span className="absolute top-2 right-2.5 text-[8.5px] font-bold px-1 rounded bg-black/20">AD</span>
+                </button>
+              )}
+            </Fragment>
           ))}
         </div>
       ) : (
@@ -917,6 +1096,13 @@ export default function ShopPage() {
             검색 초기화
           </button>
         </div>
+      )}
+
+      {showMenu && (
+        <CategoryMenu onClose={() => setShowMenu(false)}
+          onPick={(d, s) => pick(d, s)}
+          onPickConcern={c => pickConcern(c)}
+          onIngredient={() => { setShowMenu(false); setShowIngredientSearch(true) }} />
       )}
 
       {selected && (
