@@ -102,12 +102,12 @@ function TypeMatrix({ r }: { r: PsycheResult }) {
             const ty = PSYCHE_TYPES[t][s]
             const mine = r.temperament === t && r.lean === s
             return (
-              <div key={s} className="px-2 py-2.5 text-center relative"
+              <Link key={s} href={`/diagnostic/psyche/types?t=${t}_${s}`} className="block px-2 py-2.5 text-center relative hover:bg-slate-50 active:scale-[0.97] transition-transform"
                 style={mine ? { background: s === 'calm' ? '#ccfbf1' : '#ffe4e6', boxShadow: `inset 0 0 0 2px ${s === 'calm' ? CALM : TENSE}` } : undefined}>
                 <p className="text-[18px] leading-none">{ty.emoji}</p>
                 <p className={`mt-1 text-[11px] ${mine ? 'font-black text-slate-900' : 'font-semibold text-slate-600'}`}>{ty.name}</p>
                 {mine && <span className="absolute top-1 right-1 text-[9px] font-black px-1 rounded text-white" style={{ background: s === 'calm' ? CALM : TENSE }}>나</span>}
-              </div>
+              </Link>
             )
           })}
         </div>
@@ -188,6 +188,10 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
             <ul className="mt-1 space-y-1">
               {r.type.care.map(c => <li key={c} className="text-[12px] text-slate-700 flex gap-1.5"><span>✔</span>{c}</li>)}
             </ul>
+            <Link href={`/diagnostic/psyche/types?t=${r.temperament}_${r.lean}`}
+              className="mt-3 flex items-center justify-center gap-1 py-2.5 rounded-xl bg-white text-[12.5px] font-bold" style={{ color: tm.color }}>
+              내 타입 자세히 — 어울리는 운동·식습관 <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
         )}
         {!r.hasIris && (
@@ -222,8 +226,11 @@ export function PsycheDetail({ data, sessions = [], scanHref }: { data: Multimod
       {/* 3. 8가지 타입 */}
       <div className="glass-card p-5">
         <h3 className="text-sm font-semibold text-slate-700">8가지 홍채 심리 타입</h3>
-        <p className="text-[11px] text-slate-400 mb-3">타고난 기질(4) × 지금 상태(안정·긴장) — 기질은 잘 안 변하지만 상태는 관리로 움직여요</p>
+        <p className="text-[11px] text-slate-400 mb-3">타고난 기질(4) × 지금 상태(안정·긴장) — 타입을 누르면 자세한 설명·운동·식습관을 볼 수 있어요</p>
         <TypeMatrix r={r} />
+        <Link href="/diagnostic/psyche/types" className="mt-3 flex items-center justify-center gap-1 text-[12px] font-bold text-violet-600">
+          8가지 타입 모두 자세히 보기 <ChevronRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
       {/* 4. 타고난 기질 */}
